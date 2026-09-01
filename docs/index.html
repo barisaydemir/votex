@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOTEX 0.3.11 — Dokümantasyon</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+  :root { --bg:#080c14; --s:#0e1520; --b:#1e2d3d; --a:#3edc8c; --bl:#4a9eff; --t:#e8f0f4; --t2:#8ea8b8; --t3:#5a7080; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--t); min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:60px 20px; }
+  h1 { font-size:36px; font-weight:900; background:linear-gradient(135deg,var(--a),var(--bl)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:8px; }
+  .sub { color:var(--t3); font-size:14px; margin-bottom:40px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; max-width:900px; width:100%; }
+  .card { background:var(--s); border:1px solid var(--b); border-radius:12px; padding:24px; text-decoration:none; color:var(--t); transition:all 0.2s; }
+  .card:hover { border-color:var(--a); transform:translateY(-2px); box-shadow:0 8px 24px rgba(62,220,140,0.1); }
+  .card h3 { font-size:16px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .card p { font-size:13px; color:var(--t2); line-height:1.5; }
+  .card .badge { display:inline-block; font-size:10px; font-weight:600; padding:2px 8px; border-radius:4px; margin-top:8px; }
+  .badge-html { background:rgba(74,158,255,0.12); color:var(--bl); }
+  .badge-md { background:rgba(62,220,140,0.12); color:var(--a); }
+  .footer { margin-top:60px; font-size:11px; color:var(--t3); }
+</style>
+</head>
+<body>
+<h1>VOTEX 0.3.11</h1>
+<p class="sub">Dokümantasyon ve Dokümanlar</p>
+<div class="grid">
+  <a class="card" href="CHANGELOG.md">
+    <h3>📝 CHANGELOG</h3>
+    <p>Tüm sürümlerin değişiklik kaydı — 0.1.71'den bugüne.</p>
+    <span class="badge badge-md">Markdown</span>
+  </a>
+  <a class="card" href="RELEASE_NOTES_v0.1.76.md">
+    <h3>📋 Sürüm Notları (0.1.76)</h3>
+    <p>0.1.76 sürümündeki düzeltmeler ve yenilikler.</p>
+    <span class="badge badge-md">Markdown</span>
+  </a>
+  <a class="card" href="release_notes.html">
+    <h3>📋 Sürüm Notları (0.1.74)</h3>
+    <p>v0.1.74'teki tüm yeni özellikler, performans iyileştirmeleri ve hata düzeltmeleri.</p>
+    <span class="badge badge-html">HTML</span>
+  </a>
+  <a class="card" href="brochure.html">
+    <h3>📖 Özellik Broşürü</h3>
+    <p>5 sayfalık görsel broşür — tüm özellikler, kısayollar, teknik özellikler.</p>
+    <span class="badge badge-html">HTML · PDF'e dönüştürülebilir</span>
+  </a>
+  <a class="card" href="architecture.html">
+    <h3>🏗️ Mimari Diyagramı</h3>
+    <p>Interaktif mimari harita — düğümlere tıklayarak detay bilgi alın.</p>
+    <span class="badge badge-html">HTML · İnteraktif</span>
+  </a>
+  <a class="card" href="TECHNICAL_SUMMARY.md">
+    <h3>🔧 Teknik Özet</h3>
+    <p>Tüm modüller, API'ler, veri yapıları ve akışlar — geliştiriciler için.</p>
+    <span class="badge badge-md">Markdown</span>
+  </a>
+  <a class="card" href="BENCHMARK_REPORT.md">
+    <h3>📊 Performans Raporu</h3>
+    <p>Canlı benchmark sonuçları — FPS, build time, efekt maliyetleri.</p>
+    <span class="badge badge-md">Markdown</span>
+  </a>
+</div>
+<div class="footer">VOTEX 0.3.11 · Digital Future Tech © 2026</div>
+</body>
+</html>

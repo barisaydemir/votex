@@ -1,0 +1,1315 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Votex — Tactical Command</title>
+    <link rel="icon" type="image/png" href="/votex-logo.png" />
+    <style>
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background:
+          radial-gradient(900px 500px at 50% -10%, rgba(58, 168, 255, 0.12), transparent 55%),
+          #070a0e;
+        color: #e6edf2;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        transition: opacity 0.35s ease, visibility 0.35s ease;
+      }
+      #boot-splash.is-done {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #boot-splash .boot-brand {
+        display: block;
+        width: min(220px, 48vw);
+        height: auto;
+        border-radius: 10px;
+        box-shadow: 0 0 40px rgba(0, 200, 255, 0.18);
+      }
+      #boot-splash .boot-sub {
+        margin-top: 0.5rem;
+        font-size: 0.78rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #7a8a96;
+      }
+      #boot-splash .boot-msg {
+        margin-top: 1.75rem;
+        font-size: 0.95rem;
+        color: #bfdbfe;
+      }
+      #boot-splash .boot-bar {
+        margin-top: 1.1rem;
+        width: 200px;
+        height: 3px;
+        background: #1e293b;
+        overflow: hidden;
+      }
+      #boot-splash .boot-bar > i {
+        display: block;
+        height: 100%;
+        width: 40%;
+        background: #3edc8c;
+        animation: boot-slide 1.1s ease-in-out infinite;
+      }
+      #boot-splash .boot-hint {
+        margin-top: 1.25rem;
+        font-size: 0.72rem;
+        color: #64748b;
+      }
+      #boot-splash .boot-maker {
+        position: absolute;
+        bottom: 1.1rem;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+        color: #7a8a96;
+        font-family: Consolas, "Cascadia Mono", monospace;
+      }
+      @keyframes boot-slide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(280%); }
+      }
+    </style>
+    <link rel="stylesheet" href="/ui/styles.css" />
+  </head>
+  <body>
+    <div id="boot-splash" aria-live="polite" aria-busy="true">
+      <img class="boot-brand" src="/votex-logo.png" alt="VOTEX" width="220" height="220" />
+      <div class="boot-sub">Tactical Geophysics · Command Center</div>
+      <div class="boot-msg" id="boot-splash-msg" data-i18n="boot.msg">Yükleniyor — lütfen bekleyin</div>
+      <div class="boot-bar" aria-hidden="true"><i></i></div>
+      <div class="boot-hint" data-i18n="boot.hint">Tekrar tıklamayın · birkaç saniye sürebilir</div>
+      <div class="boot-maker">Barış Aydemir · Digital Future Tech</div>
+    </div>
+
+    <div id="license-gate" class="license-gate" hidden aria-modal="true" role="dialog" aria-labelledby="license-gate-title">
+      <div class="license-gate-panel">
+        <img class="license-gate-logo" src="/votex-logo.png" alt="VOTEX" width="96" height="96" />
+        <h1 id="license-gate-title" data-i18n="license.title">Lisans</h1>
+        <p class="license-gate-sub" id="license-gate-sub" data-i18n="license.subLoading">Durum yükleniyor…</p>
+        <dl class="license-gate-meta">
+          <div>
+            <dt data-i18n="license.plan">Plan</dt>
+            <dd id="license-gate-plan">—</dd>
+          </div>
+          <div>
+            <dt data-i18n="license.remaining">Kalan</dt>
+            <dd id="license-gate-days">—</dd>
+          </div>
+          <div>
+            <dt data-i18n="license.deviceId">Cihaz ID</dt>
+            <dd id="license-gate-hwid" class="mono">—</dd>
+          </div>
+        </dl>
+        <button type="button" id="license-gate-copy-hwid" class="mil" data-i18n="license.copyHwid">Makine kodunu kopyala</button>
+        <p class="license-gate-hint" id="license-gate-request-hint" data-i18n-html="license.requestHint">
+          1) Makine kodunu kopyalayıp Digital Future Tech’e gönderin.<br />
+          2) Size verilen lisans kodunu aşağı yapıştırıp Aktifleştir’e basın.
+        </p>
+        <label class="license-gate-label">
+          <span data-i18n="license.codeLabel">Lisans / kredi kodu</span>
+          <input type="text" id="license-gate-token" spellcheck="false" autocomplete="off" data-i18n-placeholder="license.placeholder" placeholder="Üreticiden aldığınız kod" />
+        </label>
+        <p class="license-gate-msg" id="license-gate-msg" hidden></p>
+        <div class="license-gate-actions">
+          <button type="button" id="license-gate-activate" class="mil primary" data-i18n="license.activate">Aktifleştir</button>
+          <button type="button" id="license-gate-continue" class="mil accent" disabled data-i18n="license.continue">Devam</button>
+        </div>
+        <p class="license-gate-hint" data-i18n="license.footer">Lisans üretici programı müşteriye kurulmaz — yalnızca makine kodu + aldığınız aktivasyon kodu yeter.</p>
+        <p class="license-gate-stamp">Barış Aydemir · Digital Future Tech</p>
+      </div>
+    </div>
+
+    <div class="app hud">
+      <header class="top">
+        <div class="brand">
+          <img class="brand-logo" src="/votex-logo.png" alt="VOTEX" width="44" height="44" />
+          <div class="brand-text">
+            <span class="brand-mark">VOTEX</span>
+            <span class="brand-sub">TACTICAL GEOPHYSICS · COMMAND CENTER</span>
+            <span class="brand-maker">Barış Aydemir · Digital Future Tech</span>
+          </div>
+        </div>
+        <div class="status-wrap">
+          <div class="lang-switch" role="group" data-i18n-aria="lang.label">
+            <button type="button" class="lang-btn active" data-lang="tr" id="btn-lang-tr">TR</button>
+            <button type="button" class="lang-btn" data-lang="en" id="btn-lang-en">EN</button>
+          </div>
+          <div style="display:flex;gap:2px;margin-left:0.4rem;">
+            <button type="button" id="btn-undo" class="mil compact" disabled title="Geri Al (Ctrl+Z)" style="font-size:0.7rem;padding:0.15rem 0.4rem;opacity:0.4;">↩</button>
+            <button type="button" id="btn-redo" class="mil compact" disabled title="İleri Al (Ctrl+Y)" style="font-size:0.7rem;padding:0.15rem 0.4rem;opacity:0.4;">↪</button>
+          </div>
+          <button type="button" class="theme-toggle" id="theme-toggle" title="Tema Değiştir">
+            <span class="theme-icon">☀️</span>
+            <span class="theme-label">Aydınlık</span>
+          </button>
+          <div class="license-badge" id="license-badge" data-state="wait" data-i18n-title="license.titleBadge">Lisans…</div>
+          <div class="dta-link" id="dta-link" data-state="wait" data-i18n-title="header.dtaTitle">
+            <span class="dta-dot" aria-hidden="true"></span>
+            <span class="dta-label" id="dta-link-label">DTA…</span>
+          </div>
+          <div class="dta-link vpe-link" id="vpe-link" data-state="wait" data-i18n-title="header.vpeTitle">
+            <span class="dta-dot" aria-hidden="true"></span>
+            <span class="dta-label" id="vpe-link-label">VPE…</span>
+          </div>
+          <button type="button" class="update-badge" id="update-badge" hidden data-i18n="header.update" data-i18n-title="header.updateTitle">Güncelleme</button>
+          <span class="app-ver" id="app-version-label" data-i18n-title="header.verTitle">—</span>
+          <button type="button" class="mil dta-launch" id="btn-launch-dta" data-i18n="header.dtaOpen" data-i18n-title="header.dtaOpenTitle">
+            DTA Aç
+          </button>
+          <button type="button" class="mil dta-launch" id="btn-launch-vpe" data-i18n="header.vpeOpen" data-i18n-title="header.vpeOpenTitle">
+            VPE Aç
+          </button>
+          <button type="button" class="mil dta-interpret" id="btn-interpret-votex" data-i18n="header.interpret" data-i18n-title="header.interpretTitle">
+            Ekranı yorumla
+          </button>
+          <span class="status-dot" aria-hidden="true"></span>
+          <div class="status" id="status">Hazır</div>
+        </div>
+      </header>
+
+      <!-- Modül seçici (sol altta; heartbeat sol köşede küçük) -->
+      <div class="subbar">
+        <div class="mod-rail" id="votex-ray" role="tablist">
+          <button type="button" class="vr-btn active" data-mod="image" data-i18n-title="rail.image" title="Görüntü (DTA)">🖥 <span>GÖRÜNTÜ</span></button>
+          <button type="button" class="vr-btn" data-mod="csv" data-i18n-title="rail.csv" title="CSV / Excel" style="display:none;">📊 <span>CSV</span></button>
+          <button type="button" class="vr-btn" data-mod="hybrid" data-i18n-title="rail.hybrid" title="Hibrit analiz" style="display:none;">🔀 <span>HİBRİT</span></button>
+          <button type="button" class="vr-btn" data-mod="sys" data-i18n-title="rail.sys" title="Sistem (lisans, DTA/VPE, arşiv)">⚙ <span>SİSTEM</span></button>
+        </div>
+        <div class="heartbeat-box" id="heartbeat-box" title="Sistem nabzı">
+          <span class="hb-dot" aria-hidden="true"></span>
+          <canvas id="heartbeat-canvas" width="96" height="26" aria-hidden="true"></canvas>
+          <span class="hb-label" id="heartbeat-label">HAZIR</span>
+        </div>
+      </div>
+
+      <main class="layout">
+        <!-- Sol: Kontrol + telemetri + 2D -->
+        <section class="panel panel-ops glass" id="panel-ops" data-mod="image">
+          <div id="ops-core-a" class="ops-core" data-mod="image">
+          <div class="panel-head">
+            <span class="panel-tag">OPS</span>
+            <h2 data-i18n="ops.title">Kontrol</h2>
+          </div>
+
+          <!-- 🗺 2D HARİТА — Üstte compact -->
+          <div class="tree-preview-compact" id="preview-wrap-compact" style="display:none;margin-bottom:0.4rem;">
+            <img id="preview-compact" alt="harita önizleme" style="width:100%;max-height:320px;object-fit:contain;" />
+            <canvas id="preview-marks-compact" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
+          </div>
+
+          <p class="hint" data-i18n-html="ops.hint">
+            Proton ELIC haritası. <strong>Dik</strong> veya <strong>yan</strong> çekim seçin,
+            ardından analizi başlatın.
+          </p>
+
+          <div class="dropzone" id="dropzone">
+            <p class="drop-title" data-i18n="ops.dropTitle">HARİTA KAYNAĞI</p>
+            <p class="drop-sub" id="file-name">Henüz dosya yok</p>
+            <div class="btn-row">
+              <button type="button" id="btn-browse" class="mil primary" data-i18n="ops.browse">Dosya Seç</button>
+              <button type="button" id="btn-build-3d" class="mil accent" disabled data-i18n="ops.analyze">
+                Analizi Başlat
+              </button>
+            </div>
+            <!-- 🔍 ANALİZ ARAÇLARI — Tree Accordion -->
+            <details class="tree-section">
+              <summary>
+                <span class="tree-icon">🔍</span>
+                <span class="tree-label">ANALİZ ARAÇLARI</span>
+              </summary>
+              <div class="tree-body">
+                <details class="tree-section">
+                  <summary>
+                    <span class="tree-icon">🏗️</span>
+                    <span class="tree-label">Derin Yapı Analiz</span>
+                    <span class="tree-badge" id="deep-scan-badge" style="display:none;">Aktif</span>
+                  </summary>
+                  <div class="tree-body">
+                    <p class="hint compact" id="deep-scan-hint" data-i18n="ops.deepHint">
+                      Analizden sonra: kalan/silinen yapıları daha derin tarar. Geri alınabilir.
+                    </p>
+                    <div class="btn-row">
+                      <button type="button" id="btn-deep-scan" class="mil" disabled data-i18n="ops.deep">Derin Yapı Analiz</button>
+                      <button type="button" id="btn-deep-undo" class="mil" hidden data-i18n="ops.undo">Geri Al</button>
+                    </div>
+                  </div>
+                </details>
+                <details class="tree-section">
+                  <summary>
+                    <span class="tree-icon">📐</span>
+                    <span class="tree-label">Kademeli Derinlik</span>
+                    <span class="tree-badge" id="staged-badge" style="display:none;">Aktif</span>
+                  </summary>
+                  <div class="tree-body">
+                    <p class="hint compact" id="staged-scan-hint" data-i18n="ops.stagedHint">
+                      Zayıf/derin sinyalleri fizik (1/r) ile daha derin katmanlara koyar; olası derin yapılar hayalet çizilir.
+                    </p>
+                    <div class="btn-row">
+                      <button type="button" id="btn-staged-scan" class="mil" disabled data-i18n="ops.staged">Kademeli Derinlik</button>
+                      <button type="button" id="btn-staged-undo" class="mil" hidden data-i18n="ops.undo">Geri Al</button>
+                    </div>
+                  </div>
+                </details>
+                <details class="tree-section">
+                  <summary>
+                    <span class="tree-icon">💧</span>
+                    <span class="tree-label">Su Tespiti (Mavi)</span>
+                    <span class="tree-badge" id="water-badge" style="display:none;">Aktif</span>
+                  </summary>
+                  <div class="tree-body">
+                    <p class="hint compact" id="water-scan-hint" data-i18n="ops.waterHint">
+                      Mavi/lacivert/mor negatif + şekil: damar veya dağınık leke = su adayı; kompakt kutu = yapı boşluğu.
+                    </p>
+                    <div class="btn-row">
+                      <button type="button" id="btn-water-scan" class="mil" disabled data-i18n="ops.water">Su Tespiti (mavi)</button>
+                      <button type="button" id="btn-water-undo" class="mil" hidden data-i18n="ops.undo">Geri Al</button>
+                    </div>
+                  </div>
+                </details>
+                <details class="tree-section">
+                  <summary>
+                    <span class="tree-icon">✏️</span>
+                    <span class="tree-label">Serbest Çizim</span>
+                  </summary>
+                  <div class="tree-body">
+                    <p class="hint compact" id="shape-scan-hint" data-i18n="ops.shapeHint">
+                      Serbest çizim: mavi/camgöbeği/mor havuz, sarı–turuncu ara ton, kırmızı form, beyaz duvar.
+                    </p>
+                    <div class="btn-row">
+                      <button type="button" id="btn-shape-scan" class="mil" disabled data-i18n="ops.shape">Serbest Çizim</button>
+                      <button type="button" id="btn-shape-pool" class="mil" hidden data-i18n="ops.poolDrain">Havuzu boşalt</button>
+                      <button type="button" id="btn-shape-undo" class="mil" hidden data-i18n="ops.undo">Geri Al</button>
+                    </div>
+                  </div>
+                </details>
+                <details class="tree-section">
+                  <summary>
+                    <span class="tree-icon">🔬</span>
+                    <span class="tree-label">Çift Analiz Paketi</span>
+                    <span class="tree-badge" id="dual-pack-badge" style="display:none;">Aktif</span>
+                  </summary>
+                  <div class="tree-body">
+                    <p class="hint compact">
+                      Image ve CSV analizlerini tamamlayıcı şekilde birleştirir. Her modül bağımsız açılıp kapatılabilir.
+                    </p>
+                    <div style="padding:0.3rem 0;">
+                      <label class="row" style="gap:0.4rem;margin:0.2rem 0;cursor:pointer;">
+                        <input type="checkbox" id="dual-toggle" />
+                        <span>🔬 Tüm Paketi Aktifleştir</span>
+                      </label>
+                      <div id="dual-module-list" style="margin-top:0.3rem;padding-left:1rem;display:none;">
+                        <label class="row" style="gap:0.4rem;margin:0.15rem 0;cursor:pointer;font-size:0.85em;">
+                          <input type="checkbox" id="dual-mod-feedback" checked />
+                          <span>🔄 Geri Besleme Döngüsü</span>
+                        </label>
+                        <label class="row" style="gap:0.4rem;margin:0.15rem 0;cursor:pointer;font-size:0.85em;">
+                          <input type="checkbox" id="dual-mod-consensus" checked />
+                          <span>🟣 Konsensüs Görselleştirme</span>
+                        </label>
+                        <label class="row" style="gap:0.4rem;margin:0.15rem 0;cursor:pointer;font-size:0.85em;">
+                          <input type="checkbox" id="dual-mod-confidence" checked />
+                          <span>📊 Birleşik Güven Skoru</span>
+                        </label>
+                        <label class="row" style="gap:0.4rem;margin:0.15rem 0;cursor:pointer;font-size:0.85em;">
+                          <input type="checkbox" id="dual-mod-geometric" checked />
+                          <span>📐 Geometrik Karşılaştırma</span>
+                        </label>
+                        <label class="row" style="gap:0.4rem;margin:0.15rem 0;cursor:pointer;font-size:0.85em;">
+                          <input type="checkbox" id="dual-mod-fusion" checked />
+                          <span>🔥 Fusion Tespiti</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div id="dual-pack-report" style="margin-top:0.4rem;"></div>
+                  </div>
+                </details>
+              </div>
+            </details>
+
+            <!-- 📌 ARAÇLAR -->
+            <details class="tree-section">
+              <summary>
+                <span class="tree-icon">📌</span>
+                <span class="tree-label">ARAÇLAR</span>
+              </summary>
+              <div class="tree-body">
+                <div class="btn-row">
+                  <button type="button" id="btn-analysis-report" class="mil" data-i18n="ops.analysisReport">📊 Analiz Raporu</button>
+                  <button type="button" id="btn-export-report" class="mil" title="Profesyonel saha raporu oluştur">📋 Dışa Aktar</button>
+                </div>
+                <div class="btn-row">
+                  <button type="button" id="btn-export-png" class="mil" title="3D sahneyi PNG/JPEG olarak indir">🖼️ PNG</button>
+                  <button type="button" id="btn-export-kml" class="mil" title="Tespitleri Google Earth'te goster (KML)">🌍 KML</button>
+                  <button type="button" id="btn-route-planner" class="mil" title="3D rota planla ve mesafe ölç (R)">📍 Rota</button>
+                </div>
+                <div class="btn-row">
+                  <button type="button" id="btn-compare" class="mil" title="İki haritayı karşılaştır (C)">🔀 Karşılaştır</button>
+                  <button type="button" id="btn-annotate" class="mil" title="Harita üzerinde tıklayarak not ekle (N)">📌 Not</button>
+                </div>
+              </div>
+            </details>
+            <div id="fd-panel" class="fd-panel" hidden>
+              <div class="fd-head">
+                <span class="panel-tag">DRAW</span>
+                <span data-i18n="fd.title">Etiketler</span>
+              </div>
+              <p class="hint compact" data-i18n="fd.clickHint">
+                Listeye tıklayınca kamera yaklaşır. Analiz listesi değişmez.
+              </p>
+              <div class="fd-sub" data-i18n="fd.bands">Bulunan renkler</div>
+              <div id="fd-bands" class="fd-bands"></div>
+              <div class="fd-sub" data-i18n="fd.list">Hacimler</div>
+              <div id="fd-list" class="fd-list"></div>
+              <p class="hint compact" data-i18n="fd.experimental">
+                Deneysel — ilk analizi değiştirmez.
+              </p>
+              <div class="fd-sub" data-i18n="fd.contacts">Kontak (deneme)</div>
+              <div id="fd-ct-chips" class="fd-bands"></div>
+              <div id="fd-ct-list" class="fd-list fd-jx-list"></div>
+            </div>
+          </div>
+        </div><!-- /ops-core-a -->
+        <div id="panel-fold-zone" class="fold-zone">
+
+          <details class="dta-settings-fold" id="dta-settings-fold" data-fold="sys">
+            <summary>
+              <span class="panel-tag">LINK</span>
+              <span data-i18n="link.summary">DTA ayarları</span>
+            </summary>
+            <div class="dta-settings" id="dta-settings">
+              <label>
+                <span data-i18n="license.gateLink">Lisans / kredi kodu (DFT)</span>
+                <input type="text" id="license-token" spellcheck="false" autocomplete="off" data-i18n-placeholder="license.gatePlaceholder" placeholder="Lisans veya kredi kodu" />
+              </label>
+              <div class="btn-row">
+                <button type="button" id="btn-license-activate" class="mil primary" data-i18n="license.activate">Aktifleştir</button>
+              </div>
+              <label>
+                <span data-i18n="link.launcher">Başlatıcı (launcher.py)</span>
+                <input type="text" id="dta-launch-path" spellcheck="false" autocomplete="off" />
+              </label>
+              <label class="dta-auto-check">
+                <input type="checkbox" id="dta-auto-launch" checked />
+                <span data-i18n="link.auto">VOTEX açılınca DTA’yı başlat</span>
+              </label>
+              <div class="btn-row">
+                <button type="button" id="btn-dta-browse" class="mil" data-i18n="link.file">Dosya</button>
+                <button type="button" id="btn-dta-save" class="mil primary" data-i18n="link.save">Kaydet</button>
+                <button type="button" id="btn-dta-launch-ops" class="mil accent" data-i18n="link.start">Başlat</button>
+              </div>
+              <p class="hint compact" id="dta-path-hint" data-i18n="link.pathHint">Varsayılan: C:\surface-z\Surface-z\launcher.py</p>
+            </div>
+          </details>
+
+          <details class="dta-settings-fold" id="vpe-settings-fold" data-fold="sys">
+            <summary>
+              <span class="panel-tag">PROB</span>
+              <span data-i18n="prob.summary">Hesap motoru (VPE)</span>
+            </summary>
+            <div class="dta-settings" id="vpe-settings">
+              <p class="hint compact" data-i18n="prob.hint">Sınıf / derinlik / tünel bağı · localhost:18766</p>
+              <div class="shot-type" id="prob-profile">
+                <label class="shot-option">
+                  <input type="radio" name="prob-profile" id="prob-profile-standard" value="standard" checked />
+                  <span>
+                    <strong data-i18n="prob.standard">Standart</strong>
+                    <small data-i18n="prob.standardSub">Legacy hizalı denge</small>
+                  </span>
+                </label>
+                <label class="shot-option">
+                  <input type="radio" name="prob-profile" id="prob-profile-corridor" value="corridor" />
+                  <span>
+                    <strong data-i18n="prob.corridor">Koridor</strong>
+                    <small data-i18n="prob.corridorSub">Kırmızı engellemesin · geo-link</small>
+                  </span>
+                </label>
+              </div>
+              <label class="dta-auto-check">
+                <input type="checkbox" id="prob-auto-launch" checked />
+                <span data-i18n="prob.auto">VOTEX açılınca VPE’yi başlat</span>
+              </label>
+              <label class="dta-auto-check">
+                <input type="checkbox" id="prob-fallback" checked />
+                <span data-i18n="prob.fallback">VPE yoksa yerel motor (yedek)</span>
+              </label>
+              <div class="btn-row">
+                <button type="button" id="btn-vpe-launch-ops" class="mil accent" data-i18n="prob.start">VPE Başlat</button>
+              </div>
+            </div>
+          </details>
+
+          <details class="dta-settings-fold" id="archive-fold" data-fold="sys">
+            <summary>
+              <span class="panel-tag">ARCH</span>
+              <span data-i18n="archive.summary">Arşiv</span>
+            </summary>
+            <div class="dta-settings" id="archive-panel">
+              <p class="hint compact" data-i18n="archive.hint">Her başarılı analiz otomatik kaydedilir · açmak kota harcamaz</p>
+              <div class="btn-row">
+                <button type="button" id="btn-archive-refresh" class="mil compact" data-i18n="archive.refresh">Yenile</button>
+              </div>
+              <div class="archive-list" id="archive-list" aria-live="polite"></div>
+            </div>
+          </details>
+
+          <details class="dta-settings-fold" id="update-fold" data-fold="sys">
+            <summary>
+              <span class="panel-tag">UPD</span>
+              <span data-i18n="upd.summary">Güncelleme</span>
+            </summary>
+            <div class="dta-settings" id="update-panel">
+              <p class="hint compact" data-i18n="upd.hint">USB / klasör paketi · manifest.json · Suite (VOTEX + VPE)</p>
+              <p class="hint compact"><span data-i18n="upd.installed">Kurulu:</span> <strong id="update-current-ver">—</strong> · <span data-i18n="upd.package">Paket:</span> <strong id="update-available-ver">—</strong></p>
+              <p class="hint compact" id="update-msg">—</p>
+              <p class="hint compact mono" id="update-package-path">Paket seçilmedi</p>
+              <div id="update-notes" class="update-notes"></div>
+              <div class="btn-row">
+                <button type="button" id="btn-update-pick" class="mil" data-i18n="upd.pick">Paket seç</button>
+                <button type="button" id="btn-update-refresh" class="mil compact" data-i18n="upd.refresh">Yenile</button>
+                <button type="button" id="btn-update-apply" class="mil accent" disabled data-i18n="upd.apply">Güncelle ve yeniden başlat</button>
+              </div>
+            </div>
+          </details>
+
+          <details class="dta-settings-fold" id="csv-fold" data-fold="csv">
+            <summary>
+              <span class="panel-tag">CSV</span>
+              <span data-i18n="csv.title">CSV Veri İçe Aktar</span>
+            </summary>
+            <div class="dta-settings" id="csv-panel">
+              <p class="hint compact" data-i18n="csv.hint">
+                x, y, z ve manyetik sensör değerlerini içeren CSV dosyası yükleyin.
+              </p>
+              <div id="csv-dropzone" class="csv-dropzone">
+                <p class="hint compact" data-i18n="csv.dropHint">CSV dosyasını buraya sürükleyin (çoklu dosya desteği)</p>
+              </div>
+              <div class="btn-row">
+                <button type="button" id="btn-csv-pick" class="mil primary" data-i18n="csv.pick">CSV Dosyası Seç</button>
+                <button type="button" id="btn-csv-pick-multi" class="mil" title="Birden fazla CSV dosyası seç">📁 Toplu Yükle</button>
+                <button type="button" id="btn-csv-build" class="mil accent" disabled data-i18n="csv.build">3D Oluştur</button>
+                <button type="button" id="btn-csv-toggle" class="mil" disabled>Overlay</button>
+                <button type="button" id="btn-csv-zoom-all" class="mil" disabled title="Tüm yapıları sığdır">⊕ Tümünü Gör</button>
+              </div>
+              <div id="multi-csv-list" style="display:none;margin-top:0.4rem;padding:0.3rem;background:rgba(255,255,255,0.02);border:1px solid var(--line);border-radius:var(--r-sharp);max-height:140px;overflow-y:auto;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+                  <span style="font-size:0.62rem;color:var(--muted);font-weight:600;">YÜKLÜ DOSYALAR</span>
+                  <span id="multi-csv-count" style="font-size:0.58rem;color:var(--accent);">0 dosya</span>
+                </div>
+                <div id="multi-csv-items"></div>
+                <div style="display:flex;gap:0.3rem;margin-top:0.3rem;">
+                  <button type="button" id="btn-csv-merge-overlay" class="mil" style="font-size:0.58rem;padding:0.15rem 0.4rem;" title="Tüm dosyaları birleştir">🔗 Birleştir</button>
+                  <button type="button" id="btn-csv-merge-separate" class="mil" style="font-size:0.58rem;padding:0.15rem 0.4rem;" title="Dosyaları ayrı tut">📋 Ayrı</button>
+                  <button type="button" id="btn-csv-clear-all" class="mil" style="font-size:0.58rem;padding:0.15rem 0.4rem;color:#e85858;" title="Tüm dosyaları temizle">✕ Temizle</button>
+                </div>
+              </div>
+              <div id="mag-ground-controls" style="display:none;margin-top:0.4rem;padding:0.4rem 0.6rem;background:rgba(14,20,28,0.85);border:1px solid var(--line);border-radius:var(--r-sharp);">
+                <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.68rem;color:var(--muted);cursor:pointer;">
+                  <input type="checkbox" id="mag-ground-toggle" style="accent-color:#e85858;" />
+                  <span style="color:#e85858;font-weight:600;">🗺 Manyetik Zemin Haritası</span>
+                </label>
+                <div id="mag-ground-opacity-row" style="display:none;margin-top:0.3rem;align-items:center;gap:0.4rem;">
+                  <span style="font-size:0.6rem;color:var(--muted);min-width:40px;">Opaklık</span>
+                  <input type="range" id="mag-ground-opacity" min="0" max="100" value="45" step="5" style="flex:1;accent-color:#e85858;" />
+                  <span id="mag-ground-opacity-val" style="font-size:0.6rem;color:#e85858;min-width:28px;text-align:right;">45%</span>
+                </div>
+              </div>
+              <!-- 📍 GPS AYARLARI -->
+              <details id="gps-fold" style="margin-top:0.5rem;border:1px solid var(--line);border-radius:var(--r-sharp);overflow:hidden;">
+                <summary style="padding:0.4rem 0.6rem;font-size:0.7rem;font-weight:600;letter-spacing:0.04em;color:var(--muted);cursor:pointer;background:rgba(255,255,255,0.02);user-select:none;">
+                  📍 GPS KOORDINAT DESTEĞİ
+                </summary>
+                <div id="gps-panel" style="padding:0.5rem 0.6rem;">
+                  <p style="font-size:0.65rem;color:var(--muted);margin-bottom:0.4rem;">CSV'de GPS verisi yoksa, manuel referans noktası girerek lokal koordinatları GPS'ye çevirebilirsiniz.</p>
+                  <div id="gps-status" style="font-size:0.65rem;color:#e85858;margin-bottom:0.4rem;">⚠ GPS referansı ayarlanmadı</div>
+                  <label style="display:block;margin-bottom:0.3rem;">
+                    <span style="font-size:0.68rem;color:var(--muted);">Enlem (°N)</span>
+                    <input type="number" id="gps-lat" step="any" placeholder="40.1234" style="width:100%;" />
+                  </label>
+                  <label style="display:block;margin-bottom:0.3rem;">
+                    <span style="font-size:0.68rem;color:var(--muted);">Boylam (°E)</span>
+                    <input type="number" id="gps-lon" step="any" placeholder="29.5678" style="width:100%;" />
+                  </label>
+                  <label style="display:block;margin-bottom:0.3rem;">
+                    <span style="font-size:0.68rem;color:var(--muted);">Referans lokal X (m)</span>
+                    <input type="number" id="gps-local-x" step="any" placeholder="0" value="0" style="width:100%;" />
+                  </label>
+                  <label style="display:block;margin-bottom:0.3rem;">
+                    <span style="font-size:0.68rem;color:var(--muted);">Referans lokal Z (m)</span>
+                    <input type="number" id="gps-local-z" step="any" placeholder="0" value="0" style="width:100%;" />
+                  </label>
+                  <div style="display:flex;gap:0.3rem;margin-top:0.4rem;">
+                    <button type="button" id="btn-gps-set" class="mil primary" style="flex:1;font-size:0.68rem;padding:0.35rem;">📍 Referansı Ayarla</button>
+                    <button type="button" id="btn-gps-clear" class="mil" style="flex:1;font-size:0.68rem;padding:0.35rem;">✕ Temizle</button>
+                  </div>
+                  <div id="gps-result" style="display:none;margin-top:0.4rem;padding:0.4rem;background:rgba(62,220,140,0.08);border:1px solid rgba(62,220,140,0.3);border-radius:var(--r-sharp);font-size:0.65rem;color:#3edc8c;"></div>
+                </div>
+              </details>
+              <details class="dta-settings-fold" id="align-fold" style="margin-top:0.4rem;">
+                <summary style="padding:0.35rem 0.5rem;font-size:0.68rem;font-weight:600;letter-spacing:0.04em;color:var(--muted);cursor:pointer;background:rgba(255,255,255,0.02);user-select:none;">
+                  <span class="panel-tag">📐</span> BOYUT & HİZALAMA
+                </summary>
+                <div style="padding:0.4rem 0.5rem;">
+                  <div style="font-size:0.62rem;color:var(--muted);margin-bottom:0.4rem;">CSV haritası ile görüntü yönünü eşleştirin.</div>
+                  <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-bottom:0.4rem;">
+                    <button type="button" id="align-90" class="mil compact" style="font-size:0.62rem;padding:0.2rem 0.5rem;">↻ 90°</button>
+                    <button type="button" id="align-180" class="mil compact" style="font-size:0.62rem;padding:0.2rem 0.5rem;">↻ 180°</button>
+                    <button type="button" id="align-270" class="mil compact" style="font-size:0.62rem;padding:0.2rem 0.5rem;">↻ 270°</button>
+                  </div>
+                  <div style="display:flex;gap:0.3rem;margin-bottom:0.4rem;">
+                    <button type="button" id="align-flip-x" class="mil compact" style="font-size:0.62rem;padding:0.2rem 0.5rem;">↔ Yatay Ters</button>
+                    <button type="button" id="align-flip-z" class="mil compact" style="font-size:0.62rem;padding:0.2rem 0.5rem;">↕ Dikey Ters</button>
+                  </div>
+                  <label style="display:block;margin-bottom:0.3rem;">
+                    <span style="font-size:0.65rem;color:var(--muted);">Açı: <span id="align-angle-label">0°</span></span>
+                    <input type="range" id="align-angle" min="0" max="360" step="1" value="0" style="width:100%;" />
+                  </label>
+                  <label style="display:block;margin-bottom:0.3rem;">
+                    <span style="font-size:0.65rem;color:var(--muted);">Ölçek X: <span id="align-scalex-label">1.00</span></span>
+                    <input type="range" id="align-scalex" min="0.1" max="5" step="0.05" value="1" style="width:100%;" />
+                  </label>
+                  <label style="display:block;margin-bottom:0.3rem;">
+                    <span style="font-size:0.65rem;color:var(--muted);">Ölçek Z: <span id="align-scalez-label">1.00</span></span>
+                    <input type="range" id="align-scalez" min="0.1" max="5" step="0.05" value="1" style="width:100%;" />
+                  </label>
+                  <label style="display:block;margin-bottom:0.3rem;">
+                    <span style="font-size:0.65rem;color:var(--muted);">Kaydırma X: <span id="align-offsetx-label">0m</span></span>
+                    <input type="range" id="align-offsetx" min="-50" max="50" step="0.5" value="0" style="width:100%;" />
+                  </label>
+                  <label style="display:block;margin-bottom:0.3rem;">
+                    <span style="font-size:0.65rem;color:var(--muted);">Kaydırma Z: <span id="align-offsetz-label">0m</span></span>
+                    <input type="range" id="align-offsetz" min="-50" max="50" step="0.5" value="0" style="width:100%;" />
+                  </label>
+                  <div style="display:flex;gap:0.3rem;margin-top:0.4rem;">
+                    <button type="button" id="align-auto-fit" class="mil accent" style="font-size:0.62rem;padding:0.25rem 0.5rem;">📐 Otomatik Sığdır</button>
+                    <button type="button" id="align-reset" class="mil" style="font-size:0.62rem;padding:0.25rem 0.5rem;">↩ Sıfırla</button>
+                  </div>
+                  <div style="margin-top:0.3rem;font-size:0.6rem;color:var(--muted);">Durum: <span id="align-status">normal</span></div>
+                  <div style="margin-top:0.4rem;padding-top:0.3rem;border-top:1px solid var(--line);">
+                    <div style="font-size:0.62rem;color:var(--muted);margin-bottom:0.3rem;">Karsilastirma</div>
+                    <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                      <button type="button" id="compare-split" class="mil compact" style="font-size:0.6rem;padding:0.2rem 0.45rem;">Split</button>
+                      <button type="button" id="compare-blend" class="mil compact" style="font-size:0.6rem;padding:0.2rem 0.45rem;">Bindirme</button>
+                      <button type="button" id="compare-grid" class="mil compact" style="font-size:0.6rem;padding:0.2rem 0.45rem;">Izgara</button>
+                      <button type="button" id="compare-off" class="mil compact" style="font-size:0.6rem;padding:0.2rem 0.45rem;">Kapat</button>
+                    </div>
+                    <label style="display:block;margin-top:0.3rem;">
+                      <span style="font-size:0.62rem;color:var(--muted);">Bindirme Opakligi: <span id="compare-opacity-label">50%</span></span>
+                      <input type="range" id="compare-opacity" min="0" max="100" step="5" value="50" style="width:100%;" />
+                    </label>
+                    <label style="display:block;margin-top:0.2rem;">
+                      <span style="font-size:0.62rem;color:var(--muted);">Split Cizgisi: <span id="compare-split-label">50%</span></span>
+                      <input type="range" id="compare-split-slider" min="0" max="100" step="1" value="50" style="width:100%;" />
+                    </label>
+                    <div style="margin-top:0.3rem;font-size:0.58rem;color:var(--muted);" id="compare-status"></div>
+                  </div>
+                </div>
+              </details>
+              <div id="csv-preview"></div>
+              <div id="csv-heatmap-wrap" style="display:none;margin-top:0.5rem;">
+                <div id="csv-heatmap-units" style="display:flex;align-items:center;gap:0.5rem;padding:3px 8px;margin-bottom:4px;background:rgba(14,20,28,0.85);border:1px solid var(--line);border-radius:var(--r-sharp);font-family:var(--font-mono);font-size:0.62rem;color:var(--muted);letter-spacing:0.04em;">
+                  <span style="color:#5888e8;">Piksel</span>
+                  <span style="color:#555;">(ilk 2 hane metre)</span>
+                  <span style="color:#3edc8c;font-weight:bold;">→</span>
+                  <span style="color:#6aee88;">Metre</span>
+                  <span style="color:#555;">|</span>
+                  <span style="color:#e85858;">Manyetik</span>
+                  <span style="color:#555;">nT</span>
+                </div>
+                <div style="display:flex;gap:0.4rem;">
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-end;padding-bottom:18px;gap:0;min-width:32px;">
+                    <canvas id="csv-heatmap-yaxis" width="32" height="200" style="width:32px;min-height:200px;image-rendering:auto;"></canvas>
+                  </div>
+                  <div style="position:relative;flex:1;display:flex;flex-direction:column;">
+                    <canvas id="csv-heatmap-canvas" style="width:100%;min-height:200px;border:1px solid var(--line);border-radius:var(--r-sharp);background:#080c10;image-rendering:auto;"></canvas>
+                    <canvas id="csv-heatmap-xaxis" style="width:100%;height:18px;image-rendering:auto;"></canvas>
+                  </div>
+                  <div style="display:flex;flex-direction:column;align-items:center;">
+                    <canvas id="csv-heatmap-legend" style="border:1px solid var(--line);border-radius:var(--r-sharp);"></canvas>
+                  </div>
+                </div>
+                <div id="csv-heatmap-stats" style="font-family:var(--font-mono);font-size:0.68rem;color:var(--muted);margin-top:0.25rem;letter-spacing:0.04em;"></div>
+              </div>
+              <div id="csv-heatmap-tooltip" style="display:none;position:absolute;z-index:999;background:rgba(10,16,24,0.92);border:1px solid var(--line);border-radius:var(--r-sharp);padding:6px 10px;font-family:var(--font-mono);font-size:0.7rem;color:#c8d8c8;pointer-events:none;white-space:pre-line;max-width:260px;backdrop-filter:blur(6px);"></div>
+              <div id="csv-struct-info" class="struct-info-panel" style="display:none;"></div>
+              <label>
+                <span>Havuz Boyutu (m)</span>
+                <input type="range" id="csv-pool-size" min="10" max="100" step="5" value="30" />
+                <span id="csv-pool-size-label">30m</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:0.4rem;margin-top:0.35rem;padding:0.3rem 0.45rem;border:1px solid var(--line);border-radius:var(--r-sharp);">
+                <input type="checkbox" id="csv-auto-box" style="accent-color:#3edc8c;" />
+                <span style="font-size:0.72rem;letter-spacing:0.05em;">Otomatik Sığdır — kutu veri dağılımına göre</span>
+              </label>
+              <label>
+                <span>Sığdırma Payı (%) — kenar boşluğu</span>
+                <input type="range" id="csv-fit" min="50" max="100" step="5" value="85" />
+                <span id="csv-fit-label">85%</span>
+              </label>
+              <label>
+                <span>Nokta Boyutu</span>
+                <input type="range" id="csv-point-size" min="0.05" max="1.0" step="0.05" value="0.2" />
+                <span id="csv-point-size-label">0.20</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:0.4rem;margin-top:0.35rem;padding:0.3rem 0.45rem;border:1px solid var(--line);border-radius:var(--r-sharp);">
+                <input type="checkbox" id="csv-underground-filter" checked style="accent-color:#3edc8c;" />
+                <span style="font-size:0.72rem;letter-spacing:0.05em;">Sadece yer altı (X&lt;0, Y&lt;0, Z&lt;0) — anomali hariç</span>
+              </label>
+              <label>
+                <span>Derinlik Dilimi (Y) — 0 = tümü</span>
+                <input type="range" id="csv-depth-slice" min="0" max="0" step="1" value="0" disabled />
+                <span id="csv-depth-slice-label">Tümü</span>
+              </label>
+              <label>
+                <span>Dilim Sayısı (4-16)</span>
+                <input type="range" id="csv-slice-count" min="4" max="16" step="1" value="8" />
+                <span id="csv-slice-count-label">8</span>
+              </label>
+              <label>
+                <span>Tespit Eşiği — anomali harita eşiği (<em style="font-style:normal;color:var(--muted);">düşük = daha çok bulur</em>)</span>
+                <input type="range" id="csv-threshold" min="0.3" max="2.0" step="0.05" value="0.9" disabled />
+                <span id="csv-threshold-label">0.90</span>
+              </label>
+              <label>
+                <span>Min Güç — yapı sayılacak z-skor (<em style="font-style:normal;color:var(--muted);">düşük = gürültü de sayar</em>)</span>
+                <input type="range" id="csv-min-strength" min="0.05" max="1.0" step="0.05" value="0.45" disabled />
+                <span id="csv-min-strength-label">0.45</span>
+              </label>
+              <div id="csv-slice-report" class="csv-slice-report" style="display:none;"></div>
+            </div>
+            <div class="slider-row">
+                <label>GRID ÇÖZÜNÜRLÜĞÜ</label>
+                <input type="range" id="csv-grid-res" min="8" max="64" step="1" value="32" />
+                <span id="csv-grid-res-label">20³</span>
+              </label>
+              <details class="dta-settings-fold" id="csv-anomaly-fold">
+                <summary>
+                  <span class="panel-tag">⚠</span>
+                  <span data-i18n="csv.anomalyTitle">Anomali Eşikleri</span>
+                </summary>
+                <div class="dta-settings" id="csv-anomaly-settings">
+                  <label>
+                    <span>Sigma (σ)</span>
+                    <input type="range" id="csv-sigma" min="1" max="4" step="0.5" value="2" />
+                    <span id="csv-sigma-label">2.0</span>
+                  </label>
+                  <label>
+                    <span>Manuel alt eşik (boş = otomatik)</span>
+                    <input type="number" id="csv-thresh-low" placeholder="otomatik" step="any" />
+                  </label>
+                  <label>
+                    <span>Manuel üst eşik (boş = otomatik)</span>
+                    <input type="number" id="csv-thresh-high" placeholder="otomatik" step="any" />
+                  </label>
+                  <div id="csv-anomaly-stats"></div>
+                </div>
+              </details>
+            </div>
+          </details>
+
+          <!-- ═══ BİRLEŞİK ANALİZ ═══ -->
+          <details class="dta-settings-fold" id="unified-fold" data-fold="hybrid">
+            <summary>
+              <span class="panel-tag" style="background:#3edc8c;">UNIFIED</span>
+              <span>Birleşik Analiz</span>
+            </summary>
+            <div class="dta-settings" id="unified-panel">
+              <!-- Kaynaklar -->
+              <div class="hybrid-sources">
+                <div class="hs-card">
+                  <span class="hs-icon">📷</span>
+                  <div class="hs-info">
+                    <span class="hs-label">Image (birincil)</span>
+                    <span class="hs-status" id="unified-image-status">Yüklenmedi</span>
+                  </div>
+                </div>
+                <div class="hs-card">
+                  <span class="hs-icon">📊</span>
+                  <div class="hs-info">
+                    <span class="hs-label">CSV (destek)</span>
+                    <span class="hs-status" id="unified-csv-status">Yüklenmedi</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Image Seç -->
+              <button type="button" id="btn-unified-image" class="mil" style="width:100%;margin-top:0.4rem;">📷 Proton ELIC Görüntüsü Seç</button>
+              <input type="file" id="unified-image-input" accept="image/png,image/jpeg" style="display:none;" />
+
+              <!-- Önizleme -->
+              <div id="unified-preview" style="display:none;margin-top:0.4rem;">
+                <canvas id="unified-image-canvas" style="width:100%;min-height:100px;border:1px solid var(--line);border-radius:var(--r-sharp);background:#080c10;cursor:crosshair;"></canvas>
+                <div style="font-size:0.6rem;color:var(--muted);margin-top:0.15rem;">Tıkla → referans noktası ekle · 3 nokta ile hizalama hesaplanır</div>
+              </div>
+
+              <!-- Manuel Hizalama -->
+              <details id="manual-align-section" style="margin-top:0.4rem;border:1px solid var(--line);border-radius:var(--r-sharp);overflow:hidden;">
+                <summary style="padding:0.4rem 0.6rem;font-size:0.7rem;font-weight:600;letter-spacing:0.04em;color:var(--muted);cursor:pointer;background:rgba(255,255,255,0.02);user-select:none;">
+                  📐 Manuel Koordinat Hizalama
+                </summary>
+                <div style="padding:0.5rem 0.6rem;">
+                  <div id="manual-align-points" style="font-size:0.65rem;color:var(--muted);margin-bottom:0.4rem;">Henüz nokta eklenmedi — resme tıklayın</div>
+                  <div id="manual-align-inputs"></div>
+                  <div style="display:flex;gap:0.3rem;margin-top:0.4rem;">
+                    <button type="button" id="btn-manual-align-apply" class="mil" disabled style="flex:1;font-size:0.68rem;padding:0.35rem;">✓ Hizalamayı Uygula</button>
+                    <button type="button" id="btn-manual-align-clear" class="mil" style="flex:1;font-size:0.68rem;padding:0.35rem;">✕ Temizle</button>
+                  </div>
+                  <div id="manual-align-quality" style="margin-top:0.3rem;font-size:0.65rem;display:none;"></div>
+                </div>
+              </details>
+
+              <!-- Ağırlık -->
+              <label style="margin-top:0.5rem;">
+                <span>CSV Desteği: <em style="color:#3edc8c;">%70</em></span>
+                <input type="range" id="unified-csv-weight" min="0" max="100" step="5" value="70" />
+              </label>
+
+              <!-- Çapraz Doğrulama Eşikleri -->
+              <details id="cv-thresholds" style="margin-top:0.5rem;border:1px solid var(--line);border-radius:var(--r-sharp);overflow:hidden;">
+                <summary style="padding:0.4rem 0.6rem;font-size:0.7rem;font-weight:600;letter-spacing:0.04em;color:var(--muted);cursor:pointer;background:rgba(255,255,255,0.02);user-select:none;">
+                  🎯 Çapraz Doğrulama Eşikleri
+                </summary>
+                <div style="padding:0.5rem 0.6rem;display:flex;flex-direction:column;gap:0.45rem;">
+                  <label style="display:flex;align-items:center;gap:0.4rem;">
+                    <span style="font-size:0.68rem;color:var(--muted);min-width:80px;">Mesafe</span>
+                    <input type="range" id="cv-match-dist" min="1" max="10" step="0.5" value="3" style="flex:1;" />
+                    <span id="cv-match-dist-label" style="font-size:0.68rem;color:#3edc8c;min-width:28px;text-align:right;">3m</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;">
+                    <span style="font-size:0.68rem;color:var(--muted);min-width:80px;">Derinlik</span>
+                    <input type="range" id="cv-depth-diff" min="0.5" max="5" step="0.5" value="2" style="flex:1;" />
+                    <span id="cv-depth-diff-label" style="font-size:0.68rem;color:#eab308;min-width:28px;text-align:right;">2m</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;">
+                    <span style="font-size:0.68rem;color:var(--muted);min-width:80px;">Manyetik</span>
+                    <input type="range" id="cv-magnetic-diff" min="50" max="500" step="25" value="150" style="flex:1;" />
+                    <span id="cv-magnetic-diff-label" style="font-size:0.68rem;color:#f97316;min-width:40px;text-align:right;">150nT</span>
+                  </label>
+                  <div style="font-size:0.6rem;color:var(--muted);padding-top:0.2rem;border-top:1px solid var(--line);">
+                    <span id="cv-threshold-info" style="color:#8ea8b8;">——</span>
+                  </div>
+                </div>
+              </details>
+
+              <!-- Tek Başlat Butonu -->
+              <button type="button" id="btn-unified-start" class="mil accent" disabled style="width:100%;margin-top:0.5rem;font-size:0.9rem;padding:0.7rem;">🚀 BAŞLAT</button>
+
+              <!-- Sonuçlar -->
+              <div id="unified-results" style="display:none;margin-top:0.5rem;">
+                <span style="font-size:0.68rem;color:var(--muted);letter-spacing:0.05em;">BİRLEŞİK HARİTA</span>
+                <canvas id="unified-map-canvas" style="width:100%;min-height:140px;border:1px solid var(--line);border-radius:var(--r-sharp);background:#080c10;margin-top:0.2rem;"></canvas>
+                <div id="unified-stats" style="margin-top:0.4rem;"></div>
+                <!-- Çapraz Doğrulama Raporu -->
+                <div id="unified-cv-report" style="display:none;margin-top:0.5rem;padding:0.5rem;border:1px solid var(--line);border-radius:var(--r-sharp);background:rgba(255,255,255,0.02);"></div>
+              </div>
+            </div>
+          </details>
+        </div><!-- /panel-fold-zone -->
+
+        <div id="ops-core-b" class="ops-core" data-mod="image">
+          <!-- 🎯 ÇEKİM TİPİ (kapalı) -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">🎯</span>
+              <span class="tree-label">ÇEKİM TİPİ</span>
+              <span class="tree-badge active" id="shot-type-badge">Yan</span>
+            </summary>
+            <div class="tree-body">
+              <div class="shot-type" id="shot-type">
+                <label class="shot-option">
+                  <input type="radio" name="shot-type" value="side" checked />
+                  <span>
+                    <strong data-i18n="shot.side">Yan çekim</strong>
+                    <small data-i18n="shot.sideSub">Kesit · serbest derinlik</small>
+                  </span>
+                </label>
+                <label class="shot-option">
+                  <input type="radio" name="shot-type" value="top" />
+                  <span>
+                    <strong data-i18n="shot.top">Dik çekim</strong>
+                    <small data-i18n="shot.topSub">Plan haritası · serbest derinlik</small>
+                  </span>
+                </label>
+              </div>
+              <p class="hint" id="shot-hint" style="font-size:0.62rem;">
+                Yan çekimde görüntü Y ekseni derinliğe karşılık gelir.
+              </p>
+            </div>
+          </details>
+
+          <!-- 🏹 HEDEF TİPİ (kapalı) -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">🏹</span>
+              <span class="tree-label">HEDEF TİPİ</span>
+              <span class="tree-badge active" id="target-badge">Otomatik</span>
+            </summary>
+            <div class="tree-body" id="target-kind-wrap">
+              <div class="shot-type target-kind" id="target-kind">
+                <label class="shot-option">
+                  <input type="radio" name="target-kind" value="auto" checked />
+                  <span>
+                    <strong data-i18n="target.auto">Otomatik</strong>
+                    <small data-i18n="target.autoSub">Tüm sınıflar serbest</small>
+                  </span>
+                </label>
+                <label class="shot-option">
+                  <input type="radio" name="target-kind" value="well" />
+                  <span>
+                    <strong data-i18n="target.well">Kuyu</strong>
+                    <small data-i18n="target.wellSub">Dikey şaft · tünel/oda yok</small>
+                  </span>
+                </label>
+                <label class="shot-option">
+                  <input type="radio" name="target-kind" value="room" />
+                  <span>
+                    <strong data-i18n="target.room">Oda / Mezar</strong>
+                    <small data-i18n="target.roomSub">Oda · mezar · tünel/şaft yok</small>
+                  </span>
+                </label>
+                <label class="shot-option">
+                  <input type="radio" name="target-kind" value="tunnel" />
+                  <span>
+                    <strong data-i18n="target.tunnel">Tünel</strong>
+                    <small data-i18n="target.tunnelSub">Yalnızca koridor</small>
+                  </span>
+                </label>
+                <label class="shot-option">
+                  <input type="radio" name="target-kind" value="site" />
+                  <span>
+                    <strong data-i18n="target.site">Yapı</strong>
+                    <small data-i18n="target.siteSub">Oda + tünel + metal · kuyu yok</small>
+                  </span>
+                </label>
+              </div>
+              <p class="hint" id="target-hint" data-i18n="target.hint" style="font-size:0.62rem;">
+                Analiz ve 3D çizim seçilen hedefe göre daraltılır.
+              </p>
+            </div>
+          </details>
+
+          <!-- 📊 DERİNLİK PROFİLİ -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">📊</span>
+              <span class="tree-label">DERİNLİK PROFİLİ</span>
+            </summary>
+            <div class="tree-body">
+              <p class="hint compact">
+                3D sahne üzerinde tıklayarak seçili noktadan yatay veya dikey kesit profili görüntüleyin.
+              </p>
+              <div class="btn-row" style="margin-bottom:0.3rem;">
+                <button type="button" id="btn-depth-profile-h" class="mil active" style="font-size:0.62rem;">Yatay (X)</button>
+                <button type="button" id="btn-depth-profile-v" class="mil" style="font-size:0.62rem;">Dikey (Z)</button>
+              </div>
+              <div id="depth-profile-info" style="font-size:0.6rem;color:var(--muted);margin-bottom:0.3rem;">3D sahne üzerinde tıklayın</div>
+              <canvas id="depth-profile-canvas" style="width:100%;height:140px;border:1px solid var(--line);border-radius:var(--r-sharp);background:#080c10;display:block;"></canvas>
+            </div>
+          </details>
+
+          <!-- 🌍 TOPRAK (kapalı) -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">🌍</span>
+              <span class="tree-label">TOPRAK</span>
+            </summary>
+            <div class="tree-body">
+          <label class="dta-auto-check">
+            <input type="checkbox" id="soil-correction-enabled" checked />
+            <span data-i18n="soil.use">Toprak düzeltmesini kullan</span>
+          </label>
+          <div class="shot-type target-kind" id="soil-profile">
+            <label class="shot-option">
+              <input type="radio" name="soil-profile" value="off" />
+              <span>
+                <strong data-i18n="soil.off">Kapalı</strong>
+                <small data-i18n="soil.offSub">Eski hesap · ×1.00</small>
+              </span>
+            </label>
+            <label class="shot-option">
+              <input type="radio" name="soil-profile" value="sand" />
+              <span>
+                <strong data-i18n="soil.sand">Kum</strong>
+                <small data-i18n="soil.sandSub">Kuru kum / çakıl · ×1.10</small>
+              </span>
+            </label>
+            <label class="shot-option">
+              <input type="radio" name="soil-profile" value="loam" checked />
+              <span>
+                <strong data-i18n="soil.loam">Tın</strong>
+                <small data-i18n="soil.loamSub">Nötr ref · ×1.00</small>
+              </span>
+            </label>
+            <label class="shot-option">
+              <input type="radio" name="soil-profile" value="wet_clay" />
+              <span>
+                <strong data-i18n="soil.clay">Kil</strong>
+                <small data-i18n="soil.claySub">Nemli kil · ×0.85</small>
+              </span>
+            </label>
+            <label class="shot-option">
+              <input type="radio" name="soil-profile" value="laterite" />
+              <span>
+                <strong data-i18n="soil.laterite">Laterit</strong>
+                <small data-i18n="soil.lateriteSub">Demirli · ×0.70</small>
+              </span>
+            </label>
+            <label class="shot-option">
+              <input type="radio" name="soil-profile" value="organic" />
+              <span>
+                <strong data-i18n="soil.organic">Organik</strong>
+                <small data-i18n="soil.organicSub">Humus · ×0.95</small>
+              </span>
+            </label>
+          </div>
+          <p class="hint" id="soil-hint">
+            Derinlik çarpanı (fizik inversiyonu değil). Sorun olursa Kapalı’ya al — eski derinlik hesabı.
+          </p>
+
+          <label class="dta-auto-check" style="margin-top: 0.55rem">
+            <input type="checkbox" id="structures-through-red" checked />
+            <span data-i18n="red.label">Kırmızı yapıya engel değil</span>
+          </label>
+          <p class="hint compact" id="structures-through-red-hint">
+            Açık: yapı içindeki / yoldaki kırmızı oda-tüneli silmez. Kapalı: eski davranış.
+          </p>
+
+          <div class="panel-head compact">
+            <span class="panel-tag">CFG</span>
+            <h2 data-i18n="cfg.title">Parametreler</h2>
+          </div>
+          <div class="grid-form">
+            <label>
+              <span data-i18n="cfg.minConf">Min. güven</span>
+              <input id="min-confidence" type="range" min="25" max="70" value="45" step="5" />
+              <span class="hint" id="min-confidence-label">0.45</span>
+            </label>
+            <label>
+              <span data-i18n="cfg.vert">Dikey abartı</span>
+              <input id="z-scale" type="range" min="10" max="15" value="10" step="1" />
+            </label>
+            <label>
+              <span data-i18n="cfg.depression">İçe çökme</span>
+              <input id="depression-scale" type="range" min="0" max="200" value="10" step="1" />
+              <span class="hint" id="depression-scale-label">1.0×</span>
+            </label>
+            <label>
+              <span data-i18n="cfg.wire">Tel kafes</span>
+              <select id="wireframe">
+                <option value="0" data-i18n="cfg.wireOff">Kapalı</option>
+                <option value="1" data-i18n="cfg.wireOn">Açık</option>
+              </select>
+            </label>
+            <label>
+              <span>Harita şeffaflığı</span>
+              <input id="heatmap-opacity" type="range" min="10" max="100" value="82" step="1" />
+              <span class="hint" id="heatmap-opacity-label">82%</span>
+            </label>
+            <label>
+              <span>Kesit modu</span>
+              <input id="clip-enabled" type="checkbox" />
+            </label>
+            <label>
+              <span>Kesit yüksekliği</span>
+              <input id="clip-height" type="range" min="-30" max="3" value="3" step="1" disabled />
+              <span class="hint" id="clip-height-label">3 m</span>
+            </label>
+            <label>
+              <span>X-Ray görünümü</span>
+              <input id="xray-toggle" type="checkbox" />
+            </label>
+            <label>
+              <span>🎨 Renklendirme</span>
+              <select id="colorizer-palette">
+                <option value="none">Kapalı</option>
+              </select>
+              <button type="button" id="btn-colorizer-cycle" class="mil compact" title="Sonraki palet">
+                ⟳
+              </button>
+            </label>
+            <div class="color-analysis-controls" style="margin-top:0.3rem;display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;">
+              <button type="button" id="btn-color-reanalyze" class="mil compact" title="Bu renkle yeniden analiz et" style="font-size:0.7rem;padding:0.2rem 0.5rem;">
+                🔄 Tekrar Analiz
+              </button>
+              <button type="button" id="btn-color-clear-cache" class="mil compact" title="Önbelleği temizle" style="font-size:0.7rem;padding:0.2rem 0.5rem;">
+                🗑
+              </button>
+              <label style="display:flex;align-items:center;gap:0.2rem;font-size:0.65rem;cursor:pointer;">
+                <input type="checkbox" id="color-auto-reanalyze" style="width:12px;height:12px;" />
+                <span>Otomatik</span>
+              </label>
+              <span id="color-analysis-status" style="font-size:0.65rem;opacity:0.6;"></span>
+            </div>
+            <div id="color-compare-result" style="display:none;margin-top:0.3rem;padding:0.3rem;background:rgba(74,158,255,0.08);border-radius:4px;border:1px solid rgba(74,158,255,0.15);"></div>
+          </div>
+          <p class="hint">Kısayollar: <b>K</b> kesit · <b>X</b> X-Ray · <b>↑/↓</b> kesit yüksekliği</p>
+          <p class="hint" data-i18n="cfg.kotHint">Kot farkı: yapı kartında · yüzey yükselir · yüzey→yapı değeri artar.</p>
+          <p class="hint" id="surface-stats">—</p>
+          <p class="hint compass-legend" data-i18n="shot.legendTop">
+            Yön: K Kuzey · D Doğu · G Güney · B Batı (harita üstü = Kuzey)
+          </p>
+
+          <div class="panel-head compact">
+            <span class="panel-tag">LOG</span>
+            <h2 data-i18n="log.title">Telemetri</h2>
+          </div>
+          <div class="telemetry" id="telemetry-log" aria-live="polite"></div>
+
+          <div class="panel-head compact">
+            <span class="panel-tag">MAP</span>
+            <h2 data-i18n="map.title">2D Önizleme</h2>
+          </div>
+          <div class="ruler-bar">
+            <label class="ruler-toggle">
+              <input type="checkbox" id="ruler-enable" />
+              <span data-i18n="map.ruler">Cetvel</span>
+            </label>
+            <span class="hint" data-i18n="map.rulerHint">2D veya 3D · iki nokta · m · sağ tık döndür</span>
+            <strong class="ruler-readout" id="ruler-readout">—</strong>
+            <button type="button" id="ruler-clear" class="mil compact" data-i18n="map.clear">Temizle</button>
+          </div>
+          <div class="preview-2d tactical" id="preview-wrap">
+            <div class="tactical-grid" aria-hidden="true"></div>
+            <div class="tactical-crosshair" aria-hidden="true"></div>
+            <div class="preview-hud-compass" aria-hidden="true">
+              <span data-i18n="map.heading">Yön</span><strong id="preview-compass-deg">—</strong>
+              <span id="preview-compass-card">K</span>
+            </div>
+            <div class="preview-depth-rail" aria-hidden="true" data-i18n-title="map.depthRail"></div>
+            <div class="scan-sweep" id="scan-sweep" aria-hidden="true"></div>
+            <img id="preview" data-i18n-alt="map.previewAlt" alt="yüklenen harita" />
+            <canvas id="preview-marks" aria-hidden="true"></canvas>
+            <canvas id="preview-ruler" aria-hidden="true"></canvas>
+            <div class="preview-corner tl"></div>
+            <div class="preview-corner tr"></div>
+            <div class="preview-corner bl"></div>
+            <div class="preview-corner br"></div>
+          </div>
+        </div><!-- /ops-core-b -->
+        </section>
+
+        <!-- Orta: 3D sahne (tek ortak sahne; modülüne göre katmanlar açılır) -->
+        <section class="panel panel-stage glass" id="panel-stage">
+          <div class="view-tabs">
+            <span class="stage-title">
+              <span class="panel-tag">STAGE</span>
+              TACTICAL VIEW · 3D
+            </span>
+            <label class="hints-3d-toggle" data-i18n-title="stage.showHintsTitle" title="3D'de yapı ipuçlarını göster/gizle">
+              <input type="checkbox" id="hints-3d-visible" checked />
+              <span data-i18n="stage.showHints">İpuçları</span>
+            </label>
+            <span class="hint-inline" data-i18n="stage.hint">Sürükle: döndür · tekerlek: zoom</span>
+          </div>
+          <div class="frame-wrap viewer-3d hud-frame" id="viewer">
+            <div class="hud-corners" aria-hidden="true">
+              <span class="hc tl"></span>
+              <span class="hc tr"></span>
+              <span class="hc bl"></span>
+              <span class="hc br"></span>
+            </div>
+            <div class="placeholder" id="placeholder" data-i18n-html="stage.placeholder">
+              JPG / PNG yükle → çekim tipi seç → <strong>Analizi Başlat</strong>
+            </div>
+          </div>
+          <!-- Heatmap: 3D sahnenin altında bölünmüş görünüm (sadece CSV modülününde) -->
+          <div id="split-heatmap" data-mod-show="csv" style="display:none;flex-shrink:0;border-top:1px solid var(--line);background:rgba(8,12,16,0.9);padding:6px 8px;">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:4px;font-family:var(--font-mono);font-size:0.62rem;color:var(--muted);letter-spacing:0.04em;">
+              <span style="color:var(--accent)">HEATMAP</span>
+              <span id="split-heatmap-info"></span>
+            </div>
+            <div style="display:flex;gap:4px;align-items:flex-start;">
+              <canvas id="split-heatmap-yaxis" width="28" height="180" style="width:28px;min-height:180px;image-rendering:auto;"></canvas>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                <canvas id="split-heatmap-canvas" style="width:100%;min-height:180px;border:1px solid var(--line);border-radius:var(--r-sharp);background:#080c10;image-rendering:auto;cursor:crosshair;"></canvas>
+                <canvas id="split-heatmap-xaxis" style="width:100%;height:16px;image-rendering:auto;"></canvas>
+              </div>
+              <canvas id="split-heatmap-legend" style="border:1px solid var(--line);border-radius:var(--r-sharp);"></canvas>
+            </div>
+            <div id="split-heatmap-stats" style="font-family:var(--font-mono);font-size:0.65rem;color:var(--muted);margin-top:3px;letter-spacing:0.04em;"></div>
+          </div>
+        </section>
+
+        <!-- Sağ: doğrulama raporu — Tree Accordion -->
+        <section class="panel panel-intel glass" id="panel-intel">
+          <!-- 📊 Genel Bakış (her zaman görünür) -->
+          <div class="panel-head">
+            <span class="panel-tag">INTEL</span>
+            <h2 data-i18n="intel.title">Analiz Raporu</h2>
+          </div>
+          <p class="hint compact" id="intel-engine" style="margin-bottom:0.2rem;">Hesap: —</p>
+          <p class="hint compact" id="intel-soil" style="margin-bottom:0.3rem;">Toprak: —</p>
+          <p class="hint compact" id="intel-dual-status" style="margin-bottom:0.3rem;color:#888;">Çift Analiz: pasif</p>
+
+          <!-- 🔍 Tespitler -->
+          <details class="tree-section" open>
+            <summary>
+              <span class="tree-icon">🔍</span>
+              <span class="tree-label">TESPİTLER</span>
+              <span class="tree-badge" id="intel-count-badge">0</span>
+            </summary>
+            <div class="tree-body">
+              <div class="intel-metrics" id="intel-metrics">
+                <div class="metric">
+                  <span data-i18n="intel.accepted">Kabul</span>
+                  <strong id="m-accepted">0</strong>
+                </div>
+                <div class="metric warn">
+                  <span data-i18n="intel.rejected">Red</span>
+                  <strong id="m-rejected">0</strong>
+                </div>
+                <div class="metric void">
+                  <span data-i18n="intel.rooms">Oda/Mezar</span>
+                  <strong id="m-rooms">0</strong>
+                </div>
+                <div class="metric void">
+                  <span data-i18n="intel.shafts">Şaft</span>
+                  <strong id="m-shafts">0</strong>
+                </div>
+                <div class="metric void">
+                  <span data-i18n="intel.tunnels">Tünel</span>
+                  <strong id="m-tunnels">0</strong>
+                </div>
+                <div class="metric metal">
+                  <span data-i18n="intel.metal">Metal</span>
+                  <strong id="m-metals">0</strong>
+                </div>
+                <div class="metric water">
+                  <span data-i18n="intel.water">Olası su</span>
+                  <strong id="m-waters">0</strong>
+                </div>
+                <div class="metric">
+                  <span data-i18n="intel.meanSym">Ort. simetri</span>
+                  <strong id="m-sym">—</strong>
+                </div>
+                <div class="metric">
+                  <span data-i18n="intel.highSym">Yüksek simetri</span>
+                  <strong id="m-sym-hi">0</strong>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- 📊 Oranlar -->
+          <details class="tree-section" open>
+            <summary>
+              <span class="tree-icon">📊</span>
+              <span class="tree-label">ORANLAR</span>
+            </summary>
+            <div class="tree-body">
+              <div class="intel-bars" id="intel-bars">
+                <div class="bar-row">
+                  <span data-i18n="intel.void">Boşluk</span>
+                  <div class="bar-track"><div class="bar-fill void" id="bar-void" style="width: 0%"></div></div>
+                  <em id="bar-void-pct">0%</em>
+                </div>
+                <div class="bar-row">
+                  <span data-i18n="intel.tunnel">Tünel</span>
+                  <div class="bar-track"><div class="bar-fill tunnel" id="bar-tunnel" style="width: 0%"></div></div>
+                  <em id="bar-tunnel-pct">0%</em>
+                </div>
+                <div class="bar-row">
+                  <span data-i18n="intel.metal">Metal</span>
+                  <div class="bar-track"><div class="bar-fill metal" id="bar-metal" style="width: 0%"></div></div>
+                  <em id="bar-metal-pct">0%</em>
+                </div>
+                <div class="bar-row">
+                  <span data-i18n="intel.symmetry">Simetri</span>
+                  <div class="bar-track"><div class="bar-fill void" id="bar-sym" style="width: 0%"></div></div>
+                  <em id="bar-sym-pct">0%</em>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- 🏛 Yapılar -->
+          <details class="tree-section" open>
+            <summary>
+              <span class="tree-icon">🏛️</span>
+              <span class="tree-label">YAPILAR</span>
+              <span class="tree-badge" id="structure-count-badge">0</span>
+            </summary>
+            <div class="tree-body">
+              <div class="structure-list" id="structure-list">
+                <p class="hint" data-i18n="list.empty" style="font-size:0.62rem;">Analiz sonrası doğrulanan yapılar burada listelenir.</p>
+              </div>
+            </div>
+          </details>
+
+          <!-- 🔎 DTA İpuçları -->
+          <details class="tree-section" id="map-hints-fold" open>
+            <summary>
+              <span class="tree-icon">🔎</span>
+              <span class="tree-label">DTA İPUÇLARI</span>
+              <span class="tree-badge" id="hints-count-badge" style="display:none;">0</span>
+            </summary>
+            <div class="tree-body" id="map-hints-panel">
+              <p class="hint compact" id="map-hints-meta" style="font-size:0.62rem;">Harita analiz edilince burada görünür.</p>
+              <label class="dta-auto-check" style="font-size:0.65rem;">
+                <input type="checkbox" id="map-hints-enabled" checked disabled />
+                <span data-i18n="hints.use">Bu haritada DTA ipuçlarını kullan</span>
+              </label>
+              <div class="map-hints-list" id="map-hints-list">
+                <p class="hint compact" data-i18n="hints.none" style="font-size:0.62rem;">Kayıtlı DTA ipucu yok.</p>
+              </div>
+            </div>
+          </details>
+          <details class="tree-section" id="timeseries-fold">
+            <summary class="tree-header">
+              <span class="tree-icon">📅</span>
+              <span class="tree-label">ZAMAN SERİSİ</span>
+              <span class="tree-badge" id="ts-session-count" style="display:none;">0</span>
+            </summary>
+            <div class="tree-body" id="timeseries-panel">
+              <p style="font-size:0.62rem;color:var(--muted);margin-bottom:0.4rem;">Aynı alanda farklı tarihlerdeki analizleri karşılaştırın.</p>
+              <div style="display:flex;gap:0.3rem;margin-bottom:0.4rem;">
+                <button type="button" id="ts-save" class="mil accent" style="font-size:0.62rem;padding:0.25rem 0.5rem;flex:1;">💾 Bu Oturumu Kaydet</button>
+              </div>
+              <div id="ts-session-list" style="font-size:0.6rem;color:var(--muted);margin-bottom:0.4rem;"></div>
+              <div style="display:flex;gap:0.3rem;margin-bottom:0.4rem;">
+                <select id="ts-select-a" style="flex:1;font-size:0.6rem;padding:0.2rem;">
+                  <option value="">— İlk Oturum —</option>
+                </select>
+                <span style="color:var(--muted);font-size:0.6rem;line-height:1.8;">vs</span>
+                <select id="ts-select-b" style="flex:1;font-size:0.6rem;padding:0.2rem;">
+                  <option value="">— İkinci Oturum —</option>
+                </select>
+              </div>
+              <button type="button" id="ts-compare" class="mil" disabled style="font-size:0.62rem;padding:0.25rem 0.5rem;width:100%;margin-bottom:0.4rem;">🔀 Karşılaştır</button>
+              <div id="ts-result" style="display:none;"></div>
+            </div>
+          </details>
+        </section>
+      </main>
+      <div class="dft-stamp" aria-hidden="true">
+        <span class="dft-stamp-name">Barış Aydemir</span>
+        <span class="dft-stamp-sep">·</span>
+        <span class="dft-stamp-co">Digital Future Tech</span>
+      </div>
+    </div>
+    <div id="csv-3d-pick-tooltip" style="display:none;position:fixed;z-index:9999;background:rgba(10,16,24,0.94);border:1px solid #3edc8c;border-radius:var(--r-sharp,4px);padding:8px 12px;font-family:var(--font-mono,monospace);font-size:0.72rem;color:#c8d8c8;pointer-events:none;white-space:pre-line;max-width:280px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
+    <script type="module" src="/ui/main.js"></script>
+    <script>
+      // Modul/JS hatasinda splash sonsuza kalmasin
+      window.setTimeout(function () {
+        var el = document.getElementById("boot-splash");
+        if (!el) return;
+        el.classList.add("is-done");
+        el.setAttribute("aria-busy", "false");
+        window.setTimeout(function () {
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        }, 450);
+      }, 12000);
+    </script>
+  </body>
+</html>

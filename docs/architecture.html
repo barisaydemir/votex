@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOTEX Mimari Diyagramı</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #080c14;
+    --surface: #0e1520;
+    --surface2: #141c2b;
+    --border: #1e2d3d;
+    --accent: #3edc8c;
+    --accent2: #7ef0a8;
+    --blue: #4a9eff;
+    --cyan: #00d4aa;
+    --red: #ff4a4a;
+    --orange: #ff8c42;
+    --gold: #ffd27a;
+    --purple: #9b5cf6;
+    --text: #e8f0f4;
+    --text2: #8ea8b8;
+    --text3: #5a7080;
+    --glow-green: 0 0 20px rgba(62,220,140,0.3);
+    --glow-blue: 0 0 20px rgba(74,158,255,0.3);
+    --glow-purple: 0 0 20px rgba(155,92,246,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ── Header ──────────────────────────────── */
+  .header {
+    text-align: center;
+    padding: 40px 20px 20px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .header h1 {
+    font-size: 32px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--cyan) 50%, var(--blue) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .header p {
+    font-size: 14px;
+    color: var(--text3);
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  /* ── Controls ────────────────────────────── */
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 20px 20px;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 10;
+  }
+
+  .ctrl-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+
+  .ctrl-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: var(--glow-green);
+  }
+
+  .ctrl-btn.active {
+    background: rgba(62,220,140,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── Diagram Canvas ──────────────────────── */
+  .diagram-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 800px;
+  }
+
+  .diagram-svg {
+    width: 100%;
+    height: 780px;
+    position: relative;
+  }
+
+  /* ── Node ────────────────────────────────── */
+  .node {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 5;
+    user-select: none;
+  }
+
+  .node:hover {
+    transform: translateY(-3px) scale(1.02);
+    z-index: 20;
+    box-shadow: var(--glow-green);
+    border-color: var(--accent);
+  }
+
+  .node.expanded {
+    z-index: 25;
+    box-shadow: 0 0 40px rgba(62,220,140,0.2);
+    border-color: var(--accent);
+  }
+
+  .node-icon {
+    font-size: 24px;
+    margin-bottom: 6px;
+  }
+
+  .node-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .node-sub {
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 2px;
+    white-space: nowrap;
+  }
+
+  .node-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.3); }
+  }
+
+  /* Node colors */
+  .node.rust { border-left: 3px solid var(--orange); }
+  .node.rust .node-dot { background: var(--orange); }
+  .node.js { border-left: 3px solid var(--gold); }
+  .node.js .node-dot { background: var(--gold); }
+  .node.three { border-left: 3px solid var(--blue); }
+  .node.three .node-dot { background: var(--blue); }
+  .node.ext { border-left: 3px solid var(--purple); }
+  .node.ext .node-dot { background: var(--purple); }
+  .node.core { border-left: 3px solid var(--accent); }
+  .node.core .node-dot { background: var(--accent); }
+  .node.ui { border-left: 3px solid var(--cyan); }
+  .node.ui .node-dot { background: var(--cyan); }
+
+  /* ── Tooltip / Detail Panel ──────────────── */
+  .detail-panel {
+    position: fixed;
+    top: 50%;
+    right: 30px;
+    transform: translateY(-50%) translateX(20px);
+    width: 340px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .detail-panel.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  .detail-panel .dp-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dp-icon {
+    font-size: 32px;
+  }
+
+  .dp-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .dp-subtitle {
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  .dp-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--text3);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+
+  .dp-close:hover { color: var(--red); }
+
+  .dp-section {
+    margin-bottom: 14px;
+  }
+
+  .dp-section h4 {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .dp-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .dp-list li {
+    font-size: 11.5px;
+    color: var(--text2);
+    padding: 4px 0;
+    padding-left: 14px;
+    position: relative;
+    line-height: 1.5;
+  }
+
+  .dp-list li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .dp-tag {
+    display: inline-block;
+    background: rgba(62,220,140,0.1);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin: 2px 2px 2px 0;
+  }
+
+  .dp-tag.blue { background: rgba(74,158,255,0.1); color: var(--blue); }
+  .dp-tag.orange { background: rgba(255,140,66,0.1); color: var(--orange); }
+  .dp-tag.purple { background: rgba(155,92,246,0.1); color: var(--purple); }
+  .dp-tag.gold { background: rgba(255,210,122,0.1); color: var(--gold); }
+
+  .dp-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--cyan);
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  /* ── SVG Connections ─────────────────────── */
+  .connections-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .conn-line {
+    stroke: var(--border);
+    stroke-width: 1.5;
+    fill: none;
+    opacity: 0.4;
+    transition: all 0.3s;
+  }
+
+  .conn-line.highlight {
+    stroke: var(--accent);
+    stroke-width: 2;
+    opacity: 0.8;
+    filter: drop-shadow(0 0 4px rgba(62,220,140,0.4));
+  }
+
+  .conn-dot {
+    fill: var(--accent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .conn-dot.animate {
+    opacity: 1;
+  }
+
+  /* ── Legend ───────────────────────────────── */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 20px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+
+  /* ── Zone Labels ─────────────────────────── */
+  .zone-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text3);
+    opacity: 0.3;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .zone-bg {
+    position: absolute;
+    border: 1px dashed;
+    border-radius: 16px;
+    opacity: 0.08;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ── Animations ──────────────────────────── */
+  @keyframes flowDash {
+    to { stroke-dashoffset: -20; }
+  }
+
+  .conn-line.flowing {
+    stroke-dasharray: 8 4;
+    animation: flowDash 1s linear infinite;
+    opacity: 0.5;
+  }
+
+  /* ── Footer ──────────────────────────────── */
+  .footer {
+    text-align: center;
+    padding: 30px 20px 40px;
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  /* ── Responsive ──────────────────────────── */
+  @media (max-width: 900px) {
+    .detail-panel {
+      position: fixed;
+      top: auto;
+      bottom: 0;
+      right: 0;
+      left: 0;
+      width: 100%;
+      border-radius: 16px 16px 0 0;
+      transform: translateY(100%);
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    .detail-panel.visible {
+      transform: translateY(0);
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>VOTEX Mimari Diyagramı</h1>
+  <p>Düğümlere tıklayarak detaylı bilgi alın. Canlı veri akışı animasyonlarını izleyin.</p>
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn active" onclick="showLayer('all')">Tümü</button>
+  <button class="ctrl-btn" onclick="showLayer('rust')">🦀 Rust Backend</button>
+  <button class="ctrl-btn" onclick="showLayer('js')">📜 JavaScript Frontend</button>
+  <button class="ctrl-btn" onclick="showLayer('three')">🎮 3D Motor</button>
+  <button class="ctrl-btn" onclick="showLayer('ext')">🔗 Dış Sistemler</button>
+  <button class="ctrl-btn" onclick="toggleFlow()">⚡ Veri Akışı</button>
+  <button class="ctrl-btn" onclick="resetView()">↻ Sıfırla</button>
+</div>
+
+<div class="diagram-wrap" id="diagramWrap">
+  <!-- Zone backgrounds -->
+  <div class="zone-bg" style="top:30px;left:20px;width:480px;height:720px;border-color:var(--orange);"></div>
+  <div class="zone-bg" style="top:30px;left:520px;width:480px;height:720px;border-color:var(--gold);"></div>
+  <div class="zone-bg" style="top:30px;left:520px;width:480px;height:420px;border-color:var(--blue);"></div>
+  <div class="zone-bg" style="top:30px;left:1020px;width:340px;height:720px;border-color:var(--purple);"></div>
+
+  <!-- Zone labels -->
+  <div class="zone-label" style="top:14px;left:180px;">Rust Backend</div>
+  <div class="zone-label" style="top:14px;left:680px;">JavaScript Frontend</div>
+  <div class="zone-label" style="top:440px;left:680px;color:var(--blue);opacity:0.2;">3D Viewer</div>
+  <div class="zone-label" style="top:14px;left:1120px;">Dış Sistemler</div>
+
+  <!-- SVG Connections -->
+  <svg class="connections-svg" id="connSvg"></svg>
+
+  <!-- ════════════════════════════════════════ RUST NODES -->
+  <div class="node rust" id="n-magnetic" style="top:60px;left:40px;" data-layer="rust"
+       onclick="showDetail('magnetic')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🧲</div>
+    <div class="node-title">Manyetik Analiz</div>
+    <div class="node-sub">magnetic/</div>
+  </div>
+
+  <div class="node rust" id="n-structures" style="top:180px;left:40px;" data-layer="rust"
+       onclick="showDetail('structures')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🏛️</div>
+    <div class="node-title">Yapı Tespiti</div>
+    <div class="node-sub">structures/</div>
+  </div>
+
+  <div class="node rust" id="n-surface" style="top:300px;left:40px;" data-layer="rust"
+       onclick="showDetail('surface')">
+    <div class="node-dot"></div>
+    <div class="node-icon">📐</div>
+    <div class="node-title">Yüzey Modelleri</div>
+    <div class="node-sub">surface/models.rs</div>
+  </div>
+
+  <div class="node rust" id="n-report" style="top:420px;left:40px;" data-layer="rust"
+       onclick="showDetail('report')">
+    <div class="node-dot"></div>
+    <div class="node-icon">📋</div>
+    <div class="node-title">Analiz Raporu</div>
+    <div class="node-sub">analysis_report.rs</div>
+  </div>
+
+  <div class="node rust" id="n-hints" style="top:540px;left:40px;" data-layer="rust"
+       onclick="showDetail('hints')">
+    <div class="node-dot"></div>
+    <div class="node-icon">💡</div>
+    <div class="node-title">İpucu Sistemi</div>
+    <div class="node-sub">hints.rs</div>
+  </div>
+
+  <div class="node rust" id="n-soil" style="top:640px;left:40px;" data-layer="rust"
+       onclick="showDetail('soil')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🌍</div>
+    <div class="node-title">Toprak Profili</div>
+    <div class="node-sub">soil_profile.rs</div>
+  </div>
+
+  <!-- Sub-modules -->
+  <div class="node rust" id="n-classify" style="top:200px;left:230px;" data-layer="rust"
+       onclick="showDetail('classify')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🏷️</div>
+    <div class="node-title">Sınıflandırma</div>
+    <div class="node-sub">classify.rs</div>
+  </div>
+
+  <div class="node rust" id="n-symmetry" style="top:320px;left:230px;" data-layer="rust"
+       onclick="showDetail('symmetry')">
+    <div class="node-dot"></div>
+    <div class="node-icon">⚖️</div>
+    <div class="node-title">Geometri Analizi</div>
+    <div class="node-sub">analysis/</div>
+  </div>
+
+  <div class="node rust" id="n-session" style="top:440px;left:230px;" data-layer="rust"
+       onclick="showDetail('session')">
+    <div class="node-dot"></div>
+    <div class="node-icon">💾</div>
+    <div class="node-title">Oturum Kayıt</div>
+    <div class="node-sub">session_persist.rs</div>
+  </div>
+
+  <div class="node rust" id="n-hintstore" style="top:560px;left:230px;" data-layer="rust"
+       onclick="showDetail('hintstore')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🗄️</div>
+    <div class="node-title">İpucu Deposu</div>
+    <div class="node-sub">hint_store.rs</div>
+  </div>
+
+  <div class="node rust" id="n-license" style="top:660px;left:230px;" data-layer="rust"
+       onclick="showDetail('license')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🔑</div>
+    <div class="node-title">Lisans</div>
+    <div class="node-sub">license.rs</div>
+  </div>
+
+  <!-- ════════════════════════════════════════ JS FRONTEND NODES -->
+  <div class="node core" id="n-ipc" style="top:100px;left:530px;" data-layer="js"
+       onclick="showDetail('ipc')">
+    <div class="node-dot"></div>
+    <div class="node-icon">⚡</div>
+    <div class="node-title">Tauri IPC</div>
+    <div class="node-sub">invoke / emit</div>
+  </div>
+
+  <div class="node js" id="n-hybrid" style="top:220px;left:530px;" data-layer="js"
+       onclick="showDetail('hybrid')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🔬</div>
+    <div class="node-title">Hibrit Analiz Motoru</div>
+    <div class="node-sub">hybridEngine.js</div>
+  </div>
+
+  <div class="node js" id="n-fusion" style="top:340px;left:530px;" data-layer="js"
+       onclick="showDetail('fusion')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🔀</div>
+    <div class="node-title">Veri Füzyonu</div>
+    <div class="node-sub">dataFusion.js</div>
+  </div>
+
+  <div class="node js" id="n-depth" style="top:460px;left:530px;" data-layer="js"
+       onclick="showDetail('depth')">
+    <div class="node-dot"></div>
+    <div class="node-icon">📏</div>
+    <div class="node-title">Derinlik Analizi</div>
+    <div class="node-sub">depthAnalysis.js</div>
+  </div>
+
+  <div class="node js" id="n-crossval" style="top:580px;left:530px;" data-layer="js"
+       onclick="showDetail('crossval')">
+    <div class="node-dot"></div>
+    <div class="node-icon">✅</div>
+    <div class="node-title">Çapraz Doğrulama</div>
+    <div class="node-sub">crossValidation.js</div>
+  </div>
+
+  <div class="node js" id="n-imgproc" style="top:700px;left:530px;" data-layer="js"
+       onclick="showDetail('imgproc')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🖼️</div>
+    <div class="node-title">Görüntü İşleme</div>
+    <div class="node-sub">imageProcessor.js</div>
+  </div>
+
+  <!-- ════════════════════════════════════════ 3D VIEWER NODES -->
+  <div class="node three" id="n-scene" style="top:60px;left:800px;" data-layer="three"
+       onclick="showDetail('scene')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🎬</div>
+    <div class="node-title">Sahne Yönetimi</div>
+    <div class="node-sub">scene.js · Render-on-demand</div>
+  </div>
+
+  <div class="node three" id="n-ground" style="top:180px;left:800px;" data-layer="three"
+       onclick="showDetail('ground')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🏔️</div>
+    <div class="node-title">Zemin</div>
+    <div class="node-sub">ground.js · Mesh + Kontur</div>
+  </div>
+
+  <div class="node three" id="n-builders" style="top:300px;left:800px;" data-layer="three"
+       onclick="showDetail('builders')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🔨</div>
+    <div class="node-title">Yapı Builder'ları</div>
+    <div class="node-sub">chamber · tunnel · metal · water</div>
+  </div>
+
+  <div class="node three" id="n-xray" style="top:420px;left:800px;" data-layer="three"
+       onclick="showDetail('xray')">
+    <div class="node-dot"></div>
+    <div class="node-icon">👁️</div>
+    <div class="node-title">X-Ray / Fresnel</div>
+    <div class="node-sub">xray.js · Shader</div>
+  </div>
+
+  <div class="node three" id="n-labels3d" style="top:540px;left:800px;" data-layer="three"
+       onclick="showDetail('labels3d')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🏷️</div>
+    <div class="node-title">Etiketler + Solma</div>
+    <div class="node-sub">labels.js · labelFade.js</div>
+  </div>
+
+  <div class="node three" id="n-aq" style="top:660px;left:800px;" data-layer="three"
+       onclick="showDetail('aq')">
+    <div class="node-dot"></div>
+    <div class="node-icon">⚡</div>
+    <div class="node-title">FPS Otomatik Kademe</div>
+    <div class="node-sub">adaptiveQuality.js</div>
+  </div>
+
+  <!-- ════════════════════════════════════════ UI NODES -->
+  <div class="node ui" id="n-analysis" style="top:460px;left:620px;" data-layer="js"
+       onclick="showDetail('analysis')">
+    <div class="node-dot"></div>
+    <div class="node-icon">📊</div>
+    <div class="node-title">Analiz Paneli</div>
+    <div class="node-sub">analysisPanel.js</div>
+  </div>
+
+  <div class="node ui" id="n-keys" style="top:580px;left:720px;" data-layer="js"
+       onclick="showDetail('keys')">
+    <div class="node-dot"></div>
+    <div class="node-icon">⌨️</div>
+    <div class="node-title">Klavye Kısayolları</div>
+    <div class="node-sub">viewerKeys.js</div>
+  </div>
+
+  <div class="node ui" id="n-telemetry" style="top:700px;left:720px;" data-layer="js"
+       onclick="showDetail('telemetry')">
+    <div class="node-dot"></div>
+    <div class="node-icon">📡</div>
+    <div class="node-title">Telemetri</div>
+    <div class="node-sub">telemetry.js · heartbeat</div>
+  </div>
+
+  <!-- ════════════════════════════════════════ EXTERNAL NODES -->
+  <div class="node ext" id="n-dta" style="top:100px;left:1130px;" data-layer="ext"
+       onclick="showDetail('dta')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🔗</div>
+    <div class="node-title">DTA Köprüsü</div>
+    <div class="node-sub">TCP 127.0.0.1:18765</div>
+  </div>
+
+  <div class="node ext" id="n-vpe" style="top:250px;left:1130px;" data-layer="ext"
+       onclick="showDetail('vpe')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🧪</div>
+    <div class="node-title">VotexProb Motoru</div>
+    <div class="node-sub">TCP 127.0.0.1:18766</div>
+  </div>
+
+  <div class="node ext" id="n-updater" style="top:400px;left:1130px;" data-layer="ext"
+       onclick="showDetail('updater')">
+    <div class="node-dot"></div>
+    <div class="node-icon">🔄</div>
+    <div class="node-title">Güncelleyici</div>
+    <div class="node-sub">updater.rs</div>
+  </div>
+
+  <div class="node ext" id="n-archive" style="top:520px;left:1130px;" data-layer="ext"
+       onclick="showDetail('archive')">
+    <div class="node-dot"></div>
+    <div class="node-icon">📁</div>
+    <div class="node-title">Arşiv</div>
+    <div class="node-sub">archive.rs · APPDATA</div>
+  </div>
+
+  <div class="node ext" id="n-fileio" style="top:650px;left:1130px;" data-layer="ext"
+       onclick="showDetail('fileio')">
+    <div class="node-dot"></div>
+    <div class="node-icon">📂</div>
+    <div class="node-title">Dosya G/Ç</div>
+    <div class="node-sub">Görüntü · CSV · Excel</div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--orange);"></div> Rust Backend</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--gold);"></div> JavaScript Modül</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--blue);"></div> 3D Motor</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--cyan);"></div> UI Bileşeni</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent);"></div> Köprü / Çekirdek</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--purple);"></div> Dış Sistem</div>
+</div>
+
+<!-- Detail Panel -->
+<div class="detail-panel" id="detailPanel">
+  <button class="dp-close" onclick="hideDetail()">✕</button>
+  <div id="detailContent"></div>
+</div>
+
+<div class="footer">
+  VOTEX 0.1.74 · Mimari Diyagramı · Digital Future Tech © 2026
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DETAIL DATA
+// ═══════════════════════════════════════════════════════════════
+
+const DETAILS = {
+  magnetic: {
+    icon: '🧲', title: 'Manyetik Analiz', sub: 'magnetic/',
+    sections: [
+      { title: 'İşlev', items: ['Ham manyetik nT değerlerini renk haritasına dönüştürür', 'Anomali sınıflandırma: Neutral / PositiveMetal / NegativeVoid', 'Proton ELIC uyumlu bipolar palet'] },
+      { title: 'Kalibrasyon', items: ['Median (robust, outlier dayanıklı)', 'Mean (ortalama)', 'Sabit (kullanıcı tanımlı nT)'] },
+      { title: 'Eşik Parametreleri', tags: ['neutral_tolerance: 25nT', 'hysteresis: 12nT', 'moving_avg: 5'] }
+    ]
+  },
+  structures: {
+    icon: '🏛️', title: 'Yapı Tespiti', sub: 'structures/',
+    sections: [
+      { title: 'Tespit Edilen Yapı Türleri', tags: ['Room (Oda)', 'Tomb (Mezar)', 'Shaft (Kuyu)', 'Tunnel (Tünel)', 'Metal Anomali', 'Water (Su)'] },
+      { title: 'Analiz Yöntemleri', items: ['Blob tespiti (PCA ekseni, doluluk, dış kontur)', 'Simetri endeksi ve dikdörtgensellik', 'Fiziksel 1/r^n derinlik kestirimi', 'Çoklu kademe (tier 0–3)'] },
+      { title: 'Kanıt Vektörü', items: ['SNR (sinyal/gürültü oranı)', 'Duvar desteği', 'Yol desteği', 'Sınıf marjı'] }
+    ]
+  },
+  surface: {
+    icon: '📐', title: 'Yüzey Modelleri', sub: 'surface/models.rs',
+    sections: [
+      { title: 'Surface3D', items: ['Grid boyutu + yükseklik dizisi', 'Renk dizisi (bipolar)', 'Harita ölçüleri (m)', 'Toprak profili + derinlik ölçeği'] },
+      { title: 'UndergroundStructures', items: ['chambers[] · tunnels[] · metals[] · waters[]', 'GeometryAnalysis (simetri, fit, uzama)', 'SiteGeometryReport (saha istatistikleri)'] }
+    ]
+  },
+  report: {
+    icon: '📋', title: 'Analiz Raporu', sub: 'analysis_report.rs',
+    sections: [
+      { title: 'Güvenilirlik Sınıflandırması', items: ['high: ≥%70 güven, SNR≥1.5, net duvar', 'medium: %50–70 güven', 'low: %35–50 güven', 'rejected: <%35 güven'] },
+      { title: 'Öncelik Sıralaması', items: ['Yüksek güvenilirlik → Orta → Düşük', 'Ardışık numaralandırma (1, 2, 3...)', 'Metal anomalileri dahil'] },
+      { title: 'AI Gerektirmez', tags: ['Kurallı rapor', 'Otomatik uyarı', 'Öneri üretimi'] }
+    ]
+  },
+  hints: {
+    icon: '💡', title: 'İpucu Sistemi', sub: 'hints.rs',
+    sections: [
+      { title: 'StructureHint Türleri', tags: ['room', 'tomb', 'tunnel', 'metal', 'shaft'] },
+      { title: 'İşlevler', items: ['Mevcut yapıları güçlendirme', 'Yeni yapı enjekte etme', 'DTA yönlendirmelerini 3D\'ye çevirme'] }
+    ]
+  },
+  soil: {
+    icon: '🌍', title: 'Toprak Profili', sub: 'soil_profile.rs',
+    sections: [
+      { title: 'Profiller', items: ['🏖️ Kum / Çakıl → ×1.10', '🌿 Tın / Nötr → ×1.00 (referans)', '🪨 Nemli Kil → ×0.85', '🔴 Laterit / Demirli → ×0.70', '🍂 Organik / Humus → ×0.95'] },
+      { title: 'Etki', items: ['Manyetik yayılımı etkiler', 'Derinlik kestiriminde çarpan olarak kullanılır'] }
+    ]
+  },
+  classify: {
+    icon: '🏷️', title: 'Sınıflandırma', sub: 'classify.rs',
+    sections: [
+      { title: 'VoidClass Enum', tags: ['Room', 'Tomb', 'Shaft', 'Tunnel', 'Noise'] },
+      { title: 'Kriterler', items: ['Boyut oranı (genişlik/uzunluk)', 'Doluluk oranı', 'Derinlik/kot farkı', 'Çevresel yapısal bağlam'] }
+    ]
+  },
+  symmetry: {
+    icon: '⚖️', title: 'Geometri Analizi', sub: 'analysis/',
+    sections: [
+      { title: 'Analiz Metrikleri', items: ['Simetri endeksi ve ekseni', 'Dikdörtgensellik oranı', 'Uzama oranı', 'Ayna kalıntı skoru'] },
+      { title: 'Fit Analizi', items: ['Ölçü uyum skoru (0–1)', 'Yön uyum skoru (0–1)', 'Otomatik düzeltme (fit_adjusted)'] }
+    ]
+  },
+  session: {
+    icon: '💾', title: 'Oturum Kayıt', sub: 'session_persist.rs',
+    sections: [
+      { title: 'Kaydedilen Veriler', items: ['Son analiz oturumu', 'DTA ipuçları', '3D yüzey verisi'] },
+      { title: 'Konum', tags: ['%APPDATA%\\Votex\\last_work.json', 'Otomatik kayıt', 'Otomatik yükleme'] }
+    ]
+  },
+  hintstore: {
+    icon: '🗄️', title: 'İpucu Deposu', sub: 'hint_store.rs',
+    sections: [
+      { title: 'Özellikler', items: ['SHA256 parmak izi ile harita tanıma', 'Maksimum 40 harita saklama', 'Harita bazlı açma/kapama', 'Aktif/pasif ipucu ayrımı'] },
+      { title: 'Konum', tags: ['%APPDATA%\\Votex\\map_hints.json'] }
+    ]
+  },
+  license: {
+    icon: '🔑', title: 'Lisans', sub: 'license.rs',
+    sections: [
+      { title: 'Doğrulama', items: ['HWID tabanlı (donanım kimliği)', 'HMAC-SHA256 imza', 'Yerel dosya kontrolü'] }
+    ]
+  },
+  ipc: {
+    icon: '⚡', title: 'Tauri IPC', sub: 'invoke / emit',
+    sections: [
+      { title: 'Yön', items: ['JS → Rust: invoke() ile komut çağrısı', 'Rust → JS: emit() ile olay yayını'] },
+      { title: 'Olaylar', tags: ['dta-guide', 'surface3d', 'dta-bridge', 'dta-contact', 'dta-link-status'] },
+      { title: 'Komut Sayısı', tags: ['~50 invoke handler'] }
+    ]
+  },
+  hybrid: {
+    icon: '🔬', title: 'Hibrit Analiz Motoru', sub: 'hybridEngine.js',
+    sections: [
+      { title: '5 Adımlı İş Akışı', items: ['1. Koordinat hizalama (auto/manuel)', '2. Veri füzyonu (ağırlıklı)', '3. Derinlik kestirimi', '4. Çapraz doğrulama', '5. İpucu üretimi'] },
+      { title: 'Özellikler', tags: ['Parametre hash önbelleği', 'Debounce koruması', 'İptal token\'ı', 'Otomatik UI güncelleme'] }
+    ]
+  },
+  fusion: {
+    icon: '🔀', title: 'Veri Füzyonu', sub: 'dataFusion.js',
+    sections: [
+      { title: 'Yöntem', items: ['k-NN komşu arama', 'Mesafe ağırlıklı ortalama', 'CSV ağırlığı: %0–100 ayarlanabilir'] },
+      { title: 'Güven Skorları', tags: ['Excellent ≥%85', 'Good ≥%65', 'Fair ≥%40', 'Poor <%20'] }
+    ]
+  },
+  depth: {
+    icon: '📏', title: 'Derinlik Analizi', sub: 'depthAnalysis.js',
+    sections: [
+      { title: 'Yöntem', items: ['Gradyan tabanlı (hızlı)', '3B potansiyel alanı inversiyonu (gelişmiş)'] },
+      { title: 'Fizik', items: ['Manyetik gradyan ∝ 1/derinlik', 'Güçlü sinyal → sığ anomali', 'Zayıf-yaygın sinyal → derin anomali'] }
+    ]
+  },
+  crossval: {
+    icon: '✅', title: 'Çapraz Doğrulama', sub: 'crossValidation.js',
+    sections: [
+      { title: 'İşlev', items: ['Image ve CSV tespitlerini karşılaştırma', 'Uyumlu / uyumsuz tespitleri ayıklama', 'Konsensüs ipuçları üretme'] }
+    ]
+  },
+  imgproc: {
+    icon: '🖼️', title: 'Görüntü İşleme', sub: 'imageProcessor.js',
+    sections: [
+      { title: 'İşlevler', items: ['Renk → nT dönüşüm LUT\'u', 'Grid çıkarma (konvolüsyon)', 'Gürültü azaltma', 'Düşük sinyal maskesi'] }
+    ]
+  },
+  scene: {
+    icon: '🎬', title: 'Sahne Yönetimi', sub: 'scene.js',
+    sections: [
+      { title: 'Render', tags: ['Render-on-demand', 'ACES Filmic', 'RoomEnvironment', 'PCFSoftShadow', 'Fog'] },
+      { title: 'Kesit Modu', items: ['Yatay clipping plane', 'Ayarlanabilir yükseklik (slider + ↑↓)', 'Zemin "soyulur", yapılar korunur'] },
+      { title: 'FPS Optimizasyonu', items: ['invalidate() → rAF döngüsü', 'Boşta GPU tamamen sessiz', '_lastClipConstant önbelleği'] }
+    ]
+  },
+  ground: {
+    icon: '🏔️', title: 'Zemin', sub: 'ground.js',
+    sections: [
+      { title: 'Dokular', tags: ['Colormap DataTexture', 'Önizleme dokusu', 'Mipmap + 8× Anizotropi'] },
+      { title: 'Kontur Çizgileri', items: ['fwidth tabanlı AA', 'Otomatik aralık seçimi', 'onBeforeCompile enjeksiyon'] },
+      { title: 'Relief', items: ['Manyetik imzadan yükseklik alanı', 'Kot yamaları (Gaussian)', 'Arazi örnekleyici (bilinear)'] }
+    ]
+  },
+  builders: {
+    icon: '🔨', title: 'Yapı Builder\'ları', sub: 'builders/',
+    sections: [
+      { title: 'Builder Modülleri', tags: ['chamber.js → Oda/Mezar/Shaft', 'tunnel.js → Tünel (silindir/İ-kesit)', 'metal.js → Metal (küre+halo)', 'water.js → Su (şeffaf bant)', 'freeDraw.js → Serbest çizim'] },
+      { title: 'Ortak Özellikler', items: ['Rozet + detay etiketi oluşturma', 'Gölge bayrağı', 'Kamera odak noktası', 'Wireframe desteği'] }
+    ]
+  },
+  xray: {
+    icon: '👁️', title: 'X-Ray / Fresnel', sub: 'xray.js',
+    sections: [
+      { title: 'Shader', items: ['Fresnel kenar parlaması', 'Yarı saydam hologram', 'Kameraya göre dinamik'] },
+      { title: 'Optimizasyon', items: ['Paylaşılan malzeme önbelleği', 'clearStructures ile uyumlu', 'votexXrayShared bayrağı'] }
+    ]
+  },
+  labels3d: {
+    icon: '🏷️', title: 'Etiketler + Solma', sub: 'labels.js · labelFade.js',
+    sections: [
+      { title: 'Etiket Türleri', tags: ['Rozet (map pin)', 'Detay kartları', 'Seçim halkası'] },
+      { title: 'Solma Mantığı', items: ['Zemin arkası: opaklık %12', 'Mesafe: 40m→110m arası solar', 'Önbellekli sprite listesi'] }
+    ]
+  },
+  aq: {
+    icon: '⚡', title: 'FPS Otomatik Kademe', sub: 'adaptiveQuality.js',
+    sections: [
+      { title: 'Kademe Tablosu', items: ['0 Tam: 2.0× DPR, 2048 gölge', '1 Dengeli: 1.5×, 1024', '2 Performans: 1.2×, 1024', '3 Uyumluluk: 1.0×, gölge yok'] },
+      { title: 'Mantık', items: ['FPS < 38 → düşür (2.5s soğuma)', 'FPS > 57 → yükselt (12s kararlılık)', 'Boşta → ölçüm durur, maliyet sıfır'] }
+    ]
+  },
+  analysis: {
+    icon: '📊', title: 'Analiz Paneli', sub: 'analysisPanel.js',
+    sections: [
+      { title: 'İçerik', items: ['Yapı kartları (güven, boyut, derinlik, SNR)', 'Öncelik sırası (ardışık 1,2,3...)', 'Metal tespitleri (Au/Ag/Fe vurgusu)', 'Uyarı/seçenek rozetleri'] }
+    ]
+  },
+  keys: {
+    icon: '⌨️', title: 'Klavye Kısayolları', sub: 'viewerKeys.js',
+    sections: [
+      { title: 'Kısayollar', items: ['K → Kesit modu', 'X → X-Ray görünümü', '↑/↓ → Kesit yüksekliği ±1m', 'Escape → Ölçü iptal'] }
+    ]
+  },
+  telemetry: {
+    icon: '📡', title: 'Telemetri + EKG', sub: 'telemetry.js · heartbeat.js',
+    sections: [
+      { title: 'EKG Monitörü', items: ['Canvas ECG çizgisi ~25fps', 'document.hidden\'de durur', 'Busy durumunda nabız artışı'] },
+      { title: 'Zamanlayıcılar', tags: ['DTA: 4sn (gizliyken atlar)', 'VPE: 5sn (gizliyken atlar)', 'Lisans: 60sn', 'Güncelleme: 45sn'] }
+    ]
+  },
+  dta: {
+    icon: '🔗', title: 'DTA Köprüsü', sub: 'TCP 127.0.0.1:18765',
+    sections: [
+      { title: 'Protokol', items: ['HTTP/1.1 TCP localhost', 'POST /guide → ipuçları enjekte', 'GET /status → durum sorgula'] },
+      { title: 'Özellikler', items: ['Otomatik başlatma (Votex açılışında)', 'Oturum + ipuçları otomatik kayıt', 'Çoklu harita ipucu saklama (40 harita)'] }
+    ]
+  },
+  vpe: {
+    icon: '🧪', title: 'VotexProb Motoru', sub: 'TCP 127.0.0.1:18766',
+    sections: [
+      { title: 'Protokol', items: ['HTTP/1.1 TCP localhost', 'Health / Policy / Decide endpointleri'] },
+      { title: 'Durum', tags: ['Faz A: stub modu', 'Python hesap sunucusu', 'Otomatik başlatma', 'Negatif önbellek: 1.2sn'] }
+    ]
+  },
+  updater: {
+    icon: '🔄', title: 'Güncelleyici', sub: 'updater.rs',
+    sections: [
+      { title: 'İşlevler', items: ['Versiyon kontrolü (45sn)', 'NSIS paket uygulama', 'Yerel dosya/klasör okuma'] }
+    ]
+  },
+  archive: {
+    icon: '📁', title: 'Arşiv', sub: 'archive.rs',
+    sections: [
+      { title: 'İşlevler', items: ['Harita arşivleme', 'Arşivden yükleme', 'Arşiv silme', 'APPDATA klasörü'] }
+    ]
+  },
+  fileio: {
+    icon: '📂', title: 'Dosya G/Ç', sub: 'io/',
+    sections: [
+      { title: 'Desteklenen Formatlar', tags: ['PNG / JPG (görüntü)', 'CSV (sayısal veri)', 'XLSX / XLS (Excel)'] },
+      { title: 'Akış', items: ['Tauri dosya dialogu', 'Base64 encoding (görüntü)', 'calamine (Excel okuma)'] }
+    ]
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// CONNECTION DEFINITIONS
+// ═══════════════════════════════════════════════════════════════
+
+const CONNECTIONS = [
+  // Rust internal
+  ['n-magnetic', 'n-structures'],
+  ['n-structures', 'n-surface'],
+  ['n-structures', 'n-report'],
+  ['n-structures', 'n-classify'],
+  ['n-structures', 'n-symmetry'],
+  ['n-structures', 'n-hints'],
+  ['n-hints', 'n-hintstore'],
+  ['n-hintstore', 'n-session'],
+  ['n-soil', 'n-surface'],
+  ['n-session', 'n-license'],
+
+  // JS internal
+  ['n-hybrid', 'n-fusion'],
+  ['n-hybrid', 'n-depth'],
+  ['n-hybrid', 'n-crossval'],
+  ['n-fusion', 'n-imgproc'],
+  ['n-depth', 'n-fusion'],
+
+  // 3D internal
+  ['n-scene', 'n-ground'],
+  ['n-scene', 'n-builders'],
+  ['n-scene', 'n-xray'],
+  ['n-scene', 'n-labels3d'],
+  ['n-scene', 'n-aq'],
+
+  // Cross-layer: Rust → JS (IPC)
+  ['n-surface', 'n-ipc'],
+  ['n-ipc', 'n-hybrid'],
+  ['n-ipc', 'n-analysis'],
+  ['n-ipc', 'n-scene'],
+
+  // JS → 3D
+  ['n-hybrid', 'n-builders'],
+  ['n-analysis', 'n-builders'],
+  ['n-keys', 'n-xray'],
+  ['n-keys', 'n-scene'],
+
+  // External
+  ['n-dta', 'n-ipc'],
+  ['n-vpe', 'n-ipc'],
+  ['n-fileio', 'n-ipc'],
+  ['n-archive', 'n-session'],
+  ['n-updater', 'n-ipc'],
+  ['n-telemetry', 'n-scene'],
+];
+
+// ═══════════════════════════════════════════════════════════════
+// LOGIC
+// ═══════════════════════════════════════════════════════════════
+
+let activeLayer = 'all';
+let flowActive = false;
+let selectedNode = null;
+
+function getCenter(id) {
+  const el = document.getElementById(id);
+  if (!el) return { x: 0, y: 0 };
+  return {
+    x: el.offsetLeft + el.offsetWidth / 2,
+    y: el.offsetTop + el.offsetHeight / 2
+  };
+}
+
+function drawConnections() {
+  const svg = document.getElementById('connSvg');
+  const wrap = document.getElementById('diagramWrap');
+  svg.setAttribute('viewBox', `0 0 ${wrap.offsetWidth} ${wrap.offsetHeight}`);
+  svg.innerHTML = '';
+
+  CONNECTIONS.forEach(([fromId, toId]) => {
+    const a = getCenter(fromId);
+    const b = getCenter(toId);
+    if (a.x === 0 && b.x === 0) return;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const dx = Math.abs(b.x - a.x);
+    const dy = Math.abs(b.y - a.y);
+    const curve = Math.min(dx, dy) * 0.3;
+
+    // Determine curve direction
+    let cpx1, cpy1, cpx2, cpy2;
+    if (Math.abs(a.y - b.y) > Math.abs(a.x - b.x) * 0.5) {
+      // Mostly vertical — curve horizontally
+      cpx1 = a.x + curve * (b.x > a.x ? 1 : -1);
+      cpy1 = a.y;
+      cpx2 = b.x + curve * (b.x > a.x ? -1 : 1);
+      cpy2 = b.y;
+    } else {
+      // Mostly horizontal — curve vertically
+      cpx1 = a.x;
+      cpy1 = a.y + curve * (b.y > a.y ? 1 : -1);
+      cpx2 = b.x;
+      cpy2 = b.y + curve * (b.y > a.y ? -1 : 1);
+    }
+
+    path.setAttribute('d', `M${a.x},${a.y} C${cpx1},${cpy1} ${cpx2},${cpy2} ${b.x},${b.y}`);
+    path.setAttribute('class', 'conn-line' + (flowActive ? ' flowing' : ''));
+    path.dataset.from = fromId;
+    path.dataset.to = toId;
+    svg.appendChild(path);
+  });
+}
+
+function showLayer(layer) {
+  activeLayer = layer;
+  document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  document.querySelectorAll('.node').forEach(n => {
+    const nl = n.dataset.layer;
+    const show = layer === 'all' || nl === layer;
+    n.style.opacity = show ? '1' : '0.1';
+    n.style.pointerEvents = show ? 'auto' : 'none';
+    n.style.transform = show ? '' : 'scale(0.95)';
+  });
+
+  // Highlight connections
+  document.querySelectorAll('.conn-line').forEach(c => {
+    const fromNode = document.getElementById(c.dataset.from);
+    const toNode = document.getElementById(c.dataset.to);
+    const fromLayer = fromNode?.dataset.layer;
+    const toLayer = toNode?.dataset.layer;
+    const visible = layer === 'all' || fromLayer === layer || toLayer === layer;
+    c.style.opacity = visible ? '' : '0.05';
+  });
+}
+
+function toggleFlow() {
+  flowActive = !flowActive;
+  document.querySelectorAll('.conn-line').forEach(c => {
+    c.classList.toggle('flowing', flowActive);
+  });
+  event.target.classList.toggle('active', flowActive);
+}
+
+function resetView() {
+  activeLayer = 'all';
+  flowActive = false;
+  document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.ctrl-btn').classList.add('active');
+  document.querySelectorAll('.node').forEach(n => {
+    n.style.opacity = '1';
+    n.style.pointerEvents = 'auto';
+    n.style.transform = '';
+  });
+  document.querySelectorAll('.conn-line').forEach(c => {
+    c.classList.remove('flowing');
+    c.style.opacity = '';
+  });
+  hideDetail();
+}
+
+function showDetail(id) {
+  const d = DETAILS[id];
+  if (!d) return;
+
+  selectedNode = id;
+  const panel = document.getElementById('detailPanel');
+  const content = document.getElementById('detailContent');
+
+  let html = `
+    <div class="dp-header">
+      <span class="dp-icon">${d.icon}</span>
+      <div>
+        <div class="dp-title">${d.title}</div>
+        <div class="dp-subtitle">${d.sub}</div>
+      </div>
+    </div>
+  `;
+
+  (d.sections || []).forEach(s => {
+    html += `<div class="dp-section"><h4>${s.title}</h4>`;
+    if (s.items) {
+      html += '<ul class="dp-list">';
+      s.items.forEach(i => { html += `<li>${i}</li>`; });
+      html += '</ul>';
+    }
+    if (s.tags) {
+      s.tags.forEach(t => { html += `<span class="dp-tag">${t}</span>`; });
+    }
+    html += '</div>';
+  });
+
+  content.innerHTML = html;
+  panel.classList.add('visible');
+
+  // Highlight connected
+  document.querySelectorAll('.conn-line').forEach(c => {
+    const connected = c.dataset.from === `n-${id}` || c.dataset.to === `n-${id}`;
+    c.classList.toggle('highlight', connected);
+  });
+
+  // Highlight node
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('expanded'));
+  document.getElementById(`n-${id}`)?.classList.add('expanded');
+}
+
+function hideDetail() {
+  selectedNode = null;
+  document.getElementById('detailPanel').classList.remove('visible');
+  document.querySelectorAll('.conn-line').forEach(c => c.classList.remove('highlight'));
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('expanded'));
+}
+
+// Close on ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') hideDetail();
+});
+
+// Close on click outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.node') && !e.target.closest('.detail-panel') && !e.target.closest('.ctrl-btn')) {
+    hideDetail();
+  }
+});
+
+// Draw connections on load and resize
+window.addEventListener('load', () => {
+  setTimeout(drawConnections, 100);
+});
+window.addEventListener('resize', () => {
+  drawConnections();
+});
+
+// Redraw periodically for layout stability
+let redrawTimer;
+const observer = new MutationObserver(() => {
+  clearTimeout(redrawTimer);
+  redrawTimer = setTimeout(drawConnections, 50);
+});
+document.querySelectorAll('.node').forEach(n => {
+  observer.observe(n, { attributes: true, attributeFilter: ['style'] });
+});
+</script>
+
+</body>
+</html>

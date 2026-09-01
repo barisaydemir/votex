@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOTEX 0.1.74 — Sürüm Notları</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #080c14;
+    --surface: #0e1520;
+    --surface2: #141c2b;
+    --border: #1e2d3d;
+    --accent: #3edc8c;
+    --blue: #4a9eff;
+    --cyan: #00d4aa;
+    --red: #ff4a4a;
+    --orange: #ff8c42;
+    --gold: #ffd27a;
+    --purple: #9b5cf6;
+    --text: #e8f0f4;
+    --text2: #8ea8b8;
+    --text3: #5a7080;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  .hero {
+    text-align: center;
+    padding: 60px 20px 40px;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 30%, rgba(62,220,140,0.07) 0%, transparent 70%),
+      var(--bg);
+  }
+
+  .hero h1 {
+    font-size: 42px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--cyan) 50%, var(--blue) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+  }
+
+  .hero .version-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 20px;
+    font-size: 13px;
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 16px;
+  }
+
+  .hero .version-badge .dot {
+    width: 7px; height: 7px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  .hero p {
+    font-size: 16px;
+    color: var(--text2);
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 30px 20px 60px;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 40px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-header .emoji {
+    font-size: 28px;
+  }
+
+  .section-header h2 {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .section-header .badge {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .badge-new {
+    background: rgba(62,220,140,0.15);
+    color: var(--accent);
+  }
+
+  .badge-fix {
+    background: rgba(74,158,255,0.15);
+    color: var(--blue);
+  }
+
+  .badge-perf {
+    background: rgba(255,210,122,0.15);
+    color: var(--gold);
+  }
+
+  .badge-improve {
+    background: rgba(155,92,246,0.15);
+    color: var(--purple);
+  }
+
+  /* Feature cards */
+  .feature {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+
+  .feature:hover {
+    border-color: var(--accent);
+  }
+
+  .feature h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .feature p {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.65;
+  }
+
+  .feature .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+    margin-right: 4px;
+  }
+
+  .tag-green { background: rgba(62,220,140,0.12); color: var(--accent); }
+  .tag-blue { background: rgba(74,158,255,0.12); color: var(--blue); }
+  .tag-gold { background: rgba(255,210,122,0.12); color: var(--gold); }
+  .tag-purple { background: rgba(155,92,246,0.12); color: var(--purple); }
+  .tag-orange { background: rgba(255,140,66,0.12); color: var(--orange); }
+
+  /* Keyboard shortcuts */
+  .shortcuts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .sc-item {
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 8px;
+  }
+
+  .sc-item kbd {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 14px;
+    margin-bottom: 6px;
+  }
+
+  .sc-item .sc-desc {
+    font-size: 11px;
+    color: var(--text2);
+    display: block;
+    margin-top: 4px;
+  }
+
+  /* Fix list */
+  .fix-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .fix-list li {
+    font-size: 13px;
+    color: var(--text2);
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.5;
+  }
+
+  .fix-list .fix-icon {
+    font-size: 14px;
+    min-width: 20px;
+    text-align: center;
+    margin-top: 2px;
+  }
+
+  .fix-list strong {
+    color: var(--text);
+  }
+
+  /* Install box */
+  .install-box {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 28px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .install-box h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .install-box code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--accent);
+    background: var(--bg);
+    padding: 8px 20px;
+    border-radius: 8px;
+    display: inline-block;
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+
+  .install-steps {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .install-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text2);
+  }
+
+  .install-step .step-num {
+    width: 24px;
+    height: 24px;
+    background: rgba(62,220,140,0.15);
+    color: var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  /* Comparison table */
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .compare-table th {
+    text-align: left;
+    padding: 8px 14px;
+    background: var(--surface2);
+    color: var(--text2);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .compare-table td {
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(30,45,61,0.4);
+    color: var(--text2);
+  }
+
+  .compare-table .before { color: var(--red); opacity: 0.8; }
+  .compare-table .after { color: var(--accent); font-weight: 600; }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 30px 20px;
+    font-size: 12px;
+    color: var(--text3);
+    border-top: 1px solid var(--border);
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>VOTEX 0.1.74</h1>
+  <div class="version-badge">
+    <span class="dot"></span>
+    Sürüm Notları · Ağustos 2026
+  </div>
+  <p>
+    3D görüntüleyicide büyük performans iyileştirmeleri, yeni kesit/X-ray araçları
+    ve metal tespit desteği — artık çok daha akıcı.
+  </p>
+</div>
+
+<div class="content">
+
+  <!-- ── Performance ──────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="emoji">⚡</span>
+      <h2>Performans İyileştirmeleri</h2>
+      <span class="badge badge-perf"> Performans</span>
+    </div>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Metrik</th>
+          <th>Eski Sürüm</th>
+          <th>v0.1.74</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Boşta CPU</td>
+          <td class="before">~%170 (dev sunucusu)</td>
+          <td class="after">%0</td>
+        </tr>
+        <tr>
+          <td>Boşta GPU</td>
+          <td class="before">Sürekli çalışıyordu</td>
+          <td class="after">Sessiz (render-on-demand)</td>
+        </tr>
+        <tr>
+          <td>EKG animasyonu</td>
+          <td class="before">60 fps sonsuz döngü</td>
+          <td class="after">25 fps + gizliyken durur</td>
+        </tr>
+        <tr>
+          <td>Zamanlayıcılar</td>
+          <td class="before">Gizli panellerde de çalışıyordu</td>
+          <td class="after">document.hidden koruması</td>
+        </tr>
+        <tr>
+          <td>Kesit slider</td>
+          <td class="before">Her harekette shader yeniden derleme</td>
+          <td class="after">Önbellek — 1× derleme</td>
+        </tr>
+        <tr>
+          <td>Zemin doku</td>
+          <td class="before">Uzak planda titreşim</td>
+          <td class="after">Mipmap + Anizotropi</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="feature" style="margin-top:12px;">
+      <h3>🎮 Entegre GPU Desteği</h3>
+      <p>
+        FPS tabanlı otomatik kalite kademesi eklendi. Kamera hareket ederken FPS ölçülüyor;
+        düşük FPS algılanırsa gölge çözünürlüğü ve piksel oranı otomatik olarak azaltılıyor.
+        4 kademe mevcut: Tam → Dengeli → Performans → Uyumluluk.
+      </p>
+      <span class="tag tag-gold">Otomatik</span>
+      <span class="tag tag-green">4 Kademe</span>
+    </div>
+  </div>
+
+  <!-- ── Clipping ────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="emoji">🗡️</span>
+      <h2>Kesit Modu</h2>
+      <span class="badge badge-new"> Yeni</span>
+    </div>
+
+    <div class="feature">
+      <h3>🔪 Zemini Soyarak İçini Görün</h3>
+      <p>
+        Zemin tabakasını yukarı-aşağı hareket ettirerek yeraltı yapılarını toprak altında
+        çıplak gözle görüntüleyin. Tünel ve odalar toprakta gizli olsa bile kesit düzleminin
+        üzerindeyseler korunur — sanki toprağı kazmışsınız gibi.
+      </p>
+      <span class="tag tag-green">K tuşu ile açılır</span>
+      <span class="tag tag-blue">↑/↓ ile yükseklik ayarı</span>
+      <span class="tag tag-purple">Otomatik aralık</span>
+    </div>
+
+    <div class="shortcuts">
+      <div class="sc-item">
+        <kbd>K</kbd>
+        <span class="sc-desc">Kesit Modu<br>aç / kapa</span>
+      </div>
+      <div class="sc-item">
+        <kbd>↑</kbd>
+        <span class="sc-desc">Kesit +1m<br>yukarı</span>
+      </div>
+      <div class="sc-item">
+        <kbd>↓</kbd>
+        <span class="sc-desc">Kesit −1m<br>aşağı</span>
+      </div>
+      <div class="sc-item">
+        <kbd>Esc</kbd>
+        <span class="sc-desc">Ölçü<br>İptal</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── X-Ray ───────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="emoji">👁️</span>
+      <h2>X-Ray Görünümü</h2>
+      <span class="badge badge-new"> Yeni</span>
+    </div>
+
+    <div class="feature">
+      <h3>🔮 Yapıları Holograma Dönüştürün</h3>
+      <p>
+        Tüm yapıları (oda, tünel, metal) yarı saydam holograma dönüştürür. Kenarlar kameraya
+        göre doğal parıltıyla çizilir — Fresnel efekti. İçerideki detaylar, arkadaki yapılar
+        ve kesit düzleminin altı bile görünür hâle gelir.
+      </p>
+      <span class="tag tag-green">X tuşu ile açılır</span>
+      <span class="tag tag-blue">Fresnel shader</span>
+      <span class="tag tag-gold">Paylaşılan önbellek</span>
+    </div>
+
+    <div class="shortcuts">
+      <div class="sc-item">
+        <kbd>X</kbd>
+        <span class="sc-desc">X-Ray<br>Görünümü</span>
+      </div>
+      <div class="sc-item" style="opacity:0.3;">
+        <kbd>—</kbd>
+        <span class="sc-desc">Yakında<br>daha fazlası</span>
+      </div>
+      <div class="sc-item" style="opacity:0.3;">
+        <kbd>—</kbd>
+        <span class="sc-desc"></span>
+      </div>
+      <div class="sc-item" style="opacity:0.3;">
+        <kbd>—</kbd>
+        <span class="sc-desc"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Metal Detection ─────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="emoji">⛏️</span>
+      <h2>Metal Anomali Tespiti</h2>
+      <span class="badge badge-improve"> Geliştirildi</span>
+    </div>
+
+    <div class="feature">
+      <h3>🥇 Değerli Metaller Artık Raporlarda</h3>
+      <p>
+        Eskiden analiz raporunda sadece oda ve tüller listeleniyordu. Artık metal anomalileri
+        de aynı raporda öncelik sırasına giriyor. Değerli metaller (Au/Ag/Fe) yüksek güçlü
+        sinyallerden otomatik olarak tanınıyor.
+      </p>
+      <span class="tag tag-green">Au/Ag/Fe otomatik tanıma</span>
+      <span class="tag tag-orange">field_strength bazlı</span>
+    </div>
+
+    <div class="feature">
+      <h3>📊 Ardışık Numaralandırma</h3>
+      <p>
+        Tüm tespitler artık 1'den başlayarak sıralı numaralandırılıyor.
+        Eskiden hepsi "1." olarak görünüyordu — şimdi her tespit kendi numarasını taşıyor.
+      </p>
+      <span class="tag tag-blue">1, 2, 3... sıralı</span>
+    </div>
+  </div>
+
+  <!-- ── 3D Viewer ──────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="emoji">🎮</span>
+      <h2>3D Görüntüleyici İyileştirmeleri</h2>
+      <span class="badge badge-improve"> Geliştirildi</span>
+    </div>
+
+    <div class="feature">
+      <h3>📐 Derinlik Kontur Çizgileri</h3>
+      <p>
+        Zemin üzerine her derinlik adımında ince eşyükselti eğrileri eklendi.
+        Tıpkı topoğrafik haritalardaki gibi — zeminin derinliğini çizgiler sayarak okuyabilirsiniz.
+        Çizgiler zoom seviyesine göre otomatik kalınlık alıyor, asla titremiyor.
+      </p>
+      <span class="tag tag-green">Otomatik aralık</span>
+      <span class="tag tag-blue">fwidth tabanlı AA</span>
+    </div>
+
+    <div class="feature">
+      <h3>🏷️ Akıllı Etiket Solması</h3>
+      <p>
+        Yapı etiketleri artık zeminin arkasına geçtiğinde otomatik olarak şeffaflaşıyor.
+        Yakın etiketler parlak, uzak olanlar solar — kalabalık sahnelerde rozetler
+        birbirine girmiyor, her zaman okunabilir kalıyor.
+      </p>
+      <span class="tag tag-purple">Arazi gizlemesi</span>
+      <span class="tag tag-gold">Mesafe solması</span>
+    </div>
+
+    <div class="feature">
+      <h3>🎬 Sinematik Görünüm</h3>
+      <p>
+        ACES Filmik ton haritalama ile doğal renkler. RoomEnvironment yansımaları
+        metal ve yüzeylere gerçekçi parlaklık kazandırıyor. Yumuşak gölgeler yapıların
+        derinliğini vurguluyor.
+      </p>
+      <span class="tag tag-blue">ACES Filmic</span>
+      <span class="tag tag-green">PBR Işık</span>
+      <span class="tag tag-gold">PCFSoft Shadow</span>
+    </div>
+  </div>
+
+  <!-- ── Bug Fixes ──────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="emoji">🐛</span>
+      <h2>Hata Düzeltmeleri</h2>
+      <span class="badge badge-fix"> Düzeltme</span>
+    </div>
+
+    <ul class="fix-list">
+      <li>
+        <span class="fix-icon">🔥</span>
+        <div><strong>Kasma sorunu:</strong> Uygulama boşta beklerken arka planda gereksiz çalışan süreçler temizlendi. EKG 60fps → 25fps, gizli paneller ve zamanlayıcılar optimize edildi.</div>
+      </li>
+      <li>
+        <span class="fix-icon">⚡</span>
+        <div><strong>Boşta enerji tüketimi:</strong> Render-on-demand ile GPU artık sahne değişmedikçe hiç çalışmıyor. Boşta CPU/GPU sıfır.</div>
+      </li>
+      <li>
+        <span class="fix-icon">🎨</span>
+        <div><strong>Zemin titreşimi:</strong> Uzak planda doko Moiré titremesi giderildi — Mipmap + Anizotropik filtreleme ile.</div>
+      </li>
+      <li>
+        <span class="fix-icon">📊</span>
+        <div><strong>Analiz raporu numaralandırması:</strong> Tüm tespitler artık ardışık numaralanıyor (1, 2, 3...) — eskisi gibi hepsi "1." değildi.</div>
+      </li>
+      <li>
+        <span class="fix-icon">🔧</span>
+        <div><strong>Kesit shader yeniden derleme:</strong> Slider her hareket ettirildiğinde shader tekrar derlenmiyor — ilk geçişte 1 kez, geri kalanı bedava.</div>
+      </li>
+      <li>
+        <span class="fix-icon">🛡️</span>
+        <div><strong>Çökme düzeltmesi:</strong> DataTexture yoluyla image.addEventListener hatası giderildi — uygulama artık çok daha stabil.</div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ── Install ─────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="emoji">📦</span>
+      <h2>Yükleme</h2>
+    </div>
+
+    <div class="install-box">
+      <h3>Yeni sürümü yüklemek için</h3>
+      <code>Votex_0.1.74_x64-setup.exe</code>
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="step-num">1</div>
+          <span>Eski VOTEX'i kapatın</span>
+        </div>
+        <div class="install-step">
+          <div class="step-num">2</div>
+          <span>Setup'u çalıştırın</span>
+        </div>
+        <div class="install-step">
+          <div class="step-num">3</div>
+          <span>Yeni sürümü başlatın</span>
+        </div>
+        <div class="install-step">
+          <div class="step-num">4</div>
+          <span>K/X kısayollarını deneyin!</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  VOTEX 0.1.74 · Digital Future Tech © 2026<br>
+  <a href="#">destek@digitalfuture.tech</a>
+</div>
+
+</body>
+</html>

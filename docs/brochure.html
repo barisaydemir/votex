@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOTEX 0.1.74 — Özellik Broşürü</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #080c14;
+    --surface: #0e1520;
+    --surface2: #141c2b;
+    --border: #1e2d3d;
+    --accent: #3edc8c;
+    --accent2: #7ef0a8;
+    --blue: #4a9eff;
+    --cyan: #00d4aa;
+    --red: #ff4a4a;
+    --orange: #ff8c42;
+    --gold: #ffd27a;
+    --text: #e8f0f4;
+    --text2: #8ea8b8;
+    --text3: #5a7080;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── Page 1: Cover ─────────────────────────── */
+  .page {
+    width: 100%;
+    min-height: 100vh;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    background: var(--bg);
+  }
+
+  .page:last-child { page-break-after: auto; }
+
+  .cover {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 40%, rgba(62,220,140,0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 50% at 20% 80%, rgba(74,158,255,0.05) 0%, transparent 60%),
+      var(--bg);
+    padding: 5vh 5vw;
+  }
+
+  .cover-logo {
+    font-size: clamp(48px, 8vw, 96px);
+    font-weight: 900;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--cyan) 50%, var(--blue) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8mm;
+  }
+
+  .cover-sub {
+    font-size: clamp(12px, 1.5vw, 20px);
+    font-weight: 500;
+    color: var(--text2);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-bottom: 20mm;
+  }
+
+  .cover-tagline {
+    font-size: clamp(18px, 2.5vw, 32px);
+    font-weight: 300;
+    color: var(--text);
+    max-width: 400px;
+    line-height: 1.5;
+    margin-bottom: 12mm;
+  }
+
+  .cover-tagline strong {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .cover-version {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 40px;
+    padding: 10px 28px;
+    font-size: clamp(11px, 1.1vw, 15px);
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .cover-version .dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  .cover-bottom {
+    position: absolute;
+    bottom: 3vh;
+    left: 5vw;
+    right: 5vw;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  /* ── Page 2: Key Features ─────────────────── */
+  .section-page {
+    padding: 4vh 4vw;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10mm;
+    padding-bottom: 5mm;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-num {
+    font-size: clamp(32px, 4vw, 56px);
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    min-width: 60px;
+  }
+
+  .section-title {
+    font-size: clamp(18px, 2.2vw, 30px);
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .section-subtitle {
+    font-size: 13px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  /* Feature Cards */
+  .features-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    flex: 1;
+  }
+
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--blue));
+    border-radius: 12px 12px 0 0;
+  }
+
+  .feature-card.blue::before { background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+  .feature-card.gold::before { background: linear-gradient(90deg, var(--gold), var(--orange)); }
+  .feature-card.red::before { background: linear-gradient(90deg, var(--red), var(--orange)); }
+  .feature-card.cyan::before { background: linear-gradient(90deg, var(--cyan), var(--accent2)); }
+
+  .fc-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+
+  .fc-title {
+    font-size: clamp(12px, 1.2vw, 16px);
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 5px;
+  }
+
+  .fc-desc {
+    font-size: clamp(10px, 1vw, 13px);
+    color: var(--text2);
+    line-height: 1.55;
+  }
+
+  .fc-tag {
+    display: inline-block;
+    background: rgba(62,220,140,0.12);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+  }
+
+  .fc-tag.blue { background: rgba(74,158,255,0.12); color: var(--blue); }
+  .fc-tag.gold { background: rgba(255,210,122,0.12); color: var(--gold); }
+  .fc-tag.red { background: rgba(255,74,74,0.12); color: var(--red); }
+
+  /* ── Page 3: 3D Viewer + Performance ──────── */
+  .viewer-hero {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+  }
+
+  .viewer-hero h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .viewer-specs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  .spec-box {
+    text-align: center;
+    padding: 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  .spec-val {
+    font-size: clamp(20px, 2.5vw, 36px);
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .spec-label {
+    font-size: 10px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  /* Performance table */
+  .perf-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 8px;
+  }
+
+  .perf-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--surface2);
+    color: var(--text2);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .perf-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid rgba(30,45,61,0.5);
+    color: var(--text2);
+  }
+
+  .perf-table tr:nth-child(even) td {
+    background: rgba(14,21,32,0.5);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .badge-green { background: rgba(62,220,140,0.15); color: var(--accent); }
+  .badge-blue { background: rgba(74,158,255,0.15); color: var(--blue); }
+  .badge-gold { background: rgba(255,210,122,0.15); color: var(--gold); }
+
+  /* ── Page 4: Workflows + Integration ──────── */
+  .flow-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .flow-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+
+  .flow-num {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--blue));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--bg);
+  }
+
+  .flow-content h4 {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .flow-content p {
+    font-size: 11px;
+    color: var(--text2);
+  }
+
+  .flow-arrow {
+    color: var(--text3);
+    font-size: 16px;
+    margin: 0 4px;
+  }
+
+  /* Integration boxes */
+  .integration-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .integ-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+
+  .integ-box h4 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .integ-box ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .integ-box li {
+    font-size: 11.5px;
+    color: var(--text2);
+    padding: 3px 0;
+    padding-left: 16px;
+    position: relative;
+  }
+
+  .integ-box li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ── Page 5: Shortcuts + Tech Specs ───────── */
+  .shortcuts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .shortcut {
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 8px;
+  }
+
+  .shortcut kbd {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(16px, 2vw, 28px);
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    margin-bottom: 8px;
+    display: inline-block;
+  }
+
+  .shortcut .sc-label {
+    font-size: 10.5px;
+    color: var(--text2);
+    display: block;
+    margin-top: 4px;
+  }
+
+  /* Soil profiles */
+  .soil-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .soil-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  .soil-item .soil-name { font-weight: 600; }
+  .soil-item .soil-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  /* Quality tiers */
+  .tier-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-bottom: 14px;
+  }
+
+  .tier-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--surface2);
+    color: var(--text2);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tier-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(30,45,61,0.5);
+    color: var(--text2);
+  }
+
+  .tier-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border);
+    position: relative;
+    overflow: hidden;
+    min-width: 80px;
+  }
+
+  .tier-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--blue));
+  }
+
+  /* Footer */
+  .page-footer {
+    position: absolute;
+    bottom: 2vh;
+    left: 4vw;
+    right: 4vw;
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--text3);
+    border-top: 1px solid var(--border);
+    padding-top: 5mm;
+  }
+
+  /* ── Print adjustments ─────────────────────── */
+  @media print {
+    body { background: #080c14; }
+    .page { margin: 0; box-shadow: none; }
+  }
+
+  /* Full-width card */
+  .feature-card.full {
+    grid-column: 1 / -1;
+  }
+
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+  }
+
+  .tech-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+
+  .tech-item h5 {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .tech-item p {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 10px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════ PAGE 1: COVER -->
+<div class="page">
+  <div class="cover">
+    <div class="cover-logo">VOTEX</div>
+    <div class="cover-sub">Tactical Geophysics · Command Center</div>
+    <div class="cover-tagline">
+      Manyetik anomalileri <strong>3 boyutta</strong> görün,<br>
+      yapıları <strong>yapay zekâ ile</strong> tespit edin,<br>
+      sahaya <strong>güvenle</strong> gidin.
+    </div>
+    <div class="cover-version">
+      <span class="dot"></span>
+      Sürüm 0.1.74 · Özellik Broşürü
+    </div>
+    <div class="cover-bottom">
+      <span>© 2026 Digital Future Tech — Barış Aydemir</span>
+      <span>www.digitalfuture.tech</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ PAGE 2: KEY FEATURES -->
+<div class="page section-page">
+  <div class="section-header">
+    <div class="section-num">01</div>
+    <div>
+      <div class="section-title">Temel Özellikler</div>
+      <div class="section-subtitle">VOTEX'in saha profesyonelleri için sunduğu araçlar</div>
+    </div>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="fc-icon">🗺️</div>
+      <div class="fc-title">3D Manyetik Haritalama</div>
+      <div class="fc-desc">Proton ELIC veya CSV sensör verisinden otomatik olarak 3 boyutlu yeraltı haritası oluşturur. Zemin üzerine manyetik renk kodlaması serilir, derinlik kontur çizgileri eklenir.</div>
+      <span class="fc-tag">WebGL2 · Three.js</span>
+    </div>
+
+    <div class="feature-card blue">
+      <div class="fc-icon">🧠</div>
+      <div class="fc-title">Otonom Yapı Tespiti</div>
+      <div class="fc-desc">Manyetik imzalardan oda, mezar, tünel, metal ve su tespit eder. Her tespit için güvenilirlik skoru, SNR, duvar desteği ve geometri analizi otomatik üretilir.</div>
+      <span class="fc-tag blue">Kural tabanlı AI</span>
+    </div>
+
+    <div class="feature-card gold">
+      <div class="fc-icon">🔬</div>
+      <div class="fc-title">Hibrit Veri Füzyonu</div>
+      <div class="fc-desc">Görsel ve CSV verilerini ağırlıklı olarak birleştirir. Koordinat hizalama, çapraz doğrulama ve derinlik kestirimi tek iş akışında çalışır — sonuç güvenilirliği artar.</div>
+      <span class="fc-tag gold">5 adımlı motor</span>
+    </div>
+
+    <div class="feature-card cyan">
+      <div class="fc-icon">📊</div>
+      <div class="fc-title">Öncelikli Analiz Raporu</div>
+      <div class="fc-desc">Her tespit için detaylı Türkçe rapor: güvenilirlik, uyarılar, öneriler. Yüksek güvenilirlikli tespitlerden başlayarak ardışık numaralandırılır.</div>
+      <span class="fc-tag">AI gerekmez</span>
+    </div>
+
+    <div class="feature-card red">
+      <div class="fc-icon">🔗</div>
+      <div class="fc-title">DTA Entegrasyonu</div>
+      <div class="fc-desc">Harici DTA analiz aracıyla canlı köprü kurar. Yapı yönlendirmeleri anında 3D haritaya yansır. Oturum ve ipuçları otomatik kaydedilir.</div>
+      <span class="fc-tag red">TCP köprü · 127.0.0.1:18765</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="fc-icon">⛏️</div>
+      <div class="fc-title">Metal Anomali Sınıflandırması</div>
+      <div class="fc-desc">Değerli metalleri (Au/Ag/Fe) güçlü sinyallerden otomatik ayırır. Metal tespitleri artık analiz raporunda oda ve tüllerle birlikte öncelik sırasına girer.</div>
+      <span class="fc-tag">field_strength bazlı</span>
+    </div>
+
+    <div class="feature-card full">
+      <div class="fc-icon">⚡</div>
+      <div class="fc-title">Performans ve Optimizasyon</div>
+      <div class="fc-desc" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <strong style="color:var(--accent);">Render-on-demand:</strong> Boşta iken GPU sıfır çalışır.<br>
+          <strong style="color:var(--blue);">FPS otomatik kademe:</strong> 4 seviye, entegre GPU dahil.<br>
+          <strong style="color:var(--gold);">Kesit + X-Ray:</strong> Klavye kısayollarıyla (K/X) hızlı geçiş.
+        </div>
+        <div>
+          <strong style="color:var(--cyan);">Etiket solması:</strong> Zemin arkası ve mesafe filtresi.<br>
+          <strong style="color:var(--accent2);">Mipmap + Anizotropi:</strong> Uzak planda titreşim yok.<br>
+          <strong style="color:var(--orange);">Boşta CPU:</strong> ~%0 — optimize edilmiş zamanlayıcılar.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>VOTEX 0.1.74 · Özellik Broşürü</span>
+    <span>Sayfa 2 / 5</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ PAGE 3: 3D VIEWER + PERFORMANCE -->
+<div class="page section-page">
+  <div class="section-header">
+    <div class="section-num">02</div>
+    <div>
+      <div class="section-title">3D Görüntüleyici</div>
+      <div class="section-subtitle">Profesyonel sinematik kalitede yeraltı görselleştirme</div>
+    </div>
+  </div>
+
+  <div class="viewer-hero">
+    <h3>🎮 Teknik Kapasite</h3>
+    <div class="viewer-specs">
+      <div class="spec-box">
+        <div class="spec-val">WebGL2</div>
+        <div class="spec-label">Grafik Motoru</div>
+      </div>
+      <div class="spec-box">
+        <div class="spec-val">ACES</div>
+        <div class="spec-label">Ton Haritalama</div>
+      </div>
+      <div class="spec-box">
+        <div class="spec-val">PBR</div>
+        <div class="spec-label">Fizik Tabanlı Işık</div>
+      </div>
+      <div class="spec-box">
+        <div class="spec-val">PCF</div>
+        <div class="spec-label">Yumuşak Gölge</div>
+      </div>
+      <div class="spec-box">
+        <div class="spec-val">8×</div>
+        <div class="spec-label">Anizotropi</div>
+      </div>
+      <div class="spec-box">
+        <div class="spec-val">∞</div>
+        <div class="spec-label">Render-on-Demand</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="fc-icon">🔪</div>
+      <div class="fc-title">Kesit Modu (Clipping)</div>
+      <div class="fc-desc">Zemin düzlemini yukarı-aşağı hareket ettirerek toprak tabakasını "soyulur" gibi kaldırın. İçerideki oda ve tüneller korunur, yapılar çıplak gözle görülür.</div>
+    </div>
+
+    <div class="feature-card blue">
+      <div class="fc-icon">👁️</div>
+      <div class="fc-title">X-Ray / Fresnel Görünümü</div>
+      <div class="fc-desc">Tüm yapıları yarı saydam holograma dönüştürür. Kenarlar kameraya göre parlar — mekânsal derinlik korunurken yapılar içinden okunur.</div>
+    </div>
+
+    <div class="feature-card gold">
+      <div class="fc-icon">🏷️</div>
+      <div class="fc-title">Akıllı Etiketler</div>
+      <div class="fc-desc">Numaralı rozetler ve detay kartları. Yaklaştıkça solar, zeminin altına geçince şeffaflaşır — kalabalık sahnelerde bile okunabilir.</div>
+    </div>
+
+    <div class="feature-card cyan">
+      <div class="fc-icon">📐</div>
+      <div class="fc-title">Kontur Çizgileri</div>
+      <div class="fc-desc">Her derinlik adımında ince eşyükselti eğrileri. Piksel kalınlığında, her zoom'da net — tıpkı topoğrafik haritalardaki gibi.</div>
+    </div>
+  </div>
+
+  <div class="divider" style="margin: 14px 0;"></div>
+
+  <h3 style="font-size:15px;font-weight:700;margin-bottom:10px;">⚡ v0.1.74 Performans Optimizasyonları</h3>
+
+  <table class="perf-table">
+    <thead>
+      <tr>
+        <th style="width:35%">İyileştirme</th>
+        <th style="width:40%">Nasıl Çalışıyor</th>
+        <th style="width:25%">Etki</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Render-on-demand</td>
+        <td>Sahne değişmedikçe GPU hiç çalışmaz</td>
+        <td><span class="badge badge-green">Boşta sıfır CPU</span></td>
+      </tr>
+      <tr>
+        <td>Otomatik kademe</td>
+        <td>FPS 38'in altına düşünce piksel oranı + gölge azalır</td>
+        <td><span class="badge badge-blue">4 kademe</span></td>
+      </tr>
+      <tr>
+        <td>Shader önbellek</td>
+        <td>Kesit slider'ı aynı değeri uyguluyorsa derleme atlanır</td>
+        <td><span class="badge badge-green">1× derleme</span></td>
+      </tr>
+      <tr>
+        <td>Etiket önbellek</td>
+        <td>Sprite listesi yapı değiştiğinde yenilenir, karelerde korunur</td>
+        <td><span class="badge badge-green">Sabit süre</span></td>
+      </tr>
+      <tr>
+        <td>Zamanlayıcı koruması</td>
+        <td>Gizli paneller ve arka plan sekmeleri zamanlayıcıları durdurur</td>
+        <td><span class="badge badge-gold">~%60 CPU tasarrufu</span></td>
+      </tr>
+      <tr>
+        <td>Mipmap + Anizotropi</td>
+        <td>Uzak plan doku titreşimi (shimmering) tamamen giderildi</td>
+        <td><span class="badge badge-blue">Görsel netlik</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <span>VOTEX 0.1.74 · Özellik Broşürü</span>
+    <span>Sayfa 3 / 5</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ PAGE 4: WORKFLOWS + INTEGRATION -->
+<div class="page section-page">
+  <div class="section-header">
+    <div class="section-num">03</div>
+    <div>
+      <div class="section-title">İş Akışları ve Entegrasyonlar</div>
+      <div class="section-subtitle">Veri girdisinden 3D haritaya, DTA entegrasyonuna kadar tam akış</div>
+    </div>
+  </div>
+
+  <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">🔄 Analiz Akışları</h3>
+
+  <div class="flow-list">
+    <div class="flow-item">
+      <div class="flow-num">1</div>
+      <div class="flow-content">
+        <h4>Görüntü → 3D Analiz</h4>
+        <p>Proton ELIC ekran görüntüsü yükleyin → renk temizleme → manyetik grid çıkarma → yapı tespiti → 3D yüzey oluşturma</p>
+      </div>
+    </div>
+    <div class="flow-item">
+      <div class="flow-num">2</div>
+      <div class="flow-content">
+        <h4>CSV / Excel → 3D Analiz</h4>
+        <p>Sayısal sensör verisini (.csv/.xlsx) yükleyin → noktalı harita → yapı tespiti → 3D yüzey oluşturma</p>
+      </div>
+    </div>
+    <div class="flow-item">
+      <div class="flow-num">3</div>
+      <div class="flow-content">
+        <h4>Hibrit (Görüntü + CSV) Analiz</h4>
+        <p>İki kaynaktan veriyi birleştirin → koordinat hizalama → ağırlıklı füzyon → derinlik → çapraz doğrulama → güvenilir sonuç</p>
+      </div>
+    </div>
+    <div class="flow-item">
+      <div class="flow-num">4</div>
+      <div class="flow-content">
+        <h4>DTA Yönlendirme</h4>
+        <p>DTA uygulamasından yapı ipuçları gönderin → 3D harita otomatik yeniden oluşturulur → ipuçları kalıcı kaydedilir</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">🔗 Dış Sistem Entegrasyonları</h3>
+
+  <div class="integration-grid">
+    <div class="integ-box">
+      <h4>🔗 DTA Köprüsü</h4>
+      <ul>
+        <li>Yerel TCP bağlantısı (127.0.0.1:18765)</li>
+        <li>Yapı yönlendirmeleri anında 3D'ye yansır</li>
+        <li>Oturum + ipuçları otomatik kaydedilir</li>
+        <li>Votex açılışında DTA otomatik başlar</li>
+        <li>Çoklu harita bazlı ipucu saklama (40 haritaya kadar)</li>
+      </ul>
+    </div>
+    <div class="integ-box">
+      <h4>🧪 VotexProb Motoru</h4>
+      <ul>
+        <li>Yerel TCP bağlantısı (127.0.0.1:18766)</li>
+        <li>İstatistiksel hesaplama motoru (Python)</li>
+        <li>Otomatik başlatma + sağlık kontrolü</li>
+        <li>Kapalıyken negatif önbellek (1.2 sn)</li>
+        <li>Geliştirme aşamasında: Faz A stub</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="divider" style="margin: 14px 0;"></div>
+
+  <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">🌍 Desteklenen Toprak Profilleri</h3>
+
+  <div class="soil-grid">
+    <div class="soil-item">
+      <span class="soil-name">🏖️ Kum / Çakıl</span>
+      <span class="soil-val">×1.10</span>
+    </div>
+    <div class="soil-item">
+      <span class="soil-name">🌿 Tın / Nötr</span>
+      <span class="soil-val">×1.00</span>
+    </div>
+    <div class="soil-item">
+      <span class="soil-name">🪨 Nemli Kil</span>
+      <span class="soil-val">×0.85</span>
+    </div>
+    <div class="soil-item">
+      <span class="soil-name">🔴 Laterit / Demirli</span>
+      <span class="soil-val">×0.70</span>
+    </div>
+    <div class="soil-item">
+      <span class="soil-name">🍂 Organik / Humus</span>
+      <span class="soil-val">×0.95</span>
+    </div>
+    <div class="soil-item">
+      <span class="soil-name">⚙️ Kapalı (Legacy)</span>
+      <span class="soil-val">×1.00</span>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>VOTEX 0.1.74 · Özellik Broşürü</span>
+    <span>Sayfa 4 / 5</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ PAGE 5: SHORTCUTS + TECH SPECS -->
+<div class="page section-page">
+  <div class="section-header">
+    <div class="section-num">04</div>
+    <div>
+      <div class="section-title">Klavye Kısayolları ve Teknik Özellikler</div>
+      <div class="section-subtitle">Hızlı erişim ve detaylı teknik referans</div>
+    </div>
+  </div>
+
+  <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">⌨️ Klavye Kısayolları</h3>
+
+  <div class="shortcuts-grid">
+    <div class="shortcut">
+      <kbd>K</kbd>
+      <span class="sc-label">Kesit Modu<br>aç / kapa</span>
+    </div>
+    <div class="shortcut">
+      <kbd>X</kbd>
+      <span class="sc-label">X-Ray<br>Görünümü</span>
+    </div>
+    <div class="shortcut">
+      <kbd>↑</kbd>
+      <span class="sc-label">Kesit +1 m<br>yukarı</span>
+    </div>
+    <div class="shortcut">
+      <kbd>↓</kbd>
+      <span class="sc-label">Kesit −1 m<br>aşağı</span>
+    </div>
+    <div class="shortcut">
+      <kbd>Esc</kbd>
+      <span class="sc-label">Ölçü<br>Aracı İptal</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">🎮 Performans Kademe Sistemi</h3>
+
+  <table class="tier-table">
+    <thead>
+      <tr>
+        <th>Kademe</th>
+        <th>Ad</th>
+        <th>Piksel Oranı</th>
+        <th>Gölge</th>
+        <th>Kalite</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-green">0</span></td>
+        <td style="font-weight:600;">Tam</td>
+        <td>2.0×</td>
+        <td>2048 × 2048</td>
+        <td><div class="tier-bar"><div class="tier-bar-fill" style="width:100%"></div></div></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-blue">1</span></td>
+        <td style="font-weight:600;">Dengeli</td>
+        <td>1.5×</td>
+        <td>1024 × 1024</td>
+        <td><div class="tier-bar"><div class="tier-bar-fill" style="width:75%"></div></div></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-gold">2</span></td>
+        <td style="font-weight:600;">Performans</td>
+        <td>1.2×</td>
+        <td>1024 × 1024</td>
+        <td><div class="tier-bar"><div class="tier-bar-fill" style="width:55%"></div></div></td>
+      </tr>
+      <tr>
+        <td><span class="badge" style="background:rgba(255,140,66,0.15);color:var(--orange);">3</span></td>
+        <td style="font-weight:600;">Uyumluluk</td>
+        <td>1.0×</td>
+        <td>Kapalı</td>
+        <td><div class="tier-bar"><div class="tier-bar-fill" style="width:35%"></div></div></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">🛠️ Teknik Altyapı</h3>
+
+  <div class="tech-grid">
+    <div class="tech-item">
+      <h5>Backend</h5>
+      <p>Rust · Tauri 2<br>Manyetik analiz · Yapı tespiti<br>DTA köprüsü · Oturum kayıt<br>Lisans · Otomatik güncelleme</p>
+    </div>
+    <div class="tech-item">
+      <h5>Frontend</h5>
+      <p>JavaScript ES Modules<br>Three.js r185 · WebGL2<br>Vite 6 · Hibrit analiz motoru<br>CSS Animasyonlar · Telemetri</p>
+    </div>
+    <div class="tech-item">
+      <h5>Veri Formatları</h5>
+      <p>Görüntü: PNG/JPG (ELIC)<p>
+      <p>Tablo: CSV · XLSX · XLS</p>
+      <p>Çıktı: 3D sahne · JSON rapor</p>
+      <p>Kayıt: APPDATA JSON</p>
+    </div>
+    <div class="tech-item">
+      <h5>Yapı Tespiti</h5>
+      <p>Room · Tomb · Shaft<br>Tunnel · Metal · Water<br>PCA · Simetri · Fit analizi<br>SNR · Duvar desteği</p>
+    </div>
+    <div class="tech-item">
+      <h5>Güvenlik</h5>
+      <p>HWID tabanlı lisans<br>HMAC-SHA256 doğrulama<br>Yerel TCP (localhost only)<br>Oturumohlama yok</p>
+    </div>
+    <div class="tech-item">
+      <h5>Test & Kalite</h5>
+      <p>188 birim testi (Vitest)<br>Rust #[cfg(test)] modülleri<br>Otomatik build + test CI<br>188/188 ✅ güncel</p>
+    </div>
+  </div>
+
+  <div style="flex:1;"></div>
+
+  <div style="text-align:center;padding:12mm 0 0;">
+    <div style="font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;">VOTEX 0.1.74</div>
+    <div style="font-size:12px;color:var(--text3);">Digital Future Tech · Barış Aydemir · 2026</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px;">Kurulum: <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);">Votex_0.1.74_x64-setup.exe</code> (~220 MB)</div>
+  </div>
+
+  <div class="page-footer">
+    <span>VOTEX 0.1.74 · Özellik Broşürü</span>
+    <span>Sayfa 5 / 5</span>
+  </div>
+</div>
+
+</body>
+</html>
