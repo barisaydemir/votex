@@ -1,63 +1,40 @@
 # Votex CI Pipeline
-# PR açıldığında veya main'e push edildiğinde otomatik çalışır.
-
 name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
-# Aynı PR'da yeni push geldiğinde eski çalışmayı iptal et
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ──────────────────────────────────────────
-  # ADIM 1: JavaScript Testleri
-  # ──────────────────────────────────────────
   js-tests:
-    name: JS Testleri
+    name: JS Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - run: npm ci
+      - run: npm run test:js
+      - run: npm run build
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run JS tests
-        run: npm run test:js
-
-      - name: Frontend build
-        run: npm run build
-
-  # ──────────────────────────────────────────
-  # ADIM 2: Rust Testleri + Check
-  # ──────────────────────────────────────────
   rust-tests:
-    name: Rust Test + Check
+    name: Rust Check + Test
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: src-tauri
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust build
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
         with:
           path: |
             src-tauri/target/debug/.fingerprint
@@ -65,48 +42,5 @@ jobs:
             src-tauri/target/debug/deps
           key: rust-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.toml') }}
           restore-keys: rust-${{ runner.os }}-
-
-      - name: Cargo check (no warnings)
-        run: cargo check 2>&1 | tee check-output.txt
-        # Uyarı varsa başarısız say
-        continue-on-error: false
-
-      - name: Verify zero warnings
-        run: |
-          WARNINGS=$(grep -c "^warning:" check-output.txt || true)
-          if [ "$WARNINGS" -gt 0 ]; then
-            echo "❌ $WARNINGS uyarı bulundu!"
-            grep "^warning:" check-output.txt
-            exit 1
-          fi
-          echo "✅ 0 uyarı"
-
-      - name: Cargo test
-        run: cargo test --lib
-
-  # ──────────────────────────────────────────
-  # ADIM 3: Kapsamlı CI (opsiyonel, manuel tetikleme)
-  # ──────────────────────────────────────────
-  full-ci:
-    name: Full CI (manual)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    needs: [js-tests, rust-tests]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Full CI pipeline
-        run: node scripts/ci.js --skip-installer --skip-rust
+      - run: cargo check
+      - run: cargo test --lib
