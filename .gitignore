@@ -16,3 +16,6 @@ logs/
 *.deb
 *.rpm
 update_staging/
+
+# WASM build artifacts (votex-wasm)
+votex-wasm/target/

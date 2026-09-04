@@ -1,0 +1,20 @@
+[package]
+name = "votex-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Votex magnetic analysis — WebAssembly build for the mobile PWA"
+license = "proprietary"
+
+# Standalone crate — parent workspace'in dışında tutulur (tauri/xcap bağımlılıkları
+# wasm32 hedefinde derlenemediği için)
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true

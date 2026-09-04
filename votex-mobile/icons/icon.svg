@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#0a0e17"/>
+  <circle cx="256" cy="256" r="230" fill="#131825" stroke="#3edc8c" stroke-width="4"/>
+  
+  <!-- Magnetic waves -->
+  <g fill="none" stroke="#3edc8c" stroke-width="3" opacity="0.6">
+    <path d="M156 256 Q206 206 256 256 Q306 306 356 256"/>
+    <path d="M136 256 Q196 186 256 256 Q316 326 376 256"/>
+    <path d="M116 256 Q186 166 256 256 Q326 346 396 256"/>
+  </g>
+  
+  <!-- Center dot -->
+  <circle cx="256" cy="256" r="12" fill="#3edc8c"/>
+  
+  <!-- Crosshair -->
+  <line x1="256" y1="200" x2="256" y2="230" stroke="#3edc8c" stroke-width="2"/>
+  <line x1="256" y1="282" x2="256" y2="312" stroke="#3edc8c" stroke-width="2"/>
+  <line x1="200" y1="256" x2="230" y2="256" stroke="#3edc8c" stroke-width="2"/>
+  <line x1="282" y1="256" x2="312" y2="256" stroke="#3edc8c" stroke-width="2"/>
+  
+  <!-- Corner marks -->
+  <path d="M140 140 L140 170 M140 140 L170 140" stroke="#3edc8c" stroke-width="3" fill="none"/>
+  <path d="M372 140 L372 170 M372 140 L342 140" stroke="#3edc8c" stroke-width="3" fill="none"/>
+  <path d="M140 372 L140 342 M140 372 L170 372" stroke="#3edc8c" stroke-width="3" fill="none"/>
+  <path d="M372 372 L372 342 M372 372 L342 372" stroke="#3edc8c" stroke-width="3" fill="none"/>
+  
+  <!-- Text -->
+  <text x="256" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#3edc8c">VOTEX</text>
+  <text x="256" y="450" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#9aa0a6">DIK ÇEKIM</text>
+</svg>

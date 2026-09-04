@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#3edc8c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Votex - Dik Çekim</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">📡</div>
+      <h1>Votex <span class="version">v1.0</span></h1>
+    </div>
+    <div class="header-right">
+      <button id="btn-menu" class="icon-btn" aria-label="Menü">☰</button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+    <!-- AI Server Panel -->
+    <section id="ai-panel" class="section ai-panel">
+      <div class="ai-header">
+        <div class="ai-status">
+          <div id="ai-status-dot" class="status-dot"></div>
+          <span id="ai-status-text">Bağlı değil</span>
+        </div>
+        <button id="ai-connect-btn" class="btn btn-primary btn-sm">Bağlan</button>
+      </div>
+      <div class="ai-controls">
+        <div class="ai-input-group">
+          <label for="ai-server-url">Sunucu URL:</label>
+          <input type="url" id="ai-server-url" value="http://127.0.0.1:8080" placeholder="http://127.0.0.1:8080">
+        </div>
+        <div class="ai-input-group">
+          <label for="ai-model-select">Model:</label>
+          <select id="ai-model-select">
+            <option value="">Model seçin...</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upload Area -->
+    <section id="upload-section" class="section upload-section">
+      <div class="upload-area" id="drop-zone">
+        <div class="upload-icon">📁</div>
+        <h2>Harita Yükle</h2>
+        <p>ELIC, PNG veya JPEG dosyası seçin</p>
+        <input type="file" id="file-input" accept=".elic,.png,.jpg,.jpeg,.bmp,.tiff" hidden>
+        <button id="btn-select-file" class="btn btn-primary">Dosya Seç</button>
+        <p class="upload-hint">veya dosyayı buraya sürükleyin</p>
+      </div>
+    </section>
+
+    <!-- Map Preview Section -->
+    <section id="map-section" class="section map-section hidden">
+      <!-- Map Header -->
+      <div class="map-header">
+        <h2>🗺️ Harita Görünümü</h2>
+        <button id="btn-back" class="icon-btn" aria-label="Geri">←</button>
+      </div>
+
+      <!-- GPS Location Bar -->
+      <div class="gps-bar" id="gps-bar">
+        <div class="gps-info">
+          <div id="location-display" class="location-display">
+            <span id="location-coords">Konum bekleniyor...</span>
+            <span id="location-accuracy" class="location-accuracy"></span>
+          </div>
+        </div>
+        <button id="gps-toggle" class="btn btn-secondary btn-sm">📍 Konum Al</button>
+      </div>
+
+      <!-- Colorizer Controls -->
+      <div class="colorizer-bar" id="colorizer-bar">
+        <div class="colorizer-label">🎨 Renk:</div>
+        <div class="swatches" id="map-colorizer-swatches"></div>
+        <div class="colorizer-actions">
+          <button id="btn-undo-color" class="icon-btn hidden" aria-label="Geri Al">↩</button>
+          <button id="btn-map-color-export" class="icon-btn" aria-label="Dışa Aktar">💾</button>
+          <div class="opacity-control">
+            <input type="range" id="map-colorizer-opacity" min="0" max="100" value="100">
+            <span id="opacity-label">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ruler -->
+      <div class="ruler-bar" id="ruler-bar">
+        <div class="ruler-scale">
+          <span id="ruler-value">0</span> m
+        </div>
+        <div class="ruler-line"></div>
+      </div>
+
+      <!-- Map Container -->
+      <div class="map-container" id="map-container">
+        <div class="preview-wrap" id="preview-wrap">
+          <img id="preview" class="preview-image" alt="Harita önizleme">
+          <canvas id="preview-colorized" class="preview-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Analysis Controls -->
+      <div class="analysis-controls">
+        <button id="btn-analyze" class="btn btn-primary btn-large">
+          🔍 Analiz Et
+        </button>
+        <button id="btn-3d-view" class="btn btn-secondary btn-large hidden">
+          🧊 3D Görünüm
+        </button>
+      </div>
+
+      <!-- Results Section -->
+      <div id="results-section" class="results-section hidden">
+        <h3>📊 Analiz Sonuçları</h3>
+        <div class="results-grid" id="results-grid">
+          <!-- Analysis results will be inserted here -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-spinner"></div>
+    <p id="loading-text">İşleniyor...</p>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/colorizer.js"></script>
+  <script src="js/analyzer.js"></script>
+  <script src="js/ai-client.js"></script>
+  <script src="js/geo.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
