@@ -4,6 +4,352 @@ Tüm sürümlerin değişiklik kaydı.
 
 ---
 
+## 0.4.2 — 4 Eylül 2026
+
+### 🎨 Harita Renklendirme (Analizden Önce)
+
+- **2D Harita Renklendirici** — 8 hazır palet ile zemin dokusu renklendirmesi:
+  - Manyetik Yoğunluk, Derinlik, Termal, Askeri, Okyanus, Gri Tonları, Metal Avcısı, Kapalı
+  - Analizden önce renk şeması seçme — 2D önizlemede hemen görünür
+  - Ham ELIC görseli her zaman korunur → tamamen geri dönüşümlü
+
+- **Palette Önizleme Küçük Resimleri** — Renk şemaları küçük gradyan canvas ile gösterilir:
+  - Her palet için 32×14px mini gradient Thumbnail
+  - Seçili palet yeşil kenarlık + parlama ile vurgulanır
+  - Hover'da kenarlık rengi değişir
+
+- **Yumuşak Geçiş Animasyonu** — Palette değişimlerinde crossfade:
+  - 250ms ease-out quad animasyon
+  - 200ms ease-in fade-out (renk kapatıldığında)
+  - Hızlı palette değişimlerinde önceki animasyon iptal edilir
+
+- **Opacity Kaydırıcısı** — Renk katmanı şeffaflığı:
+  - 0–100% arası karıştırma
+  - Gerçek zamanlı slider güncelleme
+  - Crossfade animasyonunda bile korunur
+
+- **PNG Dışa Aktarma** — Renklendirilmiş haritayı indirme:
+  - Tam çözünürlükte (naturalWidth × naturalHeight)
+  - Otomatik dosya adı: `{dosyaadı}_{palet}.png`
+
+- **Geri Al / İleri Al** — Renklendirme işlemleri geri alınabilir:
+  - Ctrl+Z / Ctrl+Y ile palette geçişleri
+  - Undo butonu renklendirme barında
+
+---
+
+## 0.4.1 — 2 Eylül 2026
+
+### 🤖 Yerel Yapay Zeka Entegrasyonu
+
+- **AI Server** — FastAPI + Ollama tabanlı yerel AI servisi:
+  - Görüntü analizi (llava, moondream ile manyetik harita yorumlama)
+  - Anomali tespiti (manyetik veri AI ile analiz)
+  - Rapor üretme (otomatik jeofizik rapor)
+  - Genel sohbet (VOTEX hakkında yardım)
+  - Streaming yanıtlar (SSE + WebSocket)
+  - Model indirme/yönetme
+
+- **AI Paneli** — VOTEX içi AI arayüzü:
+  - Ctrl+I kısayolu veya 🤖 butonu ile açılır
+  - Sunucu bağlantı ayarları
+  - Model seçimi ve indirme
+  - Hızlı analiz butonları (görsel, anomali, rapor)
+  - Streaming sohbet arayüzü
+
+- **AI Client** — JS modülü:
+  - REST + SSE + WebSocket desteği
+  - Otomatik model seçimi
+  - Bağlantı yönetimi
+
+---
+
+## 0.4.0 — 2 Eylül 2026
+
+### 🎨 Görsel İyileştirmeler
+
+- **🔴 Metal Builder Dönüşümü** — Basit kutulardan gelişmiş 3D görsellere:
+  - `RoundedBoxGeometry` ile yuvarlatılmış köşeler (artık sivri kutu yok)
+  - Strength-orantılı glow küreleri (fieldStrength > 0.5 için parlak halo)
+  - EmissiveIntensity artık strength'e bağlı (0.3 → 0.8 arası)
+  - Hostsuz metaller için küre + kutu kombinasyonu
+  - Shaft-hosted metaller için koni ucu eklendi
+
+- **🟦 Chamber iyileştirmeleri** — Mağara atmosferi:
+  - Vertex noise ile kayamsı duvar dokusu
+  - Zemin gradyanı (merkezden kenara koyulaşan renk)
+  - İç parıltılar (AdditiveBlending ile mağara partikülleri)
+
+- **🟩 Tunnel kısa tünel yükseltmesi**:
+  - Plain box → `RoundedBoxGeometry` yuvarlatılmış koridor
+  - İç karanlık katman (BackSide mesh)
+  - Zemin plakası
+  - Periyodik ışık noktaları + PointLight (her ~2.5m)
+
+- **🟨 Shaft su yansıması**:
+  - 3m+ derin şaftlar için mavi yansıma diski
+  - Su partikülleri (AdditiveBlending damlacıklar)
+
+### ✨ Yeni Özellik
+
+- **⚡ AUTO — Akıllı Ayar Sistemi** — Veriye göre parametreleri otomatik ayarlar:
+  - **Veri Profili Çıkarıcı** (`dataProfiler.js`): Görselden renk dağılımı (kırmızı/yeşil/mavi anomali oranı, LUT güveni, gürültü göstergesi), CSV'den yoğunluk/SNR/boşluk oranı çıkarır
+  - **Kural Tabanlı Motor** (`autoTune.js`): 10 kritik analiz parametresi için deterministik, açıklanabilir kurallar — Grid çözünürlüğü, tespit eşiği, min güç, sigma, havuz boyutu, sığdırma, dilim sayısı, nokta boyutu, hibrit ağırlık, min güven
+  - **Öğrenme Döngüsü**: AUTO sonrası elle değiştirdiğiniz ayarlar profil tipine göre hatırlanır — aynı tip veride sonraki sefer otomatik uygulanır
+  - **Şeffaf Öneri Kartı**: Her ayarın yanında gerekçesi görünür (örn. "Gürültülü veri SNR 1.2 → eşik 1.3")
+  - **⚡ AUTO butonu**: "Dosya Seç" ile "Analizi Başlat" arasında — tek tıkla profil çıkar, önerir, uygular
+  - Saha kullanımı için: 30 slider'ı anlamak yerine veriyi yükleyip AUTO'ya basmak yeter
+
+### 🧠 Öğrenme Mimarisi
+
+- Profil parmak izi (`hashProfile`): Benzer veriler kaba bucket'lara yuvarlanır — aynı tip saha verisi aynı öğrenme kaydına düşer
+- Kullanıcı override'ları `localStorage`'da tutulur (maks. 60 profil), her parametre için clamp'lenir
+- Kartta 🧠 işareti = o ayar önceki tercihinizden öğrenildi
+
+### 🔧 Teknik
+
+- Versiyon senkronize: `package.json`, `tauri.conf.json`, `Cargo.toml` → **0.4.0** (0.3.14/0.3.17 karışıklığı giderildi)
+- Pencere başlığı güncellendi: "Votex 0.4.0 — Magnetic Anomaly Analysis"
+- i18n: TR + EN tam destek (`auto.*` anahtarları)
+- 12 yeni birim testi (`autoTune.test.js`) — profil istatistikleri, kural seti, öğrenme döngüsü, clamp sınırları
+
+### 📁 Dosyalar
+
+| Dosya | Tür |
+|-------|-----|
+| `ui/hybrid/dataProfiler.js` | 🆕 Veri profili çıkarıcı |
+| `ui/hybrid/autoTune.js` | 🆕 Kural tabanlı motor + öğrenme döngüsü |
+| `ui/ui/autoTunePanel.js` | 🆕 Öneri kartı + buton mantığı |
+| `ui/hybrid/__tests__/autoTune.test.js` | 🆕 12 birim testi |
+| `index.html` | ⚡ AUTO butonu + öneri kartı + stiller |
+| `ui/main.js` | Entegrasyon (bindAutoTune + locale reset) |
+| `ui/i18n/locales.js` | TR/EN `auto.*` anahtarları |
+| `package.json` / `tauri.conf.json` / `Cargo.toml` | Versiyon → 0.4.0 |
+
+---
+
+## 0.4.0 — 2 Eylül 2026
+
+### 🔧 Düzeltmeler
+
+- **🔴 Alarm Koordinat Hassasiyeti** — Alarm sphere'ları artık `buildMesh`'in hesapladığı `_computedMapW/_computedMapD` değerlerini kullanıyor, tekrar hesaplama kaymaları tamamen kaldırıldı
+
+### 📁 Dosyalar
+
+| Dosya | Tür |
+|-------|-----|
+| `ui/main.js` | 🔧 `_computedMapW/D` fallback |
+| `ui/viewer/mesh.js` | 🔧 `_computedMapW/D` cache |
+| `package.json` | Versiyon → 0.3.18 |
+| `src-tauri/tauri.conf.json` | Versiyon → 0.3.18 |
+| `src-tauri/Cargo.toml` | Versiyon → 0.3.18 |
+| `CHANGELOG.md` | 0.3.18 notları |
+
+---
+
+## 0.3.17 — 1 Eylül 2026
+
+### 🔧 Düzeltmeler
+
+- **🔴 Alarm mapW/mapD Koordinat Düzeltmesi (kritik)** — Alarm sphere'ları artık metal pin marker'ların tam XZ konumunda oluşuyor:
+  - Builder `surface.mapWidthM ?? surface.map_width_m ?? surface.mapSizeM ?? surface.map_size_m ?? 24` kullanıyordu
+  - Alarm sadece `surface.map_width_m || 30` kullanıyordu — farklı fallback → farklı koordinat
+  - Şimdi alarm da aynı fallback zincirini kullanıyor
+
+### 📁 Dosyalar
+
+| Dosya | Tür |
+|-------|-----|
+| `ui/main.js` | 🔧 `activateMetalAlarm()` mapW/mapD fallback düzeltmesi |
+| `package.json` | Versiyon → 0.3.17 |
+| `src-tauri/tauri.conf.json` | Versiyon → 0.3.17 |
+| `src-tauri/Cargo.toml` | Versiyon → 0.3.17 |
+| `CHANGELOG.md` | 0.3.17 notları |
+
+---
+
+## 0.3.16 — 1 Eylül 2026
+
+### 🔧 Düzeltmeler
+
+- **🔴 Metal Alarm Konum Düzeltmesi (kritik)** — Alarm sphere'ları artık SADECE image analizinden gelen metallere göre konumlandırılır:
+  - `applySurface`'ten alarm aktifleştirmesi kaldırıldı
+  - Alarm sadece `build3D()`, `runDeepScan()`, `runStagedScan()`, `runWaterScan()` yollarında aktive ediliyor
+  - DTA, Prob Engine, CSV gibi dış kaynaklar artık alarm'ı tetiklemez
+  - Önceki sorun: DTA/CSV surface'ları alarm'ı yanlış metal konumlarına taşıyordu
+
+- **🔴 Zemin Gölge Halkası** — Her alarm sphere'ının altında kırmızı ışık dairesi (pulsing)
+
+- **🔴 vertExag Orantılı Ölçek** — Alarm sphere'ları sahne dikey abartısına göre ölçeklenir
+
+### 📁 Dosyalar
+
+| Dosya | Tür |
+|-------|-----|
+| `ui/main.js` | 🔧 `activateMetalAlarm()` helper + alarm yolları |
+| `ui/viewer/metalAlarm.js` | 🔧 Konum + gölge + vertExag ölçek |
+| `package.json` | Versiyon → 0.3.16 |
+| `src-tauri/tauri.conf.json` | Versiyon → 0.3.16 |
+| `src-tauri/Cargo.toml` | Versiyon → 0.3.16 |
+| `CHANGELOG.md` | 0.3.16 notları |
+
+---
+
+## 0.3.15 — 1 Eylül 2026
+
+### 🔧 İyileştirmeler
+
+- **🔴 Metal Alarm Konum Düzeltmesi (kritik)** — Alarm sphere'ları artık image analizindeki metal tespitlerinin tam üzeri konumunda:
+  - Eski kod derinliğe bağlı Y hesaplamasıyla sphere'ları yerin altına atıyordu
+  - Y konumu sabit y=1.2 (zeminin hemen üstü) olarak düzeltildi
+  - XZ koordinatları `mapToWorld()` ile doğru hesaplanıyordu, sadece Y sorunluydu
+
+- **🔴 Zemin Gölge Halkası** — Her alarm sphere'ının altında kırmızı ışık dairesi:
+  - `RingGeometry(0.4, 1.2)` — iç/dış yarıçaplı halka
+  - Zemin seviyesinde yatay (rotation.x = -PI/2)
+  - Pulsing animasyonu (boyut + opaklık dalgalanması)
+  - Metal tespitlerinin harita üzerinde konumunu belirginleştirir
+
+- **🔴 vertExag Orantılı Ölçek** — Alarm sphere'ları sahne dikey abartısına göre ölçeklenir:
+  - `scale = clamp(0.6 + vertExag * 0.4, 0.5, 2.0)`
+  - Tüm animasyonlar (core, halo, shadow, ışık) baseScale ile çarpılıyor
+  - Küçük sahne → daha küçük alarm, büyük sahne → daha büyük alarm
+
+### 📁 Dosyalar
+
+| Dosya | Tür |
+|-------|-----|
+| `ui/viewer/metalAlarm.js` | 🔧 Konum düzeltmesi + gölge halkası + vertExag ölçek |
+| `package.json` | Versiyon → 0.3.15 |
+| `src-tauri/tauri.conf.json` | Versiyon → 0.3.15 |
+| `src-tauri/Cargo.toml` | Versiyon → 0.3.15 |
+| `CHANGELOG.md` | 0.3.15 notları |
+
+---
+
+## 0.3.14 — 1 Eylül 2026
+
+### ✨ Yeni Özellikler
+
+- **🔴 Metal Alarm Sistemi** — Değerli metal tespitinde sesli uyarı ve görsel alarm:
+  - Web Audio API ile sinüs dalgası beep sesi (880→1100 Hz sweep)
+  - Her metal yapının üstünde dönen kırmızı ışık topu (pulsing glow)
+  - Sürekli tekrar beep — saha ortamında metal kaçırmazsınız
+  - Tam kontrol paneli: Alarm aç/kapa, ses aç/kapa, ses seviyesi, beep hızı, ışık hızı
+  - Test ses butonu — tek tıkla beep sesini duy
+  - Analiz tamamlandığında otomatik aktivasyon
+  - Metal yoksa alarm pasif, badge gizlenir
+  - Sahne yeniden kurulduğunda otomatik temizleme
+
+### 🔧 İyileştirmeler
+
+- **Metal alarm badge** sağ panelde metal sayısını gösterir
+- **Alarm durum satırı** aktif/pasif ve metal sayısını gösterir
+- **clearAll()** ile yapı grupları yeniden kurulduğunda alarm sphere'ları temizlenir
+
+### 📁 Dosyalar
+
+| Dosya | Tür |
+|-------|-----|
+| `ui/viewer/metalAlarm.js` | 🆕 Metal alarm modülü (ses + ışık) |
+| `ui/main.js` | Alarm entegrasyonu + kontrol bindingleri |
+| `index.html` | 🔴 METAL ALARM ağaç menüsü |
+| `package.json` | Versiyon → 0.3.14 |
+| `src-tauri/tauri.conf.json` | Versiyon → 0.3.14 |
+| `src-tauri/Cargo.toml` | Versiyon → 0.3.14 |
+| `CHANGELOG.md` | 0.3.14 notları |
+
+---
+
+## 0.3.13 — 1 Eylül 2026
+
+### ✨ Yeni Özellikler
+
+- **🔍 Veri Filtreleme Paneli** — CSV verisini çoklu kritere göre süzme:
+  - Manyetik yoğunluk aralığı filtresi (nT)
+  - Derinlik aralığı filtresi (m)
+  - Yapı türü filtresi (Oda / Tünel / Metal / Şaft)
+  - Filtre aktif/bilgi durumu göstergesi
+  - Tek tıkla sıfırlama
+
+- **🧩 Otomatik Anomali Kümeleme (DBSCAN)** — Tespit edilen yapıları otomatik gruplama:
+  - DBSCAN algoritması ile 3D kümeleme
+  - Yakın yapıları otomatik olarak gruplar
+  - Küme merkezi, yarıçap ve güven hesaplaması
+  - Akıllı öneriler: "Bu 3 oda birbirine yakın — mağara kompleksi olabilir"
+  - Sağ panel için HTML formatlı sonuçlar
+
+- **📁 Toplu DTA İşleme** — Aynı anda birden fazla DTA dosyası yükleme:
+  - `📁 TOPLU DTA SEÇ` butonu ile çoklu dosya seçimi
+  - Sürükle-bırak desteği
+  - Dosya format tespiti (SDC, CSV, TSV, YAML)
+  - Ondalık ayracı otomatik algılama
+  - İlerleme çubuğu ile işleme durumu
+  - Sonuç karşılaştırma görünümü
+
+### 🔧 İyileştirmeler
+
+- **Kümeleme butonu** analiz tamamlandığında otomatik aktifleşir
+- **Filtre değişikliği** CSV overlay'yi otomatik yeniden oluşturur
+- **15 yeni birim testi** (filterPanel + clustering)
+
+### 📁 Dosyalar
+
+| Dosya | Tür |
+|-------|-----|
+| `ui/ui/filterPanel.js` | 🆕 Veri filtreleme paneli |
+| `ui/viewer/clustering.js` | 🆕 DBSCAN kümeleme |
+| `ui/ui/batchDta.js` | 🆕 Toplu DTA işleme |
+| `ui/ui/__tests__/filterPanel.test.js` | 🆕 5 test |
+| `ui/viewer/__tests__/clustering.test.js` | 🆕 10 test |
+| `index.html` | 3 yeni ağaç bölümü |
+| `ui/main.js` | Entegrasyon |
+
+---
+
+## 0.3.12 — 1 Eylül 2026
+
+### ✨ Yeni Özellikler
+
+- **💾 Oturum Kaydet/Yükle** — Analiz durumunu kaydedin ve geri yükleyin:
+  - `💾 Kaydet` butonu ile anlık kaydetme
+  - `📤 Dışa Aktar` ile JSON dosyası olarak dışa aktarma
+  - Otomatik kayıt (her 5 dakika)
+  - Otomatik kayıt yükleme (yeniden başlarken)
+  - Ctrl+S kısayolu ile hızlı kaydetme
+  - Oturum listesi: yükleme, silme, durum göstergeleri
+  - Maksimum 20 oturum saklanır
+
+- **📏 3D Ölçüm Araçları** — 3D sahne üzerinde mesafe ölçümü:
+  - `📏 Ölçmeye Başla` butonu ile ölçüm modu
+  - İki nokta arası 3D mesafe ölçümü
+  - Renkli marker ve çizgi gösterimi
+  - Sonuç sprite olarak sahne üzerinde gösterilir
+  - Ctrl+M kısayolu ile hızlı açma/kapama
+  - Status bar'da canlı sonuç
+
+- **⌨️ Klavye Kısayolları Yardım Ekranı** — Tüm kısayolları listeler:
+  - `?` tuşu ile açma/kapama
+  - ESC ile kapatma
+  - Kategorilere ayrılmış gösterim (Genel, 3D, Analiz, Etkileşim)
+  - Modal pencere içinde zarif tasarım
+  - Oturumlar section'ına kısayol yardımı butonu eklendi
+
+### 🔧 Teknik
+
+- **`ui/ui/sessionManager.js`** — 🆕 Oturum yönetim modülü (9 birim testi)
+  - `saveSession()`, `loadSession()`, `listSessions()`, `deleteSession()`
+  - `autoSave()`, `loadAutoSave()`, `startAutoSave()`
+  - `exportSessionJson()`, `importSessionJson()`
+- **`ui/viewer/measurementTool.js`** — 🆕 3D ölçüm aracı modülü
+  - `startMeasurement()`, `stopMeasurement()`, `isMeasuring()`
+  - `handleMeasurementClick()`, `getMeasurementResult()`
+- **`ui/ui/shortcutHelp.js`** — 🆕 Kısayol yardım ekranı modülü
+- **`ui/main.js`** — Session, measurement ve shortcut help entegrasyonu
+- **`index.html`** — OTURUMLAR ve 3D ÖLÇÜM tree-section'ları eklendi
+
+---
+
 ## 0.3.11 — 1 Eylül 2026
 
 ### ✨ Yeni Özellikler

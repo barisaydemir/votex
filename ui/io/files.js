@@ -4,6 +4,7 @@ import { setStatus } from "../app/status.js";
 import { clearPreviewMarks } from "../ui/previewMarks.js";
 import { logLine } from "../ui/telemetry.js";
 import { t } from "../i18n/index.js";
+import { resetMapColorizer } from "../viewer/mapColorizer.js";
 
 export function isAllowedImage(file) {
   const name = (file.name || "").toLowerCase();
@@ -42,6 +43,7 @@ export async function setPendingFromPicked(picked) {
   prev.src = base64;
   prev.classList.add("visible");
   clearPreviewMarks();
+  resetMapColorizer();
   logLine(t("msg.fileLoaded", { name, kb: Math.round(size / 1024) }), "ok");
   setStatus(t("msg.fileReady"));
 }
@@ -62,6 +64,7 @@ export async function setPendingFile(file) {
     prev.src = base64;
     prev.classList.add("visible");
     clearPreviewMarks();
+    resetMapColorizer();
     logLine(t("msg.fileLoadedShort", { name: file.name }), "ok");
     setStatus(t("msg.fileReady"));
   } catch (e) {

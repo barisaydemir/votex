@@ -79,6 +79,57 @@
         0% { transform: translateX(-100%); }
         100% { transform: translateX(280%); }
       }
+
+      /* ⚡ AUTO — Akıllı Ayar butonu ve kartı */
+      .btn-row .mil.auto {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        border: 1px solid #fbbf24;
+        color: #1c1917;
+        font-weight: 700;
+      }
+      .btn-row .mil.auto:disabled { opacity: 0.5; }
+      .btn-row .mil.auto:hover:not(:disabled) {
+        box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
+      }
+      .auto-tune-card {
+        margin-top: 0.5rem;
+        padding: 0.55rem 0.65rem;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        border-radius: 8px;
+        background: rgba(245, 158, 11, 0.06);
+        font-size: 0.72rem;
+        line-height: 1.45;
+      }
+      .auto-tune-card .auto-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.25rem;
+      }
+      .auto-tune-card .auto-title { font-weight: 700; color: #fbbf24; letter-spacing: 0.04em; }
+      .auto-tune-card .auto-close {
+        background: none; border: none; color: #94a3b8; cursor: pointer;
+        font-size: 0.8rem; padding: 0 0.2rem;
+      }
+      .auto-tune-card .auto-close:hover { color: #ef4444; }
+      .auto-tune-card .auto-src { color: #8ea8b8; margin-bottom: 0.35rem; }
+      .auto-tune-card .auto-rows { display: flex; flex-direction: column; gap: 0.15rem; }
+      .auto-tune-card .auto-row {
+        display: flex;
+        gap: 0.4rem;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      .auto-tune-card .auto-row.is-skipped { opacity: 0.45; }
+      .auto-tune-card .auto-param { min-width: 108px; color: #e8f0f4; }
+      .auto-tune-card .auto-reason { flex: 1; color: #64748b; font-size: 0.64rem; }
+      .auto-tune-card .auto-value { color: #fbbf24; font-size: 0.66rem; }
+      .auto-tune-card .auto-value b { color: #fde68a; }
+      .auto-tune-card .auto-learn-note {
+        margin-top: 0.35rem;
+        color: #3edc8c;
+        font-size: 0.64rem;
+      }
     </style>
     <link rel="stylesheet" href="/ui/styles.css" />
   </head>
@@ -218,10 +269,16 @@
             <p class="drop-sub" id="file-name">Henüz dosya yok</p>
             <div class="btn-row">
               <button type="button" id="btn-browse" class="mil primary" data-i18n="ops.browse">Dosya Seç</button>
+              <button type="button" id="btn-auto-tune" class="mil auto" title="Veriye göre ayarları otomatik yap" data-i18n-title="auto.buttonTitle">
+                ⚡ AUTO
+              </button>
               <button type="button" id="btn-build-3d" class="mil accent" disabled data-i18n="ops.analyze">
                 Analizi Başlat
               </button>
             </div>
+
+            <!-- ⚡ AUTO — Akıllı Ayar Öneri Kartı -->
+            <div id="auto-tune-card" class="auto-tune-card" style="display:none;"></div>
             <!-- 🔍 ANALİZ ARAÇLARI — Tree Accordion -->
             <details class="tree-section">
               <summary>
@@ -898,6 +955,47 @@
             </div>
           </details>
 
+          <!-- 💾 OTURUMLAR -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">💾</span>
+              <span class="tree-label">OTURUMLAR</span>
+            </summary>
+            <div class="tree-body">
+              <p class="hint compact" style="font-size:0.6rem;">
+                Analiz durumunu kaydedin ve geri yükleyin. Otomatik kayıt aktif.
+              </p>
+              <div class="btn-row" style="margin-bottom:0.3rem;">
+                <button type="button" id="session-save" class="mil" style="font-size:0.62rem;">💾 Kaydet</button>
+                <button type="button" id="session-export" class="mil" style="font-size:0.62rem;">📤 Dışa Aktar</button>
+                <button type="button" id="btn-shortcut-help" style="font-size:0.62rem;">⌨️ Kısayollar</button>
+                <button type="button" id="btn-ai-panel" style="font-size:0.62rem;" onclick="window.__showAIPanel?.()">🤖 Yapay Zeka</button>
+              </div>
+              <div id="session-list" style="max-height:120px;overflow-y:auto;"></div>
+            </div>
+          </details>
+
+          <!-- 📏 3D ÖLÇÜM -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">📏</span>
+              <span class="tree-label">3D ÖLÇÜM</span>
+            </summary>
+            <div class="tree-body">
+              <p class="hint compact" style="font-size:0.6rem;">
+                3D sahne üzerinde tıklayarak noktalar arası mesafe ölçün.
+              </p>
+              <div class="btn-row" style="margin-bottom:0.3rem;">
+                <button type="button" id="btn-measure-start" class="mil" style="font-size:0.62rem;">📏 Ölçmeye Başla</button>
+                <button type="button" id="btn-measure-stop" style="font-size:0.62rem;display:none;">⏹ Durdur</button>
+              </div>
+              <div id="measure-result" style="font-size:0.6rem;color:var(--accent,#00ff88);margin-top:0.3rem;"></div>
+              <p class="hint compact" style="font-size:0.55rem;color:var(--muted,#666);margin-top:0.2rem;">
+                Kısayol: Ctrl+M • İlk tık: başlangıç • İkinci tık: bitiş
+              </p>
+            </div>
+          </details>
+
           <!-- 📊 DERİNLİK PROFİLİ -->
           <details class="tree-section">
             <summary>
@@ -1069,6 +1167,16 @@
             <span class="panel-tag">MAP</span>
             <h2 data-i18n="map.title">2D Önizleme</h2>
           </div>
+          <div id="map-colorizer-bar" style="display:flex;align-items:center;gap:0.35rem;padding:2px 6px;margin-bottom:0.25rem;background:rgba(14,20,28,0.75);border:1px solid var(--line);border-radius:var(--r-sharp);font-size:0.62rem;">
+            <span style="color:var(--muted);white-space:nowrap;">🎨</span>
+            <div id="map-colorizer-swatches" style="display:flex;gap:2px;flex-wrap:wrap;align-items:center;"></div>
+            <button type="button" id="btn-map-color-undo" class="mil compact" title="Geri al (Ctrl+Z)" style="font-size:0.62rem;padding:1px 5px;display:none;">↩</button>
+            <button type="button" id="btn-map-color-export" class="mil compact" title="Renklendirilmiş haritayı PNG olarak indir" style="font-size:0.62rem;padding:1px 5px;">💾</button>
+            <label style="display:flex;align-items:center;gap:2px;white-space:nowrap;">
+              <input type="range" id="map-colorizer-opacity" min="0" max="100" value="100" style="width:48px;height:10px;accent-color:#3edc8c;" />
+              <span id="map-colorizer-opacity-label" style="color:var(--muted);min-width:18px;text-align:right;">100%</span>
+            </label>
+          </div>
           <div class="ruler-bar">
             <label class="ruler-toggle">
               <input type="checkbox" id="ruler-enable" />
@@ -1079,6 +1187,7 @@
             <button type="button" id="ruler-clear" class="mil compact" data-i18n="map.clear">Temizle</button>
           </div>
           <div class="preview-2d tactical" id="preview-wrap">
+            <canvas id="preview-colorized" aria-hidden="true" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;display:none;image-rendering:auto;"></canvas>
             <div class="tactical-grid" aria-hidden="true"></div>
             <div class="tactical-crosshair" aria-hidden="true"></div>
             <div class="preview-hud-compass" aria-hidden="true">
@@ -1288,6 +1397,72 @@
               <button type="button" id="ts-compare" class="mil" disabled style="font-size:0.62rem;padding:0.25rem 0.5rem;width:100%;margin-bottom:0.4rem;">🔀 Karşılaştır</button>
               <div id="ts-result" style="display:none;"></div>
             </div>
+          </details>
+
+          <!-- 🔍 VERİ FİLTRELEME -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">🔍</span>
+              <span class="tree-label">VERİ FİLTRELEME</span>
+            </summary>
+            <div class="tree-body" id="filter-panel-content"></div>
+          </details>
+
+          <!-- 🧩 ANOMALİ KÜMELEME -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">🧩</span>
+              <span class="tree-label">ANOMALİ KÜMELEME</span>
+              <span class="tree-badge" id="cluster-count" style="display:none;">0</span>
+            </summary>
+            <div class="tree-body" id="cluster-panel-content">
+              <div style="font-size:0.62rem;color:var(--muted);margin-bottom:0.4rem;">Analiz sonrası yapıları otomatik gruplar.</div>
+              <button type="button" id="cluster-run" class="mil" disabled style="font-size:0.62rem;padding:0.25rem 0.5rem;width:100%;margin-bottom:0.4rem;">🧩 KÜMELE</button>
+              <div id="cluster-result"></div>
+            </div>
+          </details>
+
+          <!-- 🔴 METAL ALARM -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">🔴</span>
+              <span class="tree-label">METAL ALARM</span>
+              <span class="tree-badge" id="alarm-badge" style="display:none;background:#e23a3a;">0</span>
+            </summary>
+            <div class="tree-body" style="padding:0.4rem 0.5rem;">
+              <div style="font-size:0.62rem;color:var(--muted);margin-bottom:0.4rem;">Değerli metal tespitinde sesli uyarı ve dönen kırmızı ışık topu gösterir.</div>
+              <label style="font-size:0.62rem;color:var(--text);display:flex;align-items:center;gap:4px;margin-bottom:0.3rem;">
+                <input type="checkbox" id="alarm-enabled" checked /> 🔴 Alarm Aktif
+              </label>
+              <label style="font-size:0.62rem;color:var(--text);display:flex;align-items:center;gap:4px;margin-bottom:0.3rem;">
+                <input type="checkbox" id="alarm-sound" checked /> 🔊 Ses Açık
+              </label>
+              <div style="font-size:0.58rem;color:var(--muted);margin-bottom:0.2rem;">Ses Stili</div>
+              <select id="alarm-sound-style" style="width:100%;font-size:0.6rem;padding:0.2rem;margin-bottom:0.3rem;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:3px;">
+                <option value="melody">🎵 Melodi (Ascending)</option>
+                <option value="siren">🚨 Siren (Alçalan)</option>
+                <option value="classic" selected>🔔 Klasik Beep</option>
+                <option value="vibrato">〰️ Vibrato</option>
+              </select>
+              <div style="font-size:0.58rem;color:var(--muted);margin-bottom:0.2rem;">Ses Seviyesi</div>
+              <input type="range" id="alarm-volume" min="0" max="100" value="60" style="width:100%;margin-bottom:0.3rem;" />
+              <div style="font-size:0.58rem;color:var(--muted);margin-bottom:0.2rem;">Beep Hızı (ms)</div>
+              <input type="range" id="alarm-interval" min="500" max="5000" step="100" value="2000" style="width:100%;margin-bottom:0.3rem;" />
+              <div style="font-size:0.58rem;color:var(--muted);margin-bottom:0.2rem;">Işık Hızı</div>
+              <input type="range" id="alarm-speed" min="5" max="50" value="20" style="width:100%;margin-bottom:0.3rem;" />
+              <button type="button" id="alarm-test" class="mil" style="font-size:0.62rem;padding:0.25rem 0.5rem;width:100%;margin-bottom:0.3rem;">🔔 Test Ses</button>
+              <div id="alarm-status" style="font-size:0.58rem;color:var(--muted);margin-top:0.2rem;">Durum: Aktif — 0 metal algılandı</div>
+            </div>
+          </details>
+
+          <!-- 📁 TOPLU DTA -->
+          <details class="tree-section">
+            <summary>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">TOPLU DTA</span>
+              <span class="tree-badge" id="batch-dta-count" style="display:none;">0</span>
+            </summary>
+            <div class="tree-body" id="batch-dta-content"></div>
           </details>
         </section>
       </main>

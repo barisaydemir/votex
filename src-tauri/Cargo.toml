@@ -1,6 +1,6 @@
 [package]
 name = "votex"
-version = "0.3.11"
+version = "0.4.2"
 description = "Digital Future Tech — manyetik sensör AI analiz modülü"
 authors = ["Digital Future Tech"]
 edition = "2021"

@@ -5,10 +5,12 @@ import { setXray } from "./viewer/xray.js";
 import { initDepthProfile, drawProfile, setProfileMode, getProfileMode, exportProfilePNG } from "./viewer/depthProfile.js";
 import { setRotation, setRotationFree, toggleFlipX, toggleFlipZ, setScale, setOffset, autoFit, resetAlignment, getAlignmentStatus, setCompareMode, setBlendOpacity, setSplitPos, compareMode } from "./viewer/mapAlignment.js";
 import { bindColorizer, bindColorizerCycle, applyColorizer, onPaletteChange } from "./viewer/colorizer.js";
+import { bind2DColorizer, bind2DColorizerCycle, applyMapColorizer, undoMapColorizer, redoMapColorizer, resetMapColorizer, getActiveMapPalette, setSyncingFrom3D, updateSwatchUI, bindExportButton, bindOpacitySlider } from "./viewer/mapColorizer.js";
 import { initColorAnalysis, reanalyzeWithColor, saveOriginalResult, clearCache, getCacheStatus, renderCacheStatusHTML, setAnalysisFunction, getOriginalResult } from "./hybrid/colorBasedAnalysis.js";
 import { compareResults, formatComparison } from "./hybrid/colorCompare.js";
 import { applyStructureColors, resetStructureColors } from "./viewer/structureColors.js";
 import { bindViewerKeys } from "./ui/viewerKeys.js";
+import { initAIPanel } from "./ai/aiPanel.js";
 import { $, state } from "./app/state.js";
 import { setStatus } from "./app/status.js";
 import { openNativeFileDialog, setPendingFile } from "./io/files.js";
@@ -27,7 +29,7 @@ import { toggleAnalysisPanel, showAnalysisPanel } from "./ui/analysisPanel.js";
 import { exportReport, exportSceneImage } from "./ui/reportExport.js";
 import { exportToKml } from "./ui/kmlExport.js";
 import { undo, redo, canUndo, canRedo, onHistoryChange, pushState } from "./ui/undoRedo.js";
-import { saveSession, compareSessions, getSessionList, formatComparisonHTML } from "./ui/timeSeries.js";
+import { saveSession as saveTimeSeries, compareSessions, getSessionList, formatComparisonHTML } from "./ui/timeSeries.js";
 import { bindRoutePlanner, setActive as setRouteActive } from "./viewer/routePlanner.js";
 import { bindCompareMode, toggle as toggleCompare } from "./ui/compareMode.js";
 import { bindAnnotations, toggleAnnotationMode, renderAnnotationPins } from "./ui/annotations.js";
@@ -48,10 +50,55 @@ import { startUpdateMonitor, refreshUpdateStatus } from "./ui/updater.js";
 import { initI18n, onLocaleChange, t, tPhrase, getLocale } from "./i18n/index.js";
 import { focusBestValuableMetal } from "./viewer/labels.js";
 import { initTheme } from "./ui/themeToggle.js";
+import { saveSession, loadSession, listSessions, deleteSession, autoSave, loadAutoSave, startAutoSave, exportSessionJson } from "./ui/sessionManager.js";
+import { startMeasurement, stopMeasurement, isMeasuring, handleMeasurementClick, getMeasurementResult } from "./viewer/measurementTool.js";
+import { initShortcutHelp, toggleShortcutHelp } from "./ui/shortcutHelp.js";
+import { bindFilterPanel, filterStructures } from "./ui/filterPanel.js";
+import { clusterStructures, formatClusterHTML, getClusterStats } from "./viewer/clustering.js";
+import { initBatchDta, batchState } from "./ui/batchDta.js";
+import { metalAlarm } from "./viewer/metalAlarm.js";
+import { bindAutoTune, hideCard as hideAutoTuneCard } from "./ui/autoTunePanel.js";
 
 await initI18n();
 initTheme();
 setBootSplashMessage(t("boot.ui"));
+
+/** 🔴 Metal alarm'ı image analizinden gelen metallere göre aktifleştir */
+function activateMetalAlarm(surface) {
+  try {
+    const metals = surface.structures?.metals || [];
+    const sideView = (surface.viewMode || surface.view_mode) === "side";
+    const vertExag = (Number($("z-scale").value) || 10) / 10;
+    const alarmBadge = $("alarm-badge");
+    if (metals.length > 0) {
+      // buildGroundSurface tarafından hesaplanmış gerçek boyutları kullan
+      const alarmMapW = surface._computedMapW ?? Number(surface.mapWidthM ?? surface.map_width_m ?? surface.mapSizeM ?? surface.map_size_m ?? 24);
+      const alarmMapD = surface._computedMapD ?? Number(surface.mapDepthM ?? surface.map_depth_m ?? alarmMapW);
+      metalAlarm.activate(
+        metals,
+        alarmMapW,
+        alarmMapD,
+        vertExag,
+        sideView
+      );
+      if (alarmBadge) {
+        alarmBadge.textContent = metals.length;
+        alarmBadge.style.display = "";
+      }
+    } else {
+      metalAlarm.deactivate();
+      if (alarmBadge) alarmBadge.style.display = "none";
+    }
+    const alarmStatus = $("alarm-status");
+    if (alarmStatus) {
+      alarmStatus.textContent = metals.length > 0
+        ? `Durum: Aktif — ${metals.length} metal algılandı`
+        : "Durum: Pasif — metal bulunamadı";
+    }
+  } catch (e) {
+    console.warn('[MetalAlarm] Aktivasyon hatası:', e);
+  }
+}
 
 function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false, autoReport = false } = {}) {
   state.surfaceState = surface;
@@ -63,6 +110,7 @@ function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false,
   const vertExag = (Number($("z-scale").value) || 10) / 10;
   const wire = $("wireframe").value === "1";
   const depScale = (Number($("depression-scale")?.value) || 10) / 10;
+  metalAlarm.clearAll(); // Önceki alarm sphere'larını temizle
   buildMesh(surface, vertExag, wire, depScale);
   // 🎨 Renklendirmeyi yeniden uygula (yeni ground mesh ile)
   const cm = state.colorizerMode;
@@ -72,8 +120,8 @@ function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false,
   // İpuçlarını göster (DTA/Image analizinden)
   try {
     showHints(state.scene, surface.structures, {
-      mapW: surface.map_width_m || 30,
-      mapD: surface.map_depth_m || 30,
+      mapW: Number(surface.mapWidthM ?? surface.map_width_m ?? surface.mapSizeM ?? surface.map_size_m ?? 24),
+      mapD: Number(surface.mapDepthM ?? surface.map_depth_m ?? surface.mapWidthM ?? surface.map_width_m ?? 24),
       vertExag,
       source: "dta",
     });
@@ -83,6 +131,9 @@ function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false,
   renderStructureList(surface);
   renderFreeDrawPanel();
   renderIntelSummary(surface);
+  // Kümeleme butonunu aktifleştir
+  const clusterBtn2 = $("cluster-run");
+  if (clusterBtn2) clusterBtn2.disabled = false;
   syncStageHudFromSurface(surface);
   logProbFromSurface(surface);
   refreshMapHintsPanel();
@@ -163,6 +214,19 @@ window.__focusCsv = (csvData, mapW, mapD) => {
   state.controls.target.set(0, 0, 0);
   state.controls.update();
 };
+// AI Panel erişimi için surface state ve image callback
+Object.defineProperty(window, '__surfaceState', {
+  get() { return state.surfaceState || null; },
+  configurable: true,
+});
+window.__aiAnalyzeImage = async () => {
+  const { aiClient } = await import("./ai/aiClient.js");
+  const img = state.pendingFile?.base64;
+  if (!img) throw new Error("Önce bir görsel yükleyin.");
+  // base64 prefix'i temizle
+  const raw = img.includes(",") ? img.split(",")[1] : img;
+  return aiClient.analyzeImage(raw);
+};
 
 let deepBaseSurface = null;
 
@@ -188,6 +252,7 @@ async function runDeepScan() {
       return;
     }
     const stats = applySurface(res.surface);
+    activateMetalAlarm(res.surface);
     logLine(
       t("msg.deepDone", {
         accepted: stats.accepted,
@@ -245,6 +310,7 @@ async function runStagedScan() {
       return;
     }
     const stats = applySurface(res.surface);
+    activateMetalAlarm(res.surface);
     const t1 = Number(res.tier1 ?? 0);
     const t2 = Number(res.tier2 ?? 0);
     logLine(t("msg.stagedIntel", { t1, t2 }), t1 + t2 > 0 ? "ok" : "warn");
@@ -303,6 +369,7 @@ async function runWaterScan() {
       return;
     }
     applySurface(res.surface);
+    activateMetalAlarm(res.surface);
     const n = Number(res.waterCount ?? res.water_count ?? 0);
     logLine(t("msg.waterIntel", { n }), n > 0 ? "ok" : "warn");
     setStatus(tPhrase(res.message) || t("msg.waterOk"));
@@ -411,6 +478,8 @@ async function build3D() {
       soilProfile: selectedSoilProfile(),
     });
     const stats = applySurface(surface, minConfidence, { resetKot: true, autoReport: true });
+    // 🔴 Metal alarm — SADECE image analizinden gelen metallere göre konumlandır
+    activateMetalAlarm(surface);
     // Yeni analiz → önceki derin tarama geri-al durumunu temizle
     deepBaseSurface = null;
     const undoBtn = $("btn-deep-undo");
@@ -742,7 +811,7 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
   $("ts-save")?.addEventListener("click", () => {
     const label = prompt('Oturum adı:', new Date().toLocaleDateString('tr-TR'));
     if (label === null) return;
-    saveSession(label || new Date().toLocaleDateString('tr-TR'));
+    saveTimeSeries(label || new Date().toLocaleDateString('tr-TR'));
     refreshTsSessionList();
   });
 
@@ -796,9 +865,24 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
     pushState('xray-toggle', { enabled: !!e.target?.checked });
     setXray(e.target?.checked);
   });
-  // 🎨 Renklendirme paleti (colorizer.js — modüler, silinebilir)
+  // 🎨 3D Renklendirme paleti (colorizer.js — modüler, silinebilir)
   bindColorizer();
   bindColorizerCycle();
+  // 🎨 2D Harita renklendirme (analizden önce)
+  bind2DColorizer();
+  bind2DColorizerCycle();
+  bindExportButton();
+  bindOpacitySlider();
+  // 3D colorizer'ı harita renklendiriciye aç
+  window.__applyColorizer3D = applyColorizer;
+  // 🎨 2D renklendirme geri al butonu
+  $("btn-map-color-undo")?.addEventListener("click", () => {
+    const entry = undo();
+    if (entry) {
+      applyUndoEntry(entry);
+      setStatus(`Geri alındı: ${entry.label}`);
+    }
+  });
   // 🎨 Renk-bazlı analiz tekrarı — renk değişince analizi tekrar çalıştır
   initColorAnalysis();
   let _lastAnalysisFn = null; // son analiz fonksiyonu referansı
@@ -814,6 +898,17 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
       console.log(`[ColorAnalysis] Otomatik mod: ${_autoReanalyze ? "açık" : "kapalı"}`);
     });
   }
+
+  // 🎨 2D harita renklendirmesini 3D palet ile senkronize et
+  onPaletteChange(async (newKey) => {
+    // Swatch seçim UI'ını güncelle
+    updateSwatchUI(newKey);
+    // 2D preview'a da uygula — 3D senkronizasyonu olduğu için undo oluşturmayacak
+    setSyncingFrom3D(true);
+    const { apply2DColorizer } = await import("./viewer/mapColorizer.js");
+    apply2DColorizer(newKey);
+    setSyncingFrom3D(false);
+  });
 
   onPaletteChange(async (newKey, oldKey) => {
     const statusEl = $("color-analysis-status");
@@ -911,6 +1006,11 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
       redoBtn.disabled = !canRedo();
       redoBtn.style.opacity = canRedo() ? '1' : '0.4';
     }
+    // 2D renklendirme geri al butonu
+    const mcUndoBtn = $("btn-map-color-undo");
+    if (mcUndoBtn) {
+      mcUndoBtn.style.display = canUndo() ? '' : 'none';
+    }
   }
   onHistoryChange(updateUndoRedoUI);
   updateUndoRedoUI();
@@ -935,6 +1035,29 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
         setStatus(`İleri alındı: ${entry.label}`);
       }
     }
+    // Ctrl+S → Oturum kaydet
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      const snap = saveSession();
+      setStatus(`Oturum kaydedildi: ${snap.name}`);
+      logLine(`Oturum kaydedildi: ${snap.name}`, 'info');
+    }
+    // Ctrl+M → Ölçüm modu
+    if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+      e.preventDefault();
+      if (isMeasuring()) {
+        stopMeasurement();
+        setStatus('Ölçüm modu kapatıldı');
+      } else {
+        startMeasurement();
+        setStatus('Ölçüm modu açık — 3D sahneye tıklayın');
+      }
+    }
+    // Ctrl+I → AI Panel
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+      e.preventDefault();
+      window.__showAIPanel?.();
+    }
   });
 
   // ── Undo/Redo Yardımcı Fonksiyonu ──
@@ -951,6 +1074,11 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
       const ozSlider = $("align-offsetz"); if (ozSlider) ozSlider.value = a.offsetZ;
     } else if (entry.label === 'color-change') {
       applyColorizer(isRedo ? entry.data.next : entry.data.prev);
+    } else if (entry.label === 'map-color-change') {
+      const paletteKey = isRedo ? entry.data.next : entry.data.prev;
+      undoMapColorizer(paletteKey);
+      // 2D renklendirme swatch UI'ını güncelle
+      updateSwatchUI(paletteKey);
     } else if (entry.label === 'clip-toggle') {
       const ct = $("clip-enabled");
       if (ct) ct.checked = entry.data.enabled;
@@ -1113,6 +1241,9 @@ function rebuildCsvIfNeeded() {
     renderCsvHeatmap(state.csvData);
   }).catch(() => {});
 }
+
+// Filtre değişikliğinde CSV'yi yeniden oluştur
+window.addEventListener("votex:rebuild-csv", () => rebuildCsvIfNeeded());
 
 function updateAlignSliderLabels() {
   const a = state.csvAlignment || {};
@@ -1433,6 +1564,226 @@ onLocaleChange(() => {
   setStatus(state.surfaceState ? t("msg.ready3d", { view: (state.surfaceState.viewMode || state.surfaceState.view_mode) === "side" ? t("stats.side") : t("stats.top") }) : t("status.readyHint"));
 });
 
+// ── Oturum Kaydet/Yükle ──
+initShortcutHelp();
+startAutoSave();
+
+// Otomatik kaydı yükle (varsa)
+if (loadAutoSave()) {
+  logLine("Otomatik kayıt yüklendi", "info");
+}
+
+// Kaydet butonu
+$("session-save")?.addEventListener("click", () => {
+  const name = prompt("Oturum adı:", "Saha Çekimi");
+  if (name) {
+    const snap = saveSession(name);
+    setStatus(`Oturum kaydedildi: ${snap.name}`);
+    logLine(`Oturum kaydedildi: ${snap.name}`, "info");
+    renderSessionList();
+  }
+});
+
+// Oturum listesini göster
+function renderSessionList() {
+  const host = $("session-list");
+  if (!host) return;
+  const sessions = listSessions();
+  if (!sessions.length) {
+    host.innerHTML = `<p style="font-size:11px;color:var(--muted,#666);padding:4px 0;">Kayıtlı oturum yok</p>`;
+    return;
+  }
+  host.innerHTML = sessions.map((s) => {
+    const flags = (s.hasSurface ? "[S]" : "") + (s.hasCsv ? "[C]" : "");
+    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;background:var(--bg-hover,#1a1a3a);margin-bottom:2px;font-size:11px;">` +
+      `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" title="Yukle: ${s.name}">${s.name}</span>` +
+      `<span style="color:var(--muted,#666);font-size:10px;">${flags}</span>` +
+      `<button class="btn-sess-load" data-id="${s.id}" style="background:none;border:none;color:var(--accent,#00ff88);cursor:pointer;font-size:12px;">Y</button>` +
+      `<button class="btn-sess-del" data-id="${s.id}" style="background:none;border:none;color:#ff4444;cursor:pointer;font-size:12px;">X</button>` +
+      `</div>`;
+  }).join("");
+  // Yükleme
+  host.querySelectorAll(".btn-sess-load").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      if (loadSession(id)) {
+        setStatus("Oturum yüklendi");
+        logLine("Oturum yüklendi", "info");
+        if (state.surfaceState) applySurface(state.surfaceState);
+      }
+    });
+  });
+  // Silme
+  host.querySelectorAll(".btn-sess-del").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      deleteSession(btn.dataset.id);
+      renderSessionList();
+    });
+  });
+}
+renderSessionList();
+
+// Dışa aktar butonu
+$("session-export")?.addEventListener("click", () => {
+  const json = exportSessionJson();
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `votex-session-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  setStatus("Oturum dışa aktarıldı");
+});
+
+// AI Paneli
+initAIPanel();
+
+// Kısayol yardımı butonu
+$("btn-shortcut-help")?.addEventListener("click", toggleShortcutHelp);
+
+// ── 3D Ölçüm Modu Entegrasyonu ──
+$("btn-measure-start")?.addEventListener("click", () => {
+  startMeasurement();
+  setStatus("Ölçüm modu açık — 3D sahneye tıklayın");
+  $("btn-measure-start").style.display = "none";
+  $("btn-measure-stop").style.display = "";
+});
+$("btn-measure-stop")?.addEventListener("click", () => {
+  stopMeasurement();
+  setStatus("Ölçüm modu kapatıldı");
+  $("btn-measure-start").style.display = "";
+  $("btn-measure-stop").style.display = "none";
+  $("measure-result").textContent = "";
+});
+// Measurement tool click handler'ı 3D canvas'a bağla
+const viewerEl3d = $("viewer");
+if (viewerEl3d) {
+  const canvasMeas = viewerEl3d.querySelector("canvas");
+  if (canvasMeas) {
+    canvasMeas.addEventListener("click", async (e) => {
+      if (!isMeasuring() || !state.camera || !state.scene) return;
+      const rect = canvasMeas.getBoundingClientRect();
+      const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      const THREE = await import("three");
+      const rc = new THREE.Raycaster();
+      const mouse = new THREE.Vector2(mx, my);
+      rc.setFromCamera(mouse, state.camera);
+      const hits = rc.intersectObjects(state.scene.children, true);
+      if (handleMeasurementClick(hits)) {
+        const result = getMeasurementResult();
+        if (result) setStatus(`Ölçüm: ${result}`);
+      }
+    });
+  }
+}
+
+// ── Veri Filtreleme Paneli ──
+bindFilterPanel();
+window.addEventListener("votex:filter-change", () => {
+  if (state.surfaceState) {
+    logLine("Filtre değişikliği — sahne yeniden oluşturuluyor", "info");
+    // Filtre uygulanırsa mevcut analizi yeniden çalıştır
+    if (state.csvData) {
+      window.dispatchEvent(new CustomEvent("votex:rebuild-csv"));
+    }
+  }
+});
+
+// ── Anomali Kümeleme ──
+const clusterBtn = $("cluster-run");
+if (clusterBtn) {
+  clusterBtn.addEventListener("click", () => {
+    if (!state.surfaceState) return;
+    const chambers = state.surfaceState.chambers || [];
+    const tunnels = state.surfaceState.tunnels || [];
+    const metals = state.surfaceState.metals || [];
+    if (chambers.length + tunnels.length + metals.length < 2) {
+      setStatus("Kümeleme için en az 2 yapı gerekli");
+      return;
+    }
+    const clusters = clusterStructures(chambers, tunnels, metals, { eps: 8, minPts: 2 });
+    const resultEl = $("cluster-result");
+    if (resultEl) resultEl.innerHTML = formatClusterHTML(clusters);
+    const badge = $("cluster-count");
+    if (badge) {
+      badge.textContent = clusters.length;
+      badge.style.display = clusters.length > 0 ? "" : "none";
+    }
+    setStatus(`Kümeleme tamamlandı: ${clusters.length} küme bulundu`);
+  });
+}
+
+// ── Toplu DTA İşleme ──
+initBatchDta();
+const batchBadge = $("batch-dta-count");
+if (batchBadge) {
+  // Batch state değişikliğini izle
+  setInterval(() => {
+    const count = batchState.files.length;
+    batchBadge.textContent = count;
+    batchBadge.style.display = count > 0 ? "" : "none";
+  }, 2000);
+}
+
+// ── Metal Alarm Kontrolleri ──
+{
+  const enabledCb = $("alarm-enabled");
+  const soundCb = $("alarm-sound");
+  const volSlider = $("alarm-volume");
+  const intervalSlider = $("alarm-interval");
+  const speedSlider = $("alarm-speed");
+  const testBtn = $("alarm-test");
+  const statusEl = $("alarm-status");
+  const badgeEl = $("alarm-badge");
+
+  if (enabledCb) {
+    enabledCb.addEventListener("change", () => {
+      metalAlarm.toggle();
+      if (statusEl) {
+        const s = metalAlarm.getState();
+        statusEl.textContent = s.enabled
+          ? `Durum: Aktif — ${s.activeSpheres} metal algılandı`
+          : "Durum: Kapalı";
+      }
+    });
+  }
+  if (soundCb) {
+    soundCb.addEventListener("change", () => {
+      metalAlarm.toggleSound();
+    });
+  }
+  const soundStyleSelect = $("alarm-sound-style");
+  if (soundStyleSelect) {
+    soundStyleSelect.addEventListener("change", () => {
+      metalAlarm.setSoundStyle(soundStyleSelect.value);
+    });
+  }
+  if (volSlider) {
+    volSlider.addEventListener("input", () => {
+      metalAlarm.setVolume(Number(volSlider.value) / 100);
+    });
+  }
+  if (intervalSlider) {
+    intervalSlider.addEventListener("input", () => {
+      metalAlarm.setInterval(Number(intervalSlider.value));
+    });
+  }
+  if (speedSlider) {
+    speedSlider.addEventListener("input", () => {
+      metalAlarm.setFlashSpeed(Number(speedSlider.value) / 10);
+    });
+  }
+  if (testBtn) {
+    testBtn.addEventListener("click", () => {
+      metalAlarm.testBeep();
+      testBtn.textContent = "🔔 Çalındı!";
+      setTimeout(() => { testBtn.textContent = "🔔 Test Ses"; }, 1200);
+    });
+  }
+}
+
 /**
  * Touch cihazlarda panel scroll zincirleme engelleme
  * ve overscroll-glow efekti.
@@ -1466,3 +1817,12 @@ function initTouchScroll() {
     }, { passive: true });
   }
 }
+
+// ── ⚡ AUTO — Akıllı Ayarlar ──
+// Veri kaynaklarını panele ver; buton bağlanır. Görsel veya CSV yüklendiğinde çalışır.
+bindAutoTune(() => ({
+  imageBase64: state.pendingFile?.base64 || null,
+  csvData: state.csvData || null,
+}));
+// Dil değişince kartı sıfırla (i18n anahtarları yeniden yazılır)
+onLocaleChange(() => hideAutoTuneCard());

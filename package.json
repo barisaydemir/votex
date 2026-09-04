@@ -1,7 +1,7 @@
 {
   "name": "votex",
   "private": true,
-  "version": "0.3.11",
+  "version": "0.4.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,9 +14,11 @@
     "test:js:watch": "vitest",
     "test:rust": "cargo test --lib",
     "check:rust": "cargo check",
-    "ci": "node scripts/ci.js",
-    "ci:fast": "node scripts/ci.js --skip-installer --skip-rust",
-    "ci:full": "node scripts/ci.js"
+    "ci": "node scripts/ci-local.js",
+    "ci:quick": "node scripts/ci-local.js --quick",
+    "ci:full": "node scripts/ci-local.js",
+    "ci:no-nsis": "node scripts/ci-local.js --skip-nsis",
+    "ci:no-rust": "node scripts/ci-local.js --skip-rust"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
