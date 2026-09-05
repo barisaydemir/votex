@@ -700,6 +700,136 @@ html, body {
   }
 }
 
+/* Benchmark Panel */
+.benchmark-panel {
+  margin-top: 20px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  border: 1px solid var(--border);
+}
+
+.benchmark-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.benchmark-header h3 {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.benchmark-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bench-row {
+  display: grid;
+  grid-template-columns: 64px 1fr 1fr 64px 40px;
+  gap: 8px;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.bench-row.bench-head {
+  background: transparent;
+  padding: 2px 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bench-size {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.bench-cell {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.bench-sub {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.bench-speed.bench-win {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.bench-speed.bench-lose {
+  color: var(--warning);
+}
+
+.bench-match {
+  text-align: center;
+  color: var(--accent);
+}
+
+.bench-env {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.benchmark-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 10px;
+  line-height: 1.4;
+}
+
+/* 3D Surface Panel */
+.surface3d-panel {
+  margin-top: 20px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  border: 1px solid var(--border);
+}
+
+.surface3d-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.surface3d-header h3 {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.surface3d-canvas-wrap {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #0a0e17;
+  touch-action: none;
+}
+
+.surface3d-canvas-wrap canvas {
+  display: block;
+  cursor: grab;
+}
+
+.surface3d-canvas-wrap canvas:active {
+  cursor: grabbing;
+}
+
 /* Utilities */
 .hidden {
   display: none !important;

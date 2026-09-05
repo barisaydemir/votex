@@ -95,6 +95,41 @@ function imageStats(imageData) {
 }
 
 /**
+ * Build the 3D surface field (heights + colors grid) via WASM.
+ * Same core as desktop `colormap_to_surface` field stage.
+ * Returns null so the caller can fall back gracefully.
+ *
+ * @param {ImageData} imageData — cleaned image (no LUT strip)
+ * @param {object} opts — { gridW, gridH } (default 96×96, clamped 16..256)
+ * @returns {object|null} — { gridW, gridH, zMin, zMax, heights: Float32Array, colors: Uint8Array }
+ */
+function buildSurfaceField(imageData, opts = {}) {
+  if (!_wasmReady || !_wasmModule) return null;
+
+  try {
+    const result = _wasmModule.build_surface_field(
+      imageData.data,
+      imageData.width,
+      imageData.height,
+      opts.gridW ?? 96,
+      opts.gridH ?? 96
+    );
+    const parsed = JSON.parse(result.json);
+    return {
+      gridW: parsed.gridW,
+      gridH: parsed.gridH,
+      zMin: parsed.zMin,
+      zMax: parsed.zMax,
+      heights: Float32Array.from(parsed.heights),
+      colors: Uint8Array.from(parsed.colors)
+    };
+  } catch (err) {
+    console.warn('[VotexWASM] build_surface_field failed:', err?.message || err);
+    return null;
+  }
+}
+
+/**
  * Convert WASM anomalies to the JS analyzer's structure format
  * so renderResults can display them uniformly.
  */
@@ -118,5 +153,6 @@ window.VotexWasm = {
   isReady: isWasmReady,
   analyzeColormap,
   imageStats,
+  buildSurfaceField,
   anomaliesToStructures,
 };
