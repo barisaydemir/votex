@@ -132,10 +132,18 @@
       <div id="surface3d-panel" class="surface3d-panel hidden">
         <div class="surface3d-header">
           <h3>🧊 3D Yüzey (WASM çekirdeği)</h3>
-          <button id="btn-surface3d-close" class="icon-btn" aria-label="Kapat">×</button>
+          <div class="surface3d-actions">
+            <button id="btn-export-heightmap" class="btn btn-secondary btn-sm" title="Yükseklik haritası PNG olarak dışa aktar (Blender, QGIS, Unity)">
+              📥 Heightmap
+            </button>
+            <button id="btn-surface3d-close" class="icon-btn" aria-label="Kapat">×</button>
+          </div>
         </div>
         <div class="surface3d-canvas-wrap">
           <canvas id="surface3d-canvas"></canvas>
+        </div>
+        <div class="surface3d-footer">
+          <span class="surface3d-hint">标准高度图: 黑=低 白=高 — Blender / QGIS / World Machine 兼容</span>
         </div>
       </div>
 

@@ -138,6 +138,17 @@ function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false,
   logProbFromSurface(surface);
   refreshMapHintsPanel();
 
+  const edge = surface.edgeAnalysis || surface.edge_analysis;
+  const edgeStats = $("image-edge-stats");
+  if (edgeStats && edge) {
+    const edgeCells = Number(edge.edgeCellCount ?? edge.edge_cell_count ?? 0);
+    const edgeMean = Number(edge.meanMagnitude ?? edge.mean_magnitude ?? 0);
+    const edgeMax = Number(edge.maxMagnitude ?? edge.max_magnitude ?? 0);
+    const contours = (edge.contourLevels || edge.contour_levels || []).length;
+    edgeStats.textContent = `Resim işlem sonucu · Kenar hücresi: ${edgeCells} · |∇B| ort: ${edgeMean.toFixed(3)} · maksimum: ${edgeMax.toFixed(3)} · ${contours} iso-seviye`;
+  } else if (edgeStats) {
+    edgeStats.textContent = "—";
+  }
   const cleaned = surface.cleanedPreviewBase64 || surface.cleaned_preview_base64;
   if (cleaned) {
     const prev = $("preview");
@@ -1405,16 +1416,38 @@ import("./viewer/groundMagneticOverlay.js").then((mod) => {
   const chk = document.getElementById("mag-ground-toggle");
   const slider = document.getElementById("mag-ground-opacity");
   const valLabel = document.getElementById("mag-ground-opacity-val");
-  const opRow = document.getElementById("mag-ground-opacity-row");
+  const optionsEl = document.getElementById("mag-ground-options");
+  const modeSelect = document.getElementById("mag-ground-mode");
+  const arrowsCheck = document.getElementById("mag-ground-arrows");
+  const contoursCheck = document.getElementById("mag-ground-contours");
+  const rebuild = () => {
+    if (state.csvOverlay && state.showMagneticGround) {
+      mod.updateGroundMagneticOverlay(state.csvOverlay, state.surface || state.surfaceState);
+    }
+  };
   if (chk) {
     chk.addEventListener("change", () => {
       const on = chk.checked;
       mod.toggleMagneticGround(on);
-      if (opRow) opRow.style.display = on ? "flex" : "none";
+      if (optionsEl) optionsEl.style.display = on ? "flex" : "none";
       // CSV yüklüyse yeniden oluştur
-      if (on && state.csvOverlay) {
-        mod.updateGroundMagneticOverlay(state.csvOverlay, state.surface || state.surfaceState);
-      }
+      if (on) rebuild();
+    });
+  }
+  if (modeSelect) {
+    modeSelect.addEventListener("change", () => {
+      mod.setMagneticOverlayMode(modeSelect.value);
+      rebuild();
+    });
+  }
+  if (arrowsCheck) {
+    arrowsCheck.addEventListener("change", () => {
+      mod.setMagneticOverlayArrows(arrowsCheck.checked);
+    });
+  }
+  if (contoursCheck) {
+    contoursCheck.addEventListener("change", () => {
+      mod.setMagneticOverlayContours(contoursCheck.checked);
     });
   }
   if (slider) {
@@ -1425,8 +1458,6 @@ import("./viewer/groundMagneticOverlay.js").then((mod) => {
     });
   }
   // CSV yüklendiğinde kontrolleri göster
-  const origShow = mod.updateGroundMagneticOverlay;
-  const origRemove = mod.removeGroundMagneticOverlay;
   const ctrlEl = document.getElementById("mag-ground-controls");
   if (ctrlEl) {
     // CSV yüklendiğinde göster, kaldırınd gizle

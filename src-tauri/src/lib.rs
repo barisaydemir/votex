@@ -11,6 +11,7 @@ mod commands;
 mod csv_import;
 mod dta_bridge;
 mod license;
+mod legacy_mag_json;
 mod magnetic;
 mod preprocess;
 mod prob_client;
@@ -18,6 +19,7 @@ mod hint_store;
 mod session_persist;
 mod sdc_model;
 mod sdc_reader_mod;
+mod shape_templates;
 mod soil_profile;
 mod structures;
 mod surface;
@@ -108,6 +110,9 @@ pub fn run() {
             commands::csv_cmds::build_surface_from_csv,
             commands::csv_cmds::pick_csv_file,
             commands::csv_cmds::parse_excel_data,
+            commands::csv_cmds::analyze_legacy_dik_json,
+            commands::csv_cmds::level_legacy_mag_json,
+            commands::csv_cmds::pick_legacy_dik_json,
             commands::get_dta_link_status,
             commands::dta_cmds::get_app_settings,
             commands::dta_cmds::set_dta_launch_path,
@@ -139,6 +144,8 @@ pub fn run() {
             commands::license_cmds::activate_license,
             commands::archive_cmds::list_archive,
             commands::archive_cmds::load_archive,
+            commands::archive_cmds::save_legacy_archive,
+            commands::archive_cmds::load_legacy_archive,
             commands::archive_cmds::delete_archive,
             commands::update_cmds::get_app_version,
             commands::update_cmds::get_update_status,

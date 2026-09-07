@@ -39,7 +39,6 @@ function refreshClipState() {
   const c = Number(state.clipHeightM) || 0;
   clipPlane.constant = c;
   const planes = state.clipEnabled ? [clipPlane] : null;
-  if (c === _lastClipConstant && !!state.groundPlane?.material.clippingPlanes === !!planes) return;
   _lastClipConstant = c;
   // Zemin + grid
   if (state.groundPlane?.material) {
@@ -62,10 +61,24 @@ function refreshClipState() {
       }
     });
   }
-  // Manyetik zemin overlay'e uygula
-  if (state.groundMagneticOverlay?.material) {
-    state.groundMagneticOverlay.material.clippingPlanes = planes;
-    state.groundMagneticOverlay.material.needsUpdate = true;
+  // Legacy JSON katmanı: ölçüm grid'i, konturlar, anomaliler ve derinlik çerçevesi
+  if (state.legacyDikGroup) {
+    state.legacyDikGroup.traverse((obj) => {
+      if ((obj.isMesh || obj.isLine) && obj.material) {
+        obj.material.clippingPlanes = planes;
+        obj.material.clipShadows = true;
+        obj.material.needsUpdate = true;
+      }
+    });
+  }
+  // Manyetik zemin overlay'e uygula (ısı haritası + gradyan okları)
+  if (state.groundMagneticOverlay) {
+    state.groundMagneticOverlay.traverse((obj) => {
+      if ((obj.isMesh || obj.isLine) && obj.material) {
+        obj.material.clippingPlanes = planes;
+        obj.material.needsUpdate = true;
+      }
+    });
   }
 }
 
@@ -85,6 +98,15 @@ export function applySplitClipToScene(clipPlane) {
   if (grid?.material) {
     grid.material.clippingPlanes = planes;
     grid.material.needsUpdate = true;
+  }
+  // Legacy JSON katmanı
+  if (state.legacyDikGroup) {
+    state.legacyDikGroup.traverse((obj) => {
+      if ((obj.isMesh || obj.isLine) && obj.material) {
+        obj.material.clippingPlanes = planes;
+        obj.material.needsUpdate = true;
+      }
+    });
   }
   // Tüm yapı mesh'leri
   if (state.structureGroup) {
@@ -242,6 +264,9 @@ export function clearStructures() {
   state.freeDrawItems = [];
   state.selectedFreeDrawId = null;
   state.selectedStructureId = null;
+  state.legacyDikResult = null;
+  state.legacyDikRawContent = null;
+  state.legacyDikFileName = null;
   if (state.selectionMarker && state.scene) {
     state.scene.remove(state.selectionMarker);
     state.selectionMarker.geometry?.dispose();
@@ -278,11 +303,32 @@ export function clearStructures() {
     g.geometry?.dispose();
     const tex = g.userData?.mapTexture;
     if (tex) tex.dispose();
+    const normalMap = g.userData?.normalMap;
+    if (normalMap) normalMap.dispose();
     if (g.material) {
       if (Array.isArray(g.material)) g.material.forEach((m) => m.dispose());
       else g.material.dispose();
     }
     state.groundPlane = null;
+  }
+  if (state.legacyDikGroup) {
+    state.scene.remove(state.legacyDikGroup);
+    state.legacyDikGroup.traverse((obj) => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.userData?._origMat) {
+        obj.material = obj.userData._origMat;
+        delete obj.userData._origMat;
+      }
+      if (obj.material) {
+        const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+        materials.forEach((material) => {
+          if (material.userData?.votexXrayShared) return;
+          if (material.map) material.map.dispose();
+          material.dispose();
+        });
+      }
+    });
+    state.legacyDikGroup = null;
   }
   if (state.csvOverlay) {
     state.csvOverlay.traverse((obj) => {

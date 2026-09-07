@@ -3,6 +3,8 @@ import { state } from "../app/state.js";
 import { mapToWorld } from "./coords.js";
 import { invalidate } from "./scene.js";
 
+const TERRAIN_NORMAL_STRENGTH = 0.18;
+
 /** Soft relief amplitude (m) — view-mode default (yapı kot farkı ayrı). */
 export function reliefAmpM(viewMode) {
   return viewMode === "side" ? 0.15 : 1.0;
@@ -175,6 +177,67 @@ function burialReliefY(signed01) {
   return -signed01 * 0.7; // metal/kırmızı: yine aşağı, biraz daha derin
 }
 
+/**
+ * Encode finite-difference heightfield derivatives as tangent-space normals.
+ * Rows follow the plane's local +V tangent (world -Z after rotation).
+ *
+ * @returns {Uint8Array} RGBA normal-map pixels, row-major by heightfield cell.
+ */
+export function computeHeightfieldNormalData(heights, gw, gh, mapW, mapD) {
+  const data = new Uint8Array(Math.max(0, gw * gh * 4));
+  const stepX = mapW / Math.max(1, gw - 1);
+  const stepV = mapD / Math.max(1, gh - 1);
+  const sample = (gx, gz) => {
+    const value = Number(heights?.[gz * gw + gx]);
+    return Number.isFinite(value) ? value : 0;
+  };
+  const derivative = (gx, gz, axis) => {
+    const max = axis === "x" ? gw - 1 : gh - 1;
+    const step = axis === "x" ? stepX : stepV;
+    if (max <= 0 || step <= 0) return 0;
+    if (axis === "x") {
+      if (gx === 0) return (sample(1, gz) - sample(0, gz)) / step;
+      if (gx === max) return (sample(max, gz) - sample(max - 1, gz)) / step;
+      return (sample(gx + 1, gz) - sample(gx - 1, gz)) / (2 * step);
+    }
+    if (gz === 0) return (sample(gx, 1) - sample(gx, 0)) / step;
+    if (gz === max) return (sample(gx, max) - sample(gx, max - 1)) / step;
+    return (sample(gx, gz + 1) - sample(gx, gz - 1)) / (2 * step);
+  };
+
+  for (let gz = 0; gz < gh; gz++) {
+    for (let gx = 0; gx < gw; gx++) {
+      // Plane tangent basis: +U = world +X, +V = world -Z, +N = world +Y.
+      // For y = h(u,v), N = normalize((-dh/du, 1, -dh/dv)).
+      const nx = -derivative(gx, gz, "x");
+      const ny = 1;
+      const nz = -derivative(gx, gz, "v");
+      const length = Math.hypot(nx, ny, nz) || 1;
+      const offset = (gz * gw + gx) * 4;
+      data[offset] = Math.round((nx / length * 0.5 + 0.5) * 255);
+      data[offset + 1] = Math.round((ny / length * 0.5 + 0.5) * 255);
+      data[offset + 2] = Math.round((nz / length * 0.5 + 0.5) * 255);
+      data[offset + 3] = 255;
+    }
+  }
+  return data;
+}
+
+export function makeHeightfieldNormalTexture(heights, gw, gh, mapW, mapD) {
+  const data = computeHeightfieldNormalData(heights, gw, gh, mapW, mapD);
+  const tex = new THREE.DataTexture(data, gw, gh, THREE.RGBAFormat);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = groundAniso();
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.flipY = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function resolveColors(surface) {
   const c = surface.colors;
   if (!c) return [];
@@ -191,9 +254,11 @@ function niceStep(x) {
   return 10;
 }
 
-function makeMaterial(tex, wireframe, contour = null) {
+function makeMaterial(tex, wireframe, contour = null, normalMap = null) {
   const mat = new THREE.MeshStandardMaterial({
     map: wireframe ? null : tex,
+    normalMap: wireframe ? null : normalMap,
+    normalScale: new THREE.Vector2(TERRAIN_NORMAL_STRENGTH, TERRAIN_NORMAL_STRENGTH),
     emissiveMap: wireframe ? null : tex,
     emissive: wireframe ? 0x000000 : 0xffffff,
     emissiveIntensity: wireframe ? 0 : 0.55,
@@ -274,6 +339,7 @@ export function buildGroundSurface(surface, wireframe = false, vertExag = 1, dep
     if (!tex) tex = makeMapDataTexture(colors, gw, gh);
   }
 
+  const terrainHeights = new Float32Array(gw * gh);
   const geo = new THREE.PlaneGeometry(mapW, mapD, gw - 1, gh - 1);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -288,6 +354,7 @@ export function buildGroundSurface(surface, wireframe = false, vertExag = 1, dep
       const wz = pos.getZ(vi);
       const base = burialReliefY(heightAt(heights, gw, gh, ix, iy)) * amp;
       const y = base + kotLiftAt(wx, wz, kotPatches);
+      terrainHeights[vi] = y;
       pos.setY(vi, y);
       if (y < yMin) yMin = y;
       if (y > yMax) yMax = y;
@@ -300,11 +367,13 @@ export function buildGroundSurface(surface, wireframe = false, vertExag = 1, dep
   const span = Number.isFinite(yMin) && Number.isFinite(yMax) ? yMax - yMin : 0;
   const contour = span > 0.05 ? { interval: niceStep(span / 9) } : null;
 
-  const mat = makeMaterial(tex, wireframe, contour);
+  const normalMap = wireframe ? null : makeHeightfieldNormalTexture(terrainHeights, gw, gh, mapW, mapD);
+  const mat = makeMaterial(tex, wireframe, contour, normalMap);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = "groundMap";
   mesh.position.set(0, 0, 0);
   mesh.userData.mapTexture = wireframe ? null : tex;
+  mesh.userData.normalMap = normalMap;
   mesh.userData.reliefAmpM = amp;
   // Etiket gizlemesi için arazi örnekleyici verisi (sampleTerrainY kullanır)
   mesh.userData.relief = { heights, gw, gh, mapW, mapD, amp, kotPatches };
@@ -362,6 +431,8 @@ export function disposeGround(mesh) {
   mesh.geometry?.dispose();
   const tex = mesh.userData?.mapTexture;
   if (tex) tex.dispose();
+  const normalMap = mesh.userData?.normalMap;
+  if (normalMap) normalMap.dispose();
   if (mesh.material) {
     if (mesh.material.map && mesh.material.map !== tex) {
       mesh.material.map.dispose?.();

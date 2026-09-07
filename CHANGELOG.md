@@ -4,6 +4,201 @@ Tüm sürümlerin değişiklik kaydı.
 
 ---
 
+## 0.4.21 — 7 Eylül 2026
+
+### Geçişler Arası Interpolasyon (IDW) — Kontür Doğruluğu
+
+- Yeni `interpolate_pass_gaps`: fiziksel hücre boyu eksenler arasında ≥1,6× farklıysa (geçiş aralığı ≫ adım aralığı), zayıf eksen ızgarası k=2..6 kat yoğunlaştırılır (braket ölçüm satırları arasında lineer enterpolasyon) ve kalan iç boşluklar IDW (p=2) ile doldurulur.
+- **Konum eşlemesi korunur:** yeni boyut n2 = k·(n−1)+1, orijinal satır i → i·k; metre koordinatları kaymaz. Median/σ istatistikleri yalnızca ölçülen hücrelerden hesaplandığı için enterpolasyon σ'yı şişirmez; IDW kaynağı da yalnızca ölçülen hücrelerdir.
+- Yoğunlaştırılmış ızgara yalnızca analiz boru hattında (blob → MS kontür → şablon eşleştirme) kullanılır; UI'a giden `gridValues`/`gridCoverage` ölçülen çözünürlükte kalır (payload şişmez).
+- Tetiklendiğinde sonuç mesajına "IDW ×k" eklenir; simetrik ızgaralarda no-op.
+- 2 yeni birim testi: zayıf eksen yoğunlaştırma + konum korunumu (lineer alanda tam değer), iç boşluk IDW dolumu. Toplam 201 Rust + 264 JS testi yeşil.
+
+## 0.4.20 — 7 Eylül 2026
+
+### Şablon Eşleştirme Katmanı: Oda / Tünel / Şaft / Metal
+
+- Yeni `shape_templates` modülü: anomali kontürleri dört şablon maskesiyle (oda = dolu dikdörtgen, tünel = kapsül/stadyum, şaft = iç teğet elips, metal = kompakt daire) 24×24 bbox-normalize ızgarada korelasyonla eşleştirilir. Geometri ağırlığı 0.62 (Dice katsayısı), fiziksel öncüller 0.38 (uzama, kompaktlık, kutup, güç, ölçü).
+- En iyi skoru 0.40'ın altında olan şekiller "Belirsiz" olarak raporlanır — zorlama sınıf yok.
+- `LegacyShape`'e `templateKind` / `templateScore` / `templateScores` alanları eklendi (eski arşivlerle uyumlu default'larla).
+- 3D detay kartlarında ve doğrulama sayfasında "Şablon: Tünel %78" biçiminde gösterilir.
+- Doğrulama: izole yuvarlak güçlü tepe → Metal %89, tek hücre genişliği hat → Tünel %86, yatay sırt → Tünel %83.
+- 5 yeni birim testi (uzun/kısa/dikdörtgen/kompakt/dejenere durumları); toplam 199 Rust + 264 JS testi yeşil.
+
+## 0.4.19 — 7 Eylül 2026
+
+### Kontür Görselleştirme: 3D + 2D Harita Doğrulaması
+
+- **3D zemin dolumu:** Anomali kartlarının ölçüm kontürü (marching-squares) artık harita düzleminde yarı saydam dolumla da çiziliyor — dış kontür çizgisi + dolum birlikte, kontür kalitesi saha ekranında doğrudan görülüyor.
+- **Metal zemin projeksiyonu:** Metallere özgü genel daire diski kaldırıldı; metalin gerçek ölçüm kontürü (tepe × %70) hem dolum hem kontür çizgisi olarak haritada gösteriliyor. Ölçüm kontürü yoksa daire yaklaşımına düşer.
+- **2D doğrulama sayfası:** `cargo test dump_contour_verification_fixture` gerçek boru hattından (residual → blob → MS kontür → sınıflandırma) sentetik düşük çözünürlüklü tarama üretip `dev/contour-verify-standalone.html` dosyasına gömer; ısı haritası + dış/çekirdek kontürler + kartlar (tür, güven, RMS, alan, nokta sayısı) tek ekranda doğrulanır. Doğrulama sonucu: tek hücre genişliği hat 31 noktalı kontür + 3.41 m² gerçek alan (eski: 2-4 nokta, sıfır alan).
+- Dikdörtgen dalı MS kontürüne uyarlandı (rectangularity ≥ 0.82, ≤ 16 nokta) — yumuşak köşeli plato kontürleri artık dikdörtgen olarak sınıflanabiliyor; elips rectangularity'si (π/4≈0.785) eşiğin altında güvende.
+- Yeni JS testleri (footprintPoints/createFootprintFill) ve Rust fikstür testi ile toplam 194 Rust + 264 JS testi yeşil.
+
+## 0.4.18 — 7 Eylül 2026
+
+### Şekil Motoru v2 — Ölçüme Dayalı Gerçek Şekiller
+
+- **Bikübik ×4 büyütme + marching-squares kontür:** Düşük çözünürlüklü taramalarda (ör. 14 adım × ~3 geçiş) anomali kontürleri artık açı sıralı hücre dizilimi yerine, blob çevresindeki yerel pencerenin Catmull-Rom bikübik ile ×4 büyütülüp tepe eşiğinde (metal için %70, genel için algılama eşiği) marching-squares izo-kontürü çıkarılmasıyla üretiliyor. Tek hücre genişliğindeki anomaliler bile 8+ noktalı, gerçek alanlı, kapalı poligon veriyor — "Düzensiz %4" tabanına düşüş ortadan kalktı.
+- **Ağırlıklı moment elipsi:** Blob hücreleri |rezidü| değerleriyle ağırlıklandırılıp 2. moment kovaryansından yönelim + eksen oranı hesaplanıyor; 2–3 hücrelik blob'larda bile kararlı.
+- **Gerçek RMS:** Kartlardaki "RMS" artık uydurma bir kalite türevi değil — kontür noktalarının moment elipsine gerçek en-yakın-nokta RMS sapması (ternary arama ile). Circle/ellipse/capsule sınıflarında sezgisel model hatasının yerine ölçülen göreli sapma geçti.
+- Kontür dejenere kalırsa (çok nadir) önceki davranış korunuyor: rx/ry tabanlı tahmini sınıflandırma, "hesaplanmış" kaynak etiketi.
+- 5 yeni regresyon testi: bikübik doğrusallık, marching-squares kapalı döngü/alan doğruluğu, tek hücre genişliği blob, moment elips eksen oranı, elips RMS sıfır yakınsaması.
+- Bakım: `structures` modülündeki 3 önceden var olan test uyarısı temizlendi (tüm hedeflerde 0 uyarı).
+
+## 0.4.17 — 7 Eylül 2026
+
+### 3D Etiket Okunabilirliği ve Tür Bilgisi
+
+- 3D anomali etiketleri artık ne olduğunu gösteriyor: sıra numarası + tür (örn. `#2 · Elips`, `#7 · Metal`) — "Anomali" kelimesi kaldırıldı.
+- Etiket punto büyütüldü (başlık 18→25 px, detay 14→17 px; güçlü anomali 28→32 px) ve sprite boyutu %40 artırıldı — saha ekranında okunabilir.
+- Güçlü anomali etiketi yalnızca kırmızı-beyaz: kırmızı çerçeve + koyu kırmızı zemin + beyaz yazı.
+- Etiketler büyüdüğü için şerit/satır aralığı genişletildi; üst üste binme azaltıldı.
+
+---
+
+## 0.4.16 — 7 Eylül 2026
+
+### LEGACY3DMAG Dejenere Kontür Düzeltmesi (Düzensiz %4 Sorunu)
+
+- Düşük çözünürlüklü JSON taramalarda tek hücre genişliğindeki anomalilerin ölçüm kontürü doğrusallaşıyor (sıfır alan) ve sınıflandırıcı her seferinde "Düzensiz - şekil %4 - RMS 1.00" tabanına düşüyordu.
+- `classify_shape` artık dejenere kontürü algılıyor (3'ten az nokta veya alan ≈ 0) ve şekli sığdırılmış rx/ry ölçüsünden sınıflandırıyor: en/boy ≤ 1.25 → tahmini Daire, ≥ 2.2 → tahmini Kapsül, arası → tahmini Elips.
+- Dejenere kontürlerde `shape_source` artık `inferred` (arayüzde "hesaplanmış") işaretleniyor; anlamsız RMS 1.00 yerine dürüst güven değerleri (%47–%56 bandı) üretiliyor.
+- 3D katman, dejenere durumlarda kırık ölçüm kontürü yerine temiz sığdırılmış elips geometrisi çiziyor.
+- Düzeltme: `classify_shape` içinde kullanılmayan `kind` parametresi temizlendi; 0 uyarı kuralı korundu.
+- Regresyon testi eklendi: `degenerate_contour_falls_back_to_fitted_shape` (188/188 Rust, 258/258 JS testi geçti).
+- Sürüm metadata'sı tüm konumlarda 0.4.16'ya senkronize edildi.
+
+---
+
+## 0.4.15 — 7 Eylül 2026
+
+### 🧭 Modül Üst Sekmeleri ve Saha Katmanı Güçlendirmesi
+
+- Sol menü GÖRÜNTÜ / CSV VERİ / LEGACY3DMAG / ARAÇLAR modülleri ayrı üst sekmelere ayrıldı; aktif olmayan modülün kontrolleri gizleniyor.
+- Sekme geçişleri mevcut DOM düğümlerini taşıyarak yapılıyor; tüm kontrol ID'leri ve main.js bağlayıcıları korunuyor.
+- Manyetik zemin overlay'i genişletildi: sparse-grid en yakın geçerli hücre dolgusu, gradyan alanı (|∇B|) + yön okları, marching-squares iso-nT kontur segmentleri ve `binToGroundGrid` dışa aktarımı.
+- LEGACY3DMAG JSON analizi için backend `analyze_legacy_dik_json` komutu adım sayısı (max 10000) ve adım ölçüsü doğrulamasıyla eklendi.
+- Votex-WASM'a `detect_wall_cues` portu eklendi: beyaz duvar ipuçları + yeşil tünel çizgi segmentleri mobil 3D yüzey hattına aktarılıyor.
+- Metal builder ve arşiv modülü genişletildi; resim işleyici testleri güncellendi.
+- Düzeltme: `legacy_mag_json.rs` içinde footprint metriklerinin taşınan `polygon` değerinden sonraya kalan ödünç alma hataları (E0382) giderildi.
+- Düzeltme: `votex-wasm/src/surface.rs` içindeki yinelenen `is_near_white` tanımı çözüldü (RGB varyantı `is_near_white_rgb` olarak adlandırıldı).
+- Sürüm metadata'sı package.json, tauri.conf.json, Cargo.toml, Cargo.lock, Inno Setup ve birleşik setup yapılandırmalarında 0.4.15'e senkronize edildi.
+
+---
+
+## 0.4.14 — 7 Eylül 2026
+
+### LEGACY3DMAG Adım Sayısı Öncelik Düzeltmesi
+
+- Kullanıcı açıkça adım sayısı girdiğinde bu değer artık koordinatlardan türetilen sayı tarafından değiştirilmiyor.
+- Örneğin `12` adım girildiğinde analiz sonucu ve 3D tarama cetveli tam olarak 12 adım kullanıyor.
+- Yatay adım ölçüsü yalnızca adım sayısı boş veya `0` olduğunda otomatik segment hesabında kullanılıyor.
+- Adım sayısı ile yatay açıklık alanlarının görevleri arayüzde ayrıştırıldı.
+- Bu davranış için backend regresyon testi eklendi.
+
+---
+
+## 0.4.13 — 7 Eylül 2026
+
+### LEGACY3DMAG Kullanıcı Adımı ve Anomali Detayları
+
+- LEGACY3DMAG paneline kullanıcı tarafından girilebilen yatay adım ölçüsü (metre) eklendi.
+- Girilen ölçü, JSON koordinatlarından analiz segmentlerini ve adım sayısını üretir; adım sayısı boşsa mevcut JSON segmentleri korunur.
+- Her anomali ayrı kartta şekil, kaynak, merkez, derinlik, boyut, şekil güveni, RMS uyum hatası ve en yakın tarama adımıyla gösterilir.
+- Anomali kartına tıklanınca ilgili 3D hacme odaklanılır; en güçlü anomali görsel olarak öne çıkarılır.
+- `scanStepInputM` alanı eklenerek girilen adım ölçüsü arşiv ve JSON sonuçlarında korunur.
+- Eski JSON arşivleri geriye dönük uyumlu kalır.
+
+---
+
+## 0.4.12 — 7 Eylül 2026
+
+### LEGACY3DMAG Tarama Adımı ve Yatay Konumlandırma
+
+- JSON analiz sonucu her tarama adımının gerçek yatay merkezini, başlangıç/bitiş koordinatlarını ve kapladığı açıklığı içerir.
+- Ardışık adımlar arasındaki gerçek yatay mesafe ve ortalama adım açıklığı hesaplanır.
+- 3D JSON katmanında `Adım 1`, `Adım 2` etiketleri, ölçüm yolu ve adımlar arası `Δ metre` göstergeleri eklenir.
+- LEGACY3DMAG panelinde hangi adımın nerede olduğu, yatay merkezleri ve adım açıklıkları Türkçe gösterilir.
+- Eski arşivler boş varsayılan step listesiyle geriye dönük uyumlu kalır.
+
+---
+
+## 0.4.11 — 7 Eylül 2026
+
+### LEGACY3DMAG JSON Şekil Tabanlı 3D Görselleştirme
+
+- JSON ölçüm grid'indeki anomaliler daire, elips, kare, dikdörtgen, kapsül, çokgen veya düzensiz şekil olarak sınıflandırılır.
+- Ölçülmüş grid konturları, uygun olduğunda tahmini şeklin önüne geçirilerek gerçek ayak iziyle 3D hacme dönüştürülür.
+- Şekil yönü, genişlik, uzunluk, yuvarlaklık, şekil RMS uyum hatası ve şekil güveni analiz sonucuna eklenir.
+- 3D görünümde yüzey izdüşümü, derinlik kılavuzu ve ölçülmüş/tahmini geometri ayrımı gösterilir.
+- Seçim paneli şekil uyumunu derinlik uyumundan ayrı gösterir; eski JSON arşivleri varsayılan alanlarla açılmaya devam eder.
+
+
+---
+
+## 0.4.10 — 6 Eylül 2026
+
+### 🧭 Sol Menü Veri Sekmeleri
+
+- CSV veri içe aktarma, harita, manyetik overlay, GPS, hizalama ve filtreleme kontrolleri ayrı **CSV VERİ** sekmesine taşındı.
+- LEGACY3DMAG JSON tarama, adım sayısı ve analiz kontrolleri ayrı **LEGACY3DMAG** sekmesine ayrıldı.
+- Analiz araçları, raporlar, dışa aktarma, oturum, 3D ölçüm ve derinlik profili ayrı **ARAÇLAR** sekmesinde toplandı.
+- Mevcut kontrol kimlikleri korundu; mevcut analiz ve arşiv akışları bozulmadan çalışır.
+
+---
+
+## 0.4.9 — 6 Eylül 2026
+
+### 📦 Eski Sürümü Kaldırarak Güncelleme
+
+- Yeni birleşik setup, kurulumdan önce çalışan VOTEX sürecini kapatır.
+- Önceki VOTEX/Tauri ve DFT Suite kurulumları sessizce kaldırılır; ardından VOTEX 0.4.9 ve DTA yeniden kurulur.
+- Kullanıcı verileri, arşivler ve `%APPDATA%` ayarları kaldırılmaz.
+- Kurulum AppId'si sabit tutulduğu için sonraki güncellemeler yükseltme olarak algılanır.
+- Sürüm metadata'sı VOTEX, Tauri, Cargo ve birleşik setup yapılandırmalarında 0.4.9'a yükseltildi.
+
+---
+
+## 0.4.8 — 6 Eylül 2026
+
+### 🧭 JSON Derinlik Uyum Hatası ve Belirsizlik Görselleştirmesi
+
+- JSON derinlik tahminlerine yöntem, normalize RMS uyum hatası ve kullanılan örnek sayısı eklendi.
+- Dipol tahminleri için uyuma ve ölçüm çözünürlüğüne dayalı derinlik belirsizlik aralığı üretildi.
+- Peters ve sezgisel tahminler açıkça düşük/uygulamalı uyum olarak işaretleniyor; eski arşiv kayıtları geriye dönük uyumlu kalıyor.
+- 3D JSON katmanında her anomalinin çevresine belirsizlik hacmi ve renk kodlu derinlik aralığı etiketi eklendi.
+- Seçim bilgi panelinde yöntem, RMS hata, belirsizlik aralığı ve fit örnek sayısı gösteriliyor.
+- 0.4.8 sürüm metadata'sı Tauri, NSIS ve birleşik setup yapılandırmalarında senkronize edildi.
+
+---
+
+## 0.4.5 — 6 Eylül 2026
+
+### 🖼️ Resim İşleme Tabanlı Kenar ve Kontur Analizi
+
+- Resim analiz pipeline'ına 2B sonlu fark gradyanı eklendi; `|∇B|`, X/Y yönleri, ortalama ve maksimum gradyan değerleri hesaplanıyor.
+- Güçlü gradyan hücreleri kenar/anomali göstergesi olarak sayılıyor ve analiz sonucuna aktarılıyor.
+- Resimden üretilen manyetik grid için marching-squares yöntemiyle iso-nT kontur segmentleri oluşturuluyor.
+- Kenar okları ve iso-nT konturları 2D resim önizlemesinde ve birleşik haritada görünür hale getirildi.
+- İşlem sonucu metrikleri ana arayüze ve Türkçe saha raporuna eklendi; rapor bunların tek başına yapı/metal kanıtı olmadığını açıkça belirtir.
+- Rust desktop analiz sonucu ile JavaScript birleşik analiz sonucu aynı `edgeAnalysis` veri sözleşmesini kullanıyor.
+- 0.4.5 sürüm metadata'sı, Tauri/NSIS ve birleşik setup yapılandırmalarında senkronize edildi.
+
+---
+
+## 0.4.4 — 5 Eylül 2026
+
+### 🧭 Magnetic Terrain Relief & Edge Analysis
+
+- Added tangent-space normal-map generation from terrain heightfield derivatives for subtle lit relief.
+- Added magnetic gradient magnitude (`|∇B|`) display mode for edge detection.
+- Added gradient direction arrows and iso-nT contour line overlays.
+- Added sparse-grid handling, contour interpolation, clipping/disposal integration, and regression tests.
+- Updated the unified VOTEX + DTA setup metadata to version 0.4.4.
+
+---
+
 ## 0.4.2 — 4 Eylül 2026
 
 ### 🎨 Harita Renklendirme (Analizden Önce)

@@ -14,6 +14,7 @@ export const $ = (id) => document.getElementById(id);
   selectedStructureId: string | null,
   selectionMarker: import("three").Object3D | null,
   structureKotM: Record<string, number>,
+  legacyDikGroup: import("three").Group | null,
 }} */
 export const state = {
   pendingFile: null,
@@ -42,12 +43,28 @@ export const state = {
   freeDrawBands: {},
   /** CSV overlay grubu (3D nokta bulutu) */
   csvOverlay: null,
+  /** Legacy dik JSON ölçüm grid'i ve anomali katmanı */
+  legacyDikGroup: null,
+  /** Son yüklenen Legacy dik JSON analiz sonucu */
+  legacyDikResult: null,
+  legacyDikRawContent: null,
+  legacyDikFileName: null,
   /** CSV verisi (CsvImportResult) */
   csvData: null,
   /** CSV ham içerik */
   csvContent: null,
   /** CSV dosya adı */
   csvFileName: null,
+  /** Manyetik zemin haritasını göster */
+  showMagneticGround: false,
+  /** Manyetik zemin haritası opaklığı (0..1) */
+  magneticOverlayOpacity: 0.45,
+  /** Manyetik zemin görünüm modu: magnetic veya gradient */
+  magneticOverlayMode: "magnetic",
+  /** Manyetik gradyan yön oklarını göster */
+  magneticOverlayArrows: true,
+  /** Iso-nT manyetik kontur çizgilerini göster */
+  magneticOverlayContours: true,
   /** Kesit (clipping) modu: zemini yatay düzlemle kes */
   clipEnabled: false,
   /** Kesit düzlemi yüksekliği (dünya Y, metre) */

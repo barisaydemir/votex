@@ -15,7 +15,7 @@
  */
 
 import * as THREE from 'three';
-import { extractMagneticGrid, renderGridToCanvas } from './imageProcessor.js';
+import { extractMagneticGrid, renderGridToCanvas, summarizeImageEdges } from './imageProcessor.js';
 import { CoordinateAligner } from './coordinateAlignment.js';
 import { fuseDataSources } from './dataFusion.js';
 import { analyzeDepth } from './depthAnalysis.js';
@@ -79,8 +79,9 @@ export async function runUnifiedAnalysis(params) {
     ntRange,
     matchThreshold: 0.35,
   });
+  const edgeAnalysis = summarizeImageEdges(imageGrid, gridRes);
 
-  console.log(`[Unified] 1/4 Image grid: ${imageGrid.length} hücre, nT: ${imageStats.nTMin.toFixed(0)}..${imageStats.nTMax.toFixed(0)}`);
+  console.log(`[Unified] 1/4 Image grid: ${imageGrid.length} hücre, nT: ${imageStats.nTMin.toFixed(0)}..${imageStats.nTMax.toFixed(0)}, kenar: ${edgeAnalysis.edgeCellCount}`);
 
   // ══════════════════════════════════════════════
   // ADIM 2: CSV ile doğrula/düzelt (destek)
@@ -267,6 +268,7 @@ export async function runUnifiedAnalysis(params) {
   return {
     imageGrid,
     imageStats,
+    edgeAnalysis,
     fusionGrid,
     depthResult,
     structures,
@@ -502,7 +504,7 @@ export function clearUnifiedScene(scene) {
  * @param {number} ntRange
  * @returns {HTMLCanvasElement}
  */
-export function createUnified2DMap(imageGrid, csvPoints, canvasW, canvasH, ntRange = 500) {
+export function createUnified2DMap(imageGrid, csvPoints, canvasW, canvasH, ntRange = 500, edgeAnalysis = null) {
   const canvas = document.createElement('canvas');
   canvas.width = canvasW;
   canvas.height = canvasH;
@@ -553,6 +555,38 @@ export function createUnified2DMap(imageGrid, csvPoints, canvasW, canvasH, ntRan
       ctx.arc(px, py, 2, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  // İşlem tarafı çıktısı: iso-nT konturları + gradient yön okları.
+  if (edgeAnalysis) {
+    const contours = edgeAnalysis.contours || {};
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.78)';
+    ctx.lineWidth = 1;
+    for (const segment of contours.segments || []) {
+      const a = segment[0], b = segment[1];
+      ctx.beginPath();
+      ctx.moveTo((a[0] / Math.max(1, edgeAnalysis.gradient.gradientX.length ? edgeAnalysis.gradient.gradientX.length ** 0.5 - 1 : 1)) * canvasW, (a[1] / Math.max(1, edgeAnalysis.gradient.gradientX.length ? edgeAnalysis.gradient.gradientX.length ** 0.5 - 1 : 1)) * canvasH);
+      ctx.lineTo((b[0] / Math.max(1, edgeAnalysis.gradient.gradientX.length ? edgeAnalysis.gradient.gradientX.length ** 0.5 - 1 : 1)) * canvasW, (b[1] / Math.max(1, edgeAnalysis.gradient.gradientX.length ? edgeAnalysis.gradient.gradientX.length ** 0.5 - 1 : 1)) * canvasH);
+      ctx.stroke();
+    }
+    const gradient = edgeAnalysis.gradient;
+    const res = Math.round(Math.sqrt(gradient.magnitude.length));
+    const stride = Math.max(1, Math.ceil(res / 16));
+    const maxMag = gradient.maxMagnitude || 0;
+    ctx.strokeStyle = 'rgba(255,226,92,0.9)';
+    for (let gy = 0; gy < res; gy += stride) for (let gx = 0; gx < res; gx += stride) {
+      const i = gy * res + gx, mag = gradient.magnitude[i];
+      if (!Number.isFinite(mag) || mag < maxMag * 0.2) continue;
+      const dx = gradient.gradientX[i], dy = gradient.gradientY[i], len = Math.hypot(dx, dy) || 1;
+      const x = ((gx + 0.5) / res) * canvasW, y = ((gy + 0.5) / res) * canvasH;
+      const length = Math.min(canvasW / res, canvasH / res) * stride * 0.8;
+      const ex = x + dx / len * length, ey = y + dy / len * length, head = length * 0.28;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey);
+      ctx.moveTo(ex, ey); ctx.lineTo(ex - dx / len * head - dy / len * head * 0.65, ey - dy / len * head + dx / len * head * 0.65);
+      ctx.moveTo(ex, ey); ctx.lineTo(ex - dx / len * head + dy / len * head * 0.65, ey - dy / len * head - dx / len * head * 0.65); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // Legend

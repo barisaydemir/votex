@@ -1236,6 +1236,10 @@ button.mil.accent {
 }
 /* Touch cihazlarda daha büyük dokunma alanı */
 @media (pointer: coarse) {
+  #votex-ray .vr-btn {
+    min-height: 2.5rem;
+    padding-inline: 0.75rem;
+  }
   .tree-section > summary {
     padding: 0.65rem 0.6rem;
     min-height: 2.75rem; /* ~44px — WCAG touch target */
@@ -3454,6 +3458,23 @@ input[type="range"] {
   border-color: var(--hud-ok);
   box-shadow: 0 0 12px rgba(62, 220, 140, 0.35);
   font-weight: 700;
+}
+
+/* Ana veri akışları üst sekme gibi davranır; küçük ekranlarda kaydırılabilir. */
+#votex-ray {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+#votex-ray .vr-btn {
+  white-space: nowrap;
+}
+.module-tab-fold {
+  margin-top: 0.35rem;
+}
+.module-tab-body {
+  max-height: min(68vh, 900px);
+  overflow-y: auto;
 }
 
 /* Heartbeat — sol alt köşe, küçük sabit */

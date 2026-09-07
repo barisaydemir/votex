@@ -151,6 +151,35 @@ export function makeShaft(ch, mapW, mapD, vertExag, wireframe, id, num, sideView
   floor.position.y = -sy + 0.02;
   group.add(floor);
 
+  // —— Su yansıma diski (su taşıyan şaftlar için) ——
+  const isWaterBearing = (ch.kind === "shaft") && (hM > 3);
+  if (isWaterBearing) {
+    const waterGeo = new THREE.CircleGeometry(rBot * 0.75, 28);
+    const waterMesh = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
+      color: 0x2288aa, emissive: 0x115566, emissiveIntensity: 0.3,
+      transparent: true, opacity: 0.35, roughness: 0.1, metalness: 0.4,
+      side: THREE.DoubleSide, depthWrite: false,
+    }));
+    waterMesh.rotation.x = -Math.PI / 2;
+    waterMesh.position.y = -sy + 0.08;
+    waterMesh.userData.isWaterSurface = true;
+    group.add(waterMesh);
+    // Su damlacıkları — üstte parıltı
+    const dropGeo = new THREE.BufferGeometry();
+    const dropN = 6;
+    const dropPos = new Float32Array(dropN * 3);
+    for (let di = 0; di < dropN; di++) {
+      dropPos[di * 3] = (Math.random() - 0.5) * rBot * 1.2;
+      dropPos[di * 3 + 1] = -sy * 0.3 - Math.random() * sy * 0.5;
+      dropPos[di * 3 + 2] = (Math.random() - 0.5) * rBot * 1.2;
+    }
+    dropGeo.setAttribute('position', new THREE.Float32BufferAttribute(dropPos, 3));
+    group.add(new THREE.Points(dropGeo, new THREE.PointsMaterial({
+      color: 0x88ccee, size: 0.04, transparent: true, opacity: 0.5,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    })));
+  }
+
   // Siluet kenarları
   const outline = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.CylinderGeometry(rTop, rBot, sy, 12, 1, true)),

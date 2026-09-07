@@ -2,7 +2,7 @@
 
 use tauri::State;
 
-use crate::archive::{self, ArchiveIndexEntry, ArchiveLoadResult};
+use crate::archive::{self, ArchiveIndexEntry, ArchiveLoadResult, LegacyArchiveLoadResult};
 use crate::commands::{AnalyzeSession, AppState};
 
 #[tauri::command]
@@ -67,6 +67,22 @@ pub fn load_archive(
         Some(&loaded.surface),
     );
     Ok(loaded)
+}
+
+/// Legacy dik JSON analizini ve ham JSON içeriğini arşive kaydet.
+#[tauri::command]
+pub fn save_legacy_archive(
+    file_name: String,
+    content: String,
+    result: crate::legacy_mag_json::LegacyDikResult,
+) -> Result<ArchiveIndexEntry, String> {
+    archive::save_legacy_entry(&file_name, &content, &result)
+}
+
+/// Legacy dik JSON arşiv kaydını yükle; frontend aynı JSON 3D katmanını yeniden kurar.
+#[tauri::command]
+pub fn load_legacy_archive(id: String) -> Result<LegacyArchiveLoadResult, String> {
+    archive::load_legacy_entry(&id)
 }
 
 #[tauri::command]

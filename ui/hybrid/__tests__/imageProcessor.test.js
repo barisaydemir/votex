@@ -5,6 +5,8 @@ import {
   buildLut,
   extractMagneticGrid,
   renderGridToCanvas,
+  computeImageGradientField,
+  computeImageContourSegments,
 } from '../imageProcessor.js';
 
 describe('imageProcessor', () => {
@@ -31,8 +33,7 @@ describe('imageProcessor', () => {
     });
 
     it('siyah → HSV', () => {
-      const hsv = rgbToHsv(0, 0, 0);
-      expect(hsv.v).toBe(0);
+      expect(rgbToHsv(0, 0, 0).v).toBe(0);
     });
 
     it('beyaz → HSV', () => {
@@ -45,85 +46,61 @@ describe('imageProcessor', () => {
   describe('hsvDist', () => {
     it('aynı renk → mesafe 0', () => {
       const a = { h: 120, s: 0.5, v: 0.8 };
-      const d = hsvDist(a, a);
-      expect(d).toBe(0);
+      expect(hsvDist(a, a)).toBe(0);
     });
 
     it('farklı renkler → pozitif mesafe', () => {
-      const a = { h: 0, s: 1, v: 1 };    // kırmızı
-      const b = { h: 240, s: 1, v: 1 };  // mavi
-      const d = hsvDist(a, b);
-      expect(d).toBeGreaterThan(0);
+      expect(hsvDist({ h: 0, s: 1, v: 1 }, { h: 240, s: 1, v: 1 })).toBeGreaterThan(0);
     });
 
-    it('humnedral wrap-around → kısa mesafe', () => {
-      const a = { h: 5, s: 0.5, v: 0.8 };
-      const b = { h: 355, s: 0.5, v: 0.8 };
-      const d = hsvDist(a, b);
-      expect(d).toBeLessThan(0.1); // Çok yakın olmalı
+    it('hue wrap-around → kısa mesafe', () => {
+      expect(hsvDist({ h: 5, s: 0.5, v: 0.8 }, { h: 355, s: 0.5, v: 0.8 })).toBeLessThan(0.1);
     });
   });
 
   describe('buildLut', () => {
-    it('LUT oluştur', () => {
-      // Basit test: 10x100 kırmızı şerit
+    it('LUT oluşturur', () => {
       const width = 20, height = 100;
       const data = new Uint8ClampedArray(width * height * 4);
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const i = (y * width + x) * 4;
-          data[i] = 255;     // R
-          data[i + 1] = 0;   // G
-          data[i + 2] = 0;   // B
-          data[i + 3] = 255; // A
-        }
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 255;
+        data[i + 3] = 255;
       }
-      const imageData = { data, width, height };
-      const lut = buildLut(imageData, 20);
-      expect(lut.length).toBe(height);
-      expect(lut[0].h).toBeCloseTo(0, 0); // Hep kırmızı
+      const lut = buildLut({ data, width, height }, 20);
+      expect(lut).toHaveLength(height);
+      expect(lut[0].h).toBeCloseTo(0, 0);
     });
   });
 
-  describe('renderGridToCanvas', () => {
-    it('grid → canvas oluştur (mock)', () => {
-      // Node.js ortamında document yok — sadece fonksiyonun varlığını kontrol et
+  describe('image gradient and contour processing', () => {
+    const grid = [
+      { gx: 0, gy: 0, nT: 0 }, { gx: 1, gy: 0, nT: 10 }, { gx: 2, gy: 0, nT: 20 },
+      { gx: 0, gy: 1, nT: 0 }, { gx: 1, gy: 1, nT: 10 }, { gx: 2, gy: 1, nT: 20 },
+      { gx: 0, gy: 2, nT: 0 }, { gx: 1, gy: 2, nT: 10 }, { gx: 2, gy: 2, nT: 20 },
+    ];
+
+    it('hesaplanan gradient yönü ve büyüklüğü doğru', () => {
+      const result = computeImageGradientField(grid, 3);
+      expect(result.gradientX[4]).toBeCloseTo(10);
+      expect(result.gradientY[4]).toBeCloseTo(0);
+      expect(result.magnitude[4]).toBeCloseTo(10);
+      expect(result.maxMagnitude).toBeCloseTo(10);
+    });
+
+    it('iso-nT konturları eksik hücreler arasında çizgi üretmez', () => {
+      const result = computeImageContourSegments(grid, 3, 2);
+      expect(result.levels).toHaveLength(2);
+      expect(result.segments.length).toBeGreaterThan(0);
+      expect(computeImageContourSegments(grid.slice(0, 4), 3, 2).segments).toHaveLength(0);
+    });
+  });
+
+  describe('render and extraction APIs', () => {
+    it('renderGridToCanvas dışa aktarılan fonksiyondur', () => {
       expect(typeof renderGridToCanvas).toBe('function');
     });
-  });
 
-  describe('extractMagneticGrid', () => {
-    it('mock görüntüden grid çıkarma', () => {
-      // Mock canvas/context
-      const mockCtx = {
-        drawImage: () => {},
-        getImageData: () => ({
-          data: new Uint8ClampedArray(200 * 100 * 4).fill(128),
-          width: 200,
-          height: 100,
-        }),
-        fillRect: () => {},
-        fillStyle: '',
-        font: '',
-        fillText: () => {},
-      };
-
-      const mockCanvas = {
-        width: 200,
-        height: 100,
-        getContext: () => mockCtx,
-      };
-
-      // Mock Image
-      const mockImg = {
-        naturalWidth: 200,
-        naturalHeight: 100,
-        width: 200,
-        height: 100,
-      };
-
-      // Test sadece fonksiyonun çağrılabildiğini doğrular
-      // (gerçek canvas gerektirdiği için tam sonuç test edilmez)
+    it('extractMagneticGrid dışa aktarılan fonksiyondur', () => {
       expect(typeof extractMagneticGrid).toBe('function');
     });
   });

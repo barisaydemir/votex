@@ -233,7 +233,9 @@
       <div class="subbar">
         <div class="mod-rail" id="votex-ray" role="tablist">
           <button type="button" class="vr-btn active" data-mod="image" data-i18n-title="rail.image" title="Görüntü (DTA)">🖥 <span>GÖRÜNTÜ</span></button>
-          <button type="button" class="vr-btn" data-mod="csv" data-i18n-title="rail.csv" title="CSV / Excel" style="display:none;">📊 <span>CSV</span></button>
+          <button type="button" class="vr-btn" data-mod="csv" data-i18n-title="rail.csv" title="CSV veri içe aktarma">📊 <span>CSV VERİ</span></button>
+          <button type="button" class="vr-btn" data-mod="legacy" title="LEGACY3DMAG JSON dik tarama">🧭 <span>LEGACY3DMAG</span></button>
+          <button type="button" class="vr-btn" data-mod="tools" title="Analiz ve dışa aktarma araçları">🛠 <span>ARAÇLAR</span></button>
           <button type="button" class="vr-btn" data-mod="hybrid" data-i18n-title="rail.hybrid" title="Hibrit analiz" style="display:none;">🔀 <span>HİBRİT</span></button>
           <button type="button" class="vr-btn" data-mod="sys" data-i18n-title="rail.sys" title="Sistem (lisans, DTA/VPE, arşiv)">⚙ <span>SİSTEM</span></button>
         </div>
@@ -558,6 +560,27 @@
                 <button type="button" id="btn-csv-toggle" class="mil" disabled>Overlay</button>
                 <button type="button" id="btn-csv-zoom-all" class="mil" disabled title="Tüm yapıları sığdır">⊕ Tümünü Gör</button>
               </div>
+              <div id="legacy-dik-box" style="margin-top:0.45rem;padding:0.45rem 0.55rem;border:1px solid var(--line);border-radius:var(--r-sharp);background:rgba(255,255,255,0.02);">
+                <div style="font-size:0.62rem;font-weight:600;letter-spacing:0.04em;color:var(--muted);margin-bottom:0.25rem;">DİK ÇEKİM · LEGACY3DMAG</div>
+                <p class="hint compact" style="margin:0 0 0.35rem;">Sadece üstten tarama — anomali ve olası yapı şekilleri (ham nokta bulutu yok).</p>
+                <label style="display:flex;align-items:center;gap:0.4rem;margin:0.35rem 0;padding:0.3rem 0.4rem;border:1px solid var(--line);border-radius:var(--r-sharp);">
+                  <span style="font-size:0.64rem;color:var(--muted);min-width:118px;">Tarama adım sayısı</span>
+                  <input type="number" id="legacy-dik-step-count" min="0" max="10000" step="1" value="0" placeholder="Otomatik" style="width:78px;" />
+                  <span style="font-size:0.58rem;color:var(--muted);">0 = JSON segmentleri</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:0.4rem;margin:0.35rem 0;padding:0.3rem 0.4rem;border:1px solid var(--line);border-radius:var(--r-sharp);">
+                  <span style="font-size:0.64rem;color:var(--muted);min-width:118px;">Yatay adım ölçüsü</span>
+                  <input type="number" id="legacy-dik-step-spacing" min="0" max="1000" step="0.01" value="0" placeholder="Otomatik" style="width:78px;" />
+                  <span style="font-size:0.58rem;color:var(--muted);">metre; girilirse önceliklidir</span>
+                </label>
+                <div id="legacy-dik-step-help" style="font-size:0.58rem;color:var(--muted);margin:0.2rem 0 0.35rem;">Adım ölçüsü girildiğinde JSON koordinatlarından adım sayısı hesaplanır.</div>
+                <div class="btn-row">
+                  <button type="button" id="btn-legacy-dik-pick" class="mil primary">JSON Seç</button>
+                  <button type="button" id="btn-legacy-dik-clear" class="mil" disabled>Temizle</button>
+                </div>
+                <div id="legacy-dik-status" style="font-size:0.62rem;color:var(--muted);margin-top:0.3rem;"></div>
+                <div id="legacy-dik-list" style="font-size:0.6rem;color:var(--text);margin-top:0.25rem;max-height:120px;overflow:auto;"></div>
+              </div>
               <div id="multi-csv-list" style="display:none;margin-top:0.4rem;padding:0.3rem;background:rgba(255,255,255,0.02);border:1px solid var(--line);border-radius:var(--r-sharp);max-height:140px;overflow-y:auto;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
                   <span style="font-size:0.62rem;color:var(--muted);font-weight:600;">YÜKLÜ DOSYALAR</span>
@@ -575,10 +598,27 @@
                   <input type="checkbox" id="mag-ground-toggle" style="accent-color:#e85858;" />
                   <span style="color:#e85858;font-weight:600;">🗺 Manyetik Zemin Haritası</span>
                 </label>
-                <div id="mag-ground-opacity-row" style="display:none;margin-top:0.3rem;align-items:center;gap:0.4rem;">
-                  <span style="font-size:0.6rem;color:var(--muted);min-width:40px;">Opaklık</span>
-                  <input type="range" id="mag-ground-opacity" min="0" max="100" value="45" step="5" style="flex:1;accent-color:#e85858;" />
-                  <span id="mag-ground-opacity-val" style="font-size:0.6rem;color:#e85858;min-width:28px;text-align:right;">45%</span>
+                <div id="mag-ground-options" style="display:none;margin-top:0.3rem;flex-direction:column;gap:0.35rem;">
+                  <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.6rem;color:var(--muted);">
+                    <span style="min-width:40px;">Görünüm</span>
+                    <select id="mag-ground-mode" style="flex:1;font-size:0.62rem;background:#101820;color:var(--text);border:1px solid var(--line);">
+                      <option value="magnetic">Manyetik alan (B)</option>
+                      <option value="gradient">Gradyan büyüklüğü (|∇B|)</option>
+                    </select>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.6rem;color:var(--muted);cursor:pointer;">
+                    <input type="checkbox" id="mag-ground-arrows" checked style="accent-color:#e85858;" />
+                    <span>Gradyan yön oklarını göster</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.6rem;color:var(--muted);cursor:pointer;">
+                    <input type="checkbox" id="mag-ground-contours" checked style="accent-color:#e85858;" />
+                    <span>Iso-nT kontur çizgilerini göster</span>
+                  </label>
+                  <div id="mag-ground-opacity-row" style="display:flex;align-items:center;gap:0.4rem;">
+                    <span style="font-size:0.6rem;color:var(--muted);min-width:40px;">Opaklık</span>
+                    <input type="range" id="mag-ground-opacity" min="0" max="100" value="45" step="5" style="flex:1;accent-color:#e85858;" />
+                    <span id="mag-ground-opacity-val" style="font-size:0.6rem;color:#e85858;min-width:28px;text-align:right;">45%</span>
+                  </div>
                 </div>
               </div>
               <!-- 📍 GPS AYARLARI -->
@@ -866,6 +906,7 @@
                 <span style="font-size:0.68rem;color:var(--muted);letter-spacing:0.05em;">BİRLEŞİK HARİTA</span>
                 <canvas id="unified-map-canvas" style="width:100%;min-height:140px;border:1px solid var(--line);border-radius:var(--r-sharp);background:#080c10;margin-top:0.2rem;"></canvas>
                 <div id="unified-stats" style="margin-top:0.4rem;"></div>
+                <div id="unified-edge-stats" style="margin-top:0.3rem;font-size:0.62rem;color:#f5c542;"></div>
                 <!-- Çapraz Doğrulama Raporu -->
                 <div id="unified-cv-report" style="display:none;margin-top:0.5rem;padding:0.5rem;border:1px solid var(--line);border-radius:var(--r-sharp);background:rgba(255,255,255,0.02);"></div>
               </div>
@@ -1153,6 +1194,7 @@
           <p class="hint">Kısayollar: <b>K</b> kesit · <b>X</b> X-Ray · <b>↑/↓</b> kesit yüksekliği</p>
           <p class="hint" data-i18n="cfg.kotHint">Kot farkı: yapı kartında · yüzey yükselir · yüzey→yapı değeri artar.</p>
           <p class="hint" id="surface-stats">—</p>
+          <p class="hint" id="image-edge-stats" style="color:#f5c542;">—</p>
           <p class="hint compass-legend" data-i18n="shot.legendTop">
             Yön: K Kuzey · D Doğu · G Güney · B Batı (harita üstü = Kuzey)
           </p>

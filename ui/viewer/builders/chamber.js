@@ -106,6 +106,19 @@ export function makeChamber(ch, mapW, mapD, vertExag, wireframe, id, num, sideVi
   // ── KAPALI ODA / MEZAR ──
   const outer = new RoundedBoxGeometry(sx, sy, sz, 3, Math.min(0.25, Math.min(sx, sy, sz) * 0.12));
 
+  // Vertex noise — kayamsı doku
+  const outerPos = outer.attributes.position;
+  for (let i = 0; i < outerPos.count; i++) {
+    const vx = outerPos.getX(i);
+    const vy = outerPos.getY(i);
+    const vz = outerPos.getZ(i);
+    const noise = Math.sin(vx * 4.7 + vy * 3.2) * Math.cos(vz * 5.1 + vx * 2.8) * 0.035;
+    outerPos.setX(i, vx + vx * noise);
+    outerPos.setY(i, vy + vy * noise);
+    outerPos.setZ(i, vz + vz * noise);
+  }
+  outer.computeVertexNormals();
+
   group.add(
     new THREE.Mesh(
       outer,
@@ -138,6 +151,44 @@ export function makeChamber(ch, mapW, mapD, vertExag, wireframe, id, num, sideVi
       })
     )
   );
+
+  // Zemin — merkezden kenara gradyan (koyu→açık)
+  const floorSize = Math.max(sx, sz);
+  const floorGeo = new THREE.CircleGeometry(floorSize * 0.48, 28);
+  const floorColors = new Float32Array(floorGeo.attributes.position.count * 3);
+  for (let i = 0; i < floorGeo.attributes.position.count; i++) {
+    const fx = floorGeo.attributes.position.getX(i);
+    const fz = floorGeo.attributes.position.getZ(i);
+    const dist = Math.sqrt(fx * fx + fz * fz) / (floorSize * 0.48);
+    const bright = 0.06 + (1 - dist) * 0.12;
+    floorColors[i * 3] = bright * 0.6;
+    floorColors[i * 3 + 1] = bright * 0.8;
+    floorColors[i * 3 + 2] = bright;
+  }
+  floorGeo.setAttribute('color', new THREE.Float32BufferAttribute(floorColors, 3));
+  const floor = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({
+    vertexColors: true, transparent: true, opacity: 0.45,
+    roughness: 0.95, side: THREE.DoubleSide, depthWrite: false,
+  }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -sy * 0.5 + 0.02;
+  group.add(floor);
+
+  // İç parıltılar — mağara atmosferi
+  const nParticles = Math.min(12, Math.round(sx * sz * 2));
+  const particleGeo = new THREE.BufferGeometry();
+  const pPositions = new Float32Array(nParticles * 3);
+  for (let i = 0; i < nParticles; i++) {
+    pPositions[i * 3] = (Math.random() - 0.5) * sx * 0.8;
+    pPositions[i * 3 + 1] = (Math.random() - 0.5) * sy * 0.7;
+    pPositions[i * 3 + 2] = (Math.random() - 0.5) * sz * 0.8;
+  }
+  particleGeo.setAttribute('position', new THREE.Float32BufferAttribute(pPositions, 3));
+  const particles = new THREE.Points(particleGeo, new THREE.PointsMaterial({
+    color: 0x88ccff, size: 0.06, transparent: true, opacity: 0.5,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  group.add(particles);
 
   // Kenar çizgisi
   const wallS = Number(ch.evidence?.wallSupport ?? ch.evidence?.wall_support ?? 0.3);

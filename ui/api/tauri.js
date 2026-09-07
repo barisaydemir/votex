@@ -116,6 +116,14 @@ export function loadArchive(id) {
   return invoke("load_archive", { id });
 }
 
+export function saveLegacyArchive(fileName, content, result) {
+  return invoke("save_legacy_archive", { fileName, content, result });
+}
+
+export function loadLegacyArchive(id) {
+  return invoke("load_legacy_archive", { id });
+}
+
 export function deleteArchive(id) {
   return invoke("delete_archive", { id });
 }
@@ -154,6 +162,48 @@ export function pickCsvFile() {
 
 export function parseExcelData(base64Content) {
   return invoke("parse_excel_data", { base64Content });
+}
+
+export function analyzeLegacyDikJson(content, fileName, scanStepCount = 0, scanStepSpacingM = 0) {
+  return invoke("analyze_legacy_dik_json", {
+    content,
+    fileName: fileName ?? null,
+    scanStepCount: Number.isFinite(Number(scanStepCount)) ? Math.max(0, Math.floor(Number(scanStepCount))) : 0,
+    scanStepSpacingM: Number.isFinite(Number(scanStepSpacingM)) && Number(scanStepSpacingM) > 0
+      ? Number(scanStepSpacingM)
+      : null,
+  });
+}
+
+/**
+ * Zero-Order Median Leveling — zig-zag heading error (Bx/By striping).
+ * @param {string} content Legacy3DMag JSON string
+ * @returns {Promise<{
+ *   ok: boolean,
+ *   message: string,
+ *   columns: string[],
+ *   data: number[][],
+ *   stats: {
+ *     referenceMedianX: number,
+ *     referenceMedianY: number,
+ *     segmentCount: number,
+ *     segmentMedians: Array<{
+ *       start: number,
+ *       end: number,
+ *       medianX: number,
+ *       medianY: number,
+ *       pointCount: number
+ *     }>
+ *   },
+ *   leveledJson: string
+ * }>}
+ */
+export function levelLegacyMagJson(content) {
+  return invoke("level_legacy_mag_json", { content });
+}
+
+export function pickLegacyDikJson() {
+  return invoke("pick_legacy_dik_json");
 }
 
 export function saveFileDialog(content, suggestedName, filterName, filterExts) {

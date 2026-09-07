@@ -119,6 +119,7 @@ function extractStats(surface) {
     soilProfile,
     soilLabel,
     vpeUsed,
+    edgeAnalysis: surface.edgeAnalysis ?? surface.edge_analysis ?? null,
     // Arrays (for card generation)
     chambers,
     tunnels,
@@ -530,6 +531,22 @@ function generateReportHTML(stats, scenePNG) {
       <div>🌍 Toprak: <strong style="color:var(--text)">${stats?.soilLabel || stats?.soilProfile || "Kapalı"}</strong></div>
     </div>
   </div>
+
+  <!-- İŞLEM TARAFLI RESİM ANALİZİ -->
+  ${stats?.edgeAnalysis ? `
+  <div class="section print-break">
+    <div class="section-title">🧭 Resim İşleme: Kenar / Gradyan Analizi</div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.7">
+      Resimden hesaplanan sonlu fark gradyanı <strong>|∇B|</strong> kenar tespitinde kullanıldı.
+      ${Number(stats.edgeAnalysis.edgeCellCount || 0)} güçlü kenar hücresi ve ${(stats.edgeAnalysis.contourLevels || stats.edgeAnalysis.contour_levels || []).length} iso-seviye üretildi.
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-top:10px">
+      <div class="stat-box"><div class="stat-val">${Number(stats.edgeAnalysis.meanMagnitude ?? stats.edgeAnalysis.mean_magnitude ?? 0).toFixed(3)}</div><div class="stat-label">Ortalama |∇B|</div></div>
+      <div class="stat-box"><div class="stat-val">${Number(stats.edgeAnalysis.maxMagnitude ?? stats.edgeAnalysis.max_magnitude ?? 0).toFixed(3)}</div><div class="stat-label">Maksimum |∇B|</div></div>
+      <div class="stat-box"><div class="stat-val">${Number(stats.edgeAnalysis.edgeCellCount ?? stats.edgeAnalysis.edge_cell_count ?? 0)}</div><div class="stat-label">Kenar Hücresi</div></div>
+    </div>
+    <p style="font-size:10px;color:var(--text3);margin-top:8px">Kontur çizgileri işlem çıktısını gösterir; tek başına yapı/metal kanıtı değildir ve saha doğrulaması gerektirir.</p>
+  </div>` : ""}
 
   <!-- ÖNCELİK SIRASI -->
   <div class="section print-break">

@@ -526,6 +526,360 @@ pub fn min_max(values: &[f32]) -> (f32, f32) {
     (min_v, max_v)
 }
 
+// ── Duvar / tünel ipucu tespiti (preprocess.rs port) ────────
+
+/// Duvar ipucu — beyaz/parlak piksel (mavi kenarı veya yeşil içinde çizgi).
+#[derive(Clone, Copy)]
+pub struct WallCue {
+    pub x: f32,       // normalize 0–1
+    pub y: f32,       // normalize 0–1
+    pub strength: f32,
+    pub near_void: bool,  // mavi boşluk kenarı
+    pub green_line: bool, // yeşil içinde düz beyaz çizgi
+}
+
+/// Yeşil içi düz beyaz çizgi segmenti (normalize uçlar).
+#[derive(Clone, Copy)]
+pub struct GreenLineSeg {
+    pub x0: f32,
+    pub y0: f32,
+    pub x1: f32,
+    pub y1: f32,
+    pub strength: f32,
+    pub length: f32,
+}
+
+fn lum(r: u8, g: u8, b: u8) -> f32 {
+    0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32
+}
+
+fn sat(r: u8, g: u8, b: u8) -> f32 {
+    let rf = r as f32 / 255.0;
+    let gf = g as f32 / 255.0;
+    let bf = b as f32 / 255.0;
+    let max = rf.max(gf).max(bf);
+    let min = rf.min(gf).min(bf);
+    if max <= 1e-6 { 0.0 } else { (max - min) / max }
+}
+
+fn is_blue_void(r: u8, g: u8, b: u8) -> bool {
+    b as i32 > r as i32 + 25 && b as i32 >= g as i32 - 10 && b > 70
+}
+
+fn is_map_green(r: u8, g: u8, b: u8) -> bool {
+    let s = sat(r, g, b);
+    let l = lum(r, g, b);
+    g as i32 > r as i32 + 10 && g as i32 > b as i32 + 6 && s > 0.15 && l > 30.0 && l < 225.0
+}
+
+fn is_near_white_rgb(r: u8, g: u8, b: u8) -> bool {
+    let l = lum(r, g, b);
+    let s = sat(r, g, b);
+    l >= 150.0 && s <= 0.42
+}
+
+fn is_pale_on_green(r: u8, g: u8, b: u8) -> bool {
+    let l = lum(r, g, b);
+    let s = sat(r, g, b);
+    l >= 95.0 && l <= 210.0 && s >= 0.08 && s <= 0.55
+        && g as i32 >= r as i32 - 15 && g as i32 > b as i32 + 8
+        && (r as i32 + g as i32) > b as i32 * 2
+}
+
+/// Beyaz/parlak duvar ipucu tespiti — `preprocess.rs::detect_wall_cues` port.
+///
+/// Args: raw RGBA pixels, image width, image height.
+/// Returns Vec of WallCue (normalized coordinates).
+pub fn detect_wall_cues(rgba: &[u8], w: u32, h: u32) -> Vec<WallCue> {
+    if w < 16 || h < 16 || (rgba.len() as u64) < (w as u64) * (h as u64) * 4 {
+        return Vec::new();
+    }
+    let step = ((w.min(h) / 110).max(1)) as usize;
+    let margin = 5u32;
+    let x_end = w.saturating_sub(margin);
+    let y_end = h.saturating_sub(margin);
+    if x_end <= margin || y_end <= margin {
+        return Vec::new();
+    }
+
+    let sample = |x: i32, y: i32| -> Option<(u8, u8, u8)> {
+        if x < 0 || y < 0 || x >= w as i32 || y >= h as i32 {
+            return None;
+        }
+        let p = ((y as u32 * w + x as u32) * 4) as usize;
+        Some((rgba[p], rgba[p + 1], rgba[p + 2]))
+    };
+
+    let dirs: [(i32, i32); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
+    let mut raw: Vec<(u32, u32, f32, bool, bool)> = Vec::new();
+
+    for y in (margin..y_end).step_by(step) {
+        for x in (margin..x_end).step_by(step) {
+            let p = ((y * w + x) * 4) as usize;
+            let (r, g, b) = (rgba[p], rgba[p + 1], rgba[p + 2]);
+            let whiteish = is_near_white_rgb(r, g, b);
+            let pale = is_pale_on_green(r, g, b);
+            if !whiteish && !pale {
+                continue;
+            }
+            let l = lum(r, g, b);
+            let s = sat(r, g, b);
+
+            // 7×7 neighborhood scan
+            let mut near_blue = false;
+            let mut green_n = 0u32;
+            for dy in -3i32..=3 {
+                for dx in -3i32..=3 {
+                    if dx == 0 && dy == 0 {
+                        continue;
+                    }
+                    if let Some((qr, qg, qb)) = sample(x as i32 + dx, y as i32 + dy) {
+                        if is_blue_void(qr, qg, qb) {
+                            near_blue = true;
+                        }
+                        if is_map_green(qr, qg, qb) {
+                            green_n += 1;
+                        }
+                    }
+                }
+            }
+            let in_green_field = green_n >= 4;
+
+            // Directional line continuity check
+            let mut best_line = 0.0f32;
+            for &(ux, uy) in &dirs {
+                let px = -uy;
+                let py = ux;
+                let mut side_green = 0u32;
+                for dist in [2i32, 3, 4] {
+                    for sign in [-1i32, 1] {
+                        if let Some((qr, qg, qb)) =
+                            sample(x as i32 + px * dist * sign, y as i32 + py * dist * sign)
+                        {
+                            if is_map_green(qr, qg, qb) {
+                                side_green += 1;
+                            }
+                        }
+                    }
+                }
+                if side_green < 3 {
+                    continue;
+                }
+                let mut along = 0u32;
+                let mut along_bright = 0.0f32;
+                for t in -4i32..=4 {
+                    if t == 0 {
+                        continue;
+                    }
+                    if let Some((qr, qg, qb)) = sample(x as i32 + ux * t, y as i32 + uy * t) {
+                        along += 1;
+                        if is_near_white_rgb(qr, qg, qb) || is_pale_on_green(qr, qg, qb) {
+                            along_bright += 1.0;
+                        } else if lum(qr, qg, qb) > l - 30.0 && sat(qr, qg, qb) < 0.55 {
+                            along_bright += 0.4;
+                        }
+                    }
+                }
+                if along < 4 {
+                    continue;
+                }
+                let cont = along_bright / along as f32;
+                if cont < 0.4 {
+                    continue;
+                }
+                let score = cont * (side_green as f32 / 6.0).min(1.0);
+                best_line = best_line.max(score);
+            }
+            let is_green_line = in_green_field
+                && !near_blue
+                && best_line >= (if pale && !whiteish { 0.36 } else { 0.42 });
+
+            if !(near_blue || is_green_line || (in_green_field && whiteish && l >= 170.0)) {
+                continue;
+            }
+
+            let mut strength = if whiteish {
+                ((l - 150.0) / 105.0).clamp(0.12, 1.0) * (1.0 - s * 0.35)
+            } else {
+                ((l - 90.0) / 120.0).clamp(0.14, 0.85) * (1.0 - s * 0.2)
+            };
+            if is_green_line {
+                strength = (strength * (1.25 + best_line * 0.55)).min(1.0);
+            } else if near_blue {
+                strength = (strength * 1.5).min(1.0);
+            } else if in_green_field {
+                strength = (strength * 1.25).min(1.0);
+            }
+            raw.push((x, y, strength, near_blue, is_green_line));
+        }
+    }
+
+    raw.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+    let mut out: Vec<WallCue> = Vec::new();
+    let denom_x = (w - 1).max(1) as f32;
+    let denom_y = (h - 1).max(1) as f32;
+    for (x, y, s, near_void, green_line) in raw {
+        let nx = x as f32 / denom_x;
+        let ny = y as f32 / denom_y;
+        let min_d2 = if green_line { 0.0016 } else { 0.0045 };
+        let too_close = out.iter().any(|c| {
+            let dx = c.x - nx;
+            let dy = c.y - ny;
+            dx * dx + dy * dy < min_d2
+        });
+        if too_close {
+            continue;
+        }
+        out.push(WallCue {
+            x: nx,
+            y: ny,
+            strength: s,
+            near_void,
+            green_line,
+        });
+        if out.len() >= 140 {
+            break;
+        }
+    }
+    out
+}
+
+/// Yeşil içi düz beyaz çizgi noktalarını segmentlere çevir (tünel adayları).
+/// `preprocess.rs::extract_green_line_segments` port.
+pub fn extract_green_line_segments(cues: &[WallCue]) -> Vec<GreenLineSeg> {
+    let pts: Vec<(usize, f32, f32, f32)> = cues
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.green_line && !c.near_void)
+        .map(|(i, c)| (i, c.x, c.y, c.strength))
+        .collect();
+    if pts.len() < 4 {
+        return Vec::new();
+    }
+
+    let cell = 0.04f32;
+    let gw = ((1.0 / cell).ceil() as usize).max(1);
+    let mut bins: Vec<Vec<usize>> = vec![Vec::new(); gw * gw];
+    for (li, (_, x, y, _)) in pts.iter().enumerate() {
+        let bx = ((*x / cell).floor() as usize).min(gw - 1);
+        let by = ((*y / cell).floor() as usize).min(gw - 1);
+        bins[by * gw + bx].push(li);
+    }
+
+    let mut visited = vec![false; pts.len()];
+    let mut segs = Vec::new();
+
+    for start in 0..pts.len() {
+        if visited[start] {
+            continue;
+        }
+        let mut stack = vec![start];
+        visited[start] = true;
+        let mut members = Vec::new();
+        while let Some(i) = stack.pop() {
+            members.push(i);
+            let (_, x, y, _) = pts[i];
+            let bx = ((x / cell).floor() as i32).max(0);
+            let by = ((y / cell).floor() as i32).max(0);
+            for oy in -1i32..=1 {
+                for ox in -1i32..=1 {
+                    let nx = bx + ox;
+                    let ny = by + oy;
+                    if nx < 0 || ny < 0 || nx >= gw as i32 || ny >= gw as i32 {
+                        continue;
+                    }
+                    for &j in &bins[ny as usize * gw + nx as usize] {
+                        if visited[j] {
+                            continue;
+                        }
+                        let (_, x2, y2, _) = pts[j];
+                        let dx = x2 - x;
+                        let dy = y2 - y;
+                        if dx * dx + dy * dy <= (cell * 1.9).powi(2) {
+                            visited[j] = true;
+                            stack.push(j);
+                        }
+                    }
+                }
+            }
+        }
+        if members.len() < 3 {
+            continue;
+        }
+
+        // PCA-like line fit
+        let mx = members.iter().map(|&i| pts[i].1).sum::<f32>() / members.len() as f32;
+        let my = members.iter().map(|&i| pts[i].2).sum::<f32>() / members.len() as f32;
+        let mut sxx = 0.0f32;
+        let mut syy = 0.0f32;
+        let mut sxy = 0.0f32;
+        for &i in &members {
+            let dx = pts[i].1 - mx;
+            let dy = pts[i].2 - my;
+            sxx += dx * dx;
+            syy += dy * dy;
+            sxy += dx * dy;
+        }
+        let trace = sxx + syy;
+        let det = sxx * syy - sxy * sxy;
+        let disc = (trace * trace * 0.25 - det).max(0.0).sqrt();
+        let l1 = trace * 0.5 + disc;
+        let l2 = trace * 0.5 - disc;
+        let aspect = if l2.abs() < 1e-8 {
+            8.0
+        } else {
+            (l1 / l2.abs()).sqrt().clamp(1.0, 20.0)
+        };
+        if aspect < 1.95 {
+            continue;
+        }
+        let (dx, dy) = if sxy.abs() > 1e-8 || (l1 - syy).abs() > 1e-8 {
+            let vx = l1 - syy;
+            let vy = sxy;
+            let len = (vx * vx + vy * vy).sqrt().max(1e-6);
+            (vx / len, vy / len)
+        } else if sxx >= syy {
+            (1.0, 0.0)
+        } else {
+            (0.0, 1.0)
+        };
+        let mut min_p = 0.0f32;
+        let mut max_p = 0.0f32;
+        for (k, &i) in members.iter().enumerate() {
+            let p = (pts[i].1 - mx) * dx + (pts[i].2 - my) * dy;
+            if k == 0 {
+                min_p = p;
+                max_p = p;
+            } else {
+                min_p = min_p.min(p);
+                max_p = max_p.max(p);
+            }
+        }
+        let length = (max_p - min_p).abs();
+        if length < 0.05 {
+            continue;
+        }
+        let strength =
+            members.iter().map(|&i| pts[i].3).sum::<f32>() / members.len() as f32;
+        segs.push(GreenLineSeg {
+            x0: (mx + dx * min_p).clamp(0.02, 0.98),
+            y0: (my + dy * min_p).clamp(0.02, 0.98),
+            x1: (mx + dx * max_p).clamp(0.02, 0.98),
+            y1: (my + dy * max_p).clamp(0.02, 0.98),
+            strength,
+            length,
+        });
+    }
+
+    segs.sort_by(|a, b| {
+        b.strength
+            .partial_cmp(&a.strength)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    segs.truncate(24);
+    segs
+}
+
 // ── Testler (field.rs polarity_tests birebir) ──────────────
 
 #[cfg(test)]

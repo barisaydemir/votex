@@ -19,3 +19,7 @@ update_staging/
 
 # WASM build artifacts (votex-wasm)
 votex-wasm/target/
+
+# Şekil doğrulama fikstürü (cargo test üretir)
+dev/contour-fixture.js
+dev/contour-verify-standalone.html

@@ -184,3 +184,77 @@ pub fn parse_excel_data(base64_content: String) -> Result<csv_import::CsvImportR
         .map_err(|e| format!("Base64 çözülemedi: {e}"))?;
     csv_import::parse_excel(&bytes)
 }
+
+/// Legacy3DMag dik çekim JSON — anomali + olası yapı şekilleri (CSV yolundan ayrı).
+#[tauri::command]
+pub fn analyze_legacy_dik_json(
+    content: String,
+    file_name: Option<String>,
+    scan_step_count: Option<u32>,
+    scan_step_spacing_m: Option<f32>,
+) -> Result<crate::legacy_mag_json::LegacyDikResult, String> {
+    if content.trim().is_empty() {
+        return Err("JSON içeriği boş".into());
+    }
+    if !crate::legacy_mag_json::looks_like_legacy_dik(content.as_str(), file_name.as_deref()) {
+        // Yine de parse dene — imza gevşek olabilir
+        let _ = file_name;
+    }
+    if scan_step_count.unwrap_or(0) > 10000 {
+        return Err("Adım sayısı 10000 değerinden büyük olamaz".into());
+    }
+    if let Some(spacing) = scan_step_spacing_m {
+        if !spacing.is_finite() || spacing <= 0.0 || spacing > 1000.0 {
+            return Err("Yatay adım ölçüsü 0'dan büyük ve 1000 m'den küçük olmalıdır".into());
+        }
+    }
+    crate::legacy_mag_json::analyze_legacy_dik_with_step_spacing(
+        &content,
+        scan_step_count,
+        scan_step_spacing_m,
+    )
+}
+
+/// Legacy dik JSON — Zero-Order Median Leveling (heading-error / zig-zag striping).
+#[tauri::command]
+pub fn level_legacy_mag_json(
+    content: String,
+) -> Result<crate::legacy_mag_json::LegacyLevelResult, String> {
+    if content.trim().is_empty() {
+        return Err("JSON içeriği boş".into());
+    }
+    crate::legacy_mag_json::level_legacy_mag_json(&content)
+}
+
+/// Legacy dik JSON dosyası seç.
+#[tauri::command]
+pub fn pick_legacy_dik_json() -> Result<Option<super::dto::PickedCsvFile>, String> {
+    let path = rfd::FileDialog::new()
+        .set_title("Votex — Dik çekim (Legacy3DMag JSON)")
+        .add_filter("Legacy dik JSON", &["json"])
+        .add_filter("Tüm dosyalar", &["*"])
+        .pick_file();
+
+    let Some(path) = path else {
+        return Ok(None);
+    };
+
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("legacy_dik.json")
+        .to_string();
+
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("Dosya okunamadı: {e}"))?;
+    if content.trim().is_empty() {
+        return Err("Dosya boş".into());
+    }
+    if !crate::legacy_mag_json::looks_like_legacy_dik(&content, Some(&file_name)) {
+        return Err(
+            "Bu dosya Legacy3DMag dik çekim formatında görünmüyor (metadata + scan gerekli)"
+                .into(),
+        );
+    }
+    Ok(Some(super::dto::PickedCsvFile { file_name, content }))
+}

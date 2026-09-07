@@ -437,3 +437,71 @@ pub fn build_surface_field(
 
     Ok(SurfaceResult { json })
 }
+
+// ── Wall cue detection (preprocess.rs port) ──────────────
+
+/// Wall cue detection result as JSON string.
+/// Contains wall cues (near-void white pixels) + green line segments (tunnels).
+#[wasm_bindgen]
+pub struct WallCueResult {
+    json: String,
+}
+
+#[wasm_bindgen]
+impl WallCueResult {
+    #[wasm_bindgen(getter)]
+    pub fn json(&self) -> String {
+        self.json.clone()
+    }
+}
+
+/// Detect wall cues and extract tunnel line segments from a colormap image.
+///
+/// * `rgba` — raw RGBA pixels (cleaned image)
+/// * `width`, `height` — source image dimensions
+///
+/// Returns JSON: { cues: [...], segments: [...] }
+/// cues:     { x, y, strength, nearVoid, greenLine }
+/// segments: { x0, y0, x1, y1, strength, length }
+#[wasm_bindgen]
+pub fn detect_wall_cues(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+) -> Result<WallCueResult, JsValue> {
+    if width < 16 || height < 16 {
+        return Err("Görüntü çok küçük".into());
+    }
+    if (rgba.len() as u64) < (width as u64) * (height as u64) * 4 {
+        return Err("RGBA buffer too small".into());
+    }
+
+    let cues = surface::detect_wall_cues(rgba, width, height);
+    let segs = surface::extract_green_line_segments(&cues);
+
+    // Build JSON manually
+    let mut json = String::with_capacity(128 + cues.len() * 64 + segs.len() * 80);
+    json.push_str("{\"cues\":[");
+    for (i, c) in cues.iter().enumerate() {
+        if i > 0 {
+            json.push(',');
+        }
+        json.push_str(&format!(
+            "{{\"x\":{:.4},\"y\":{:.4},\"strength\":{:.4},\"nearVoid\":{},\"greenLine\":{}}}",
+            c.x, c.y, c.strength, c.near_void, c.green_line
+        ));
+    }
+    json.push_str("],\"segments\":[");
+    for (i, s) in segs.iter().enumerate() {
+        if i > 0 {
+            json.push(',');
+        }
+        json.push_str(&format!(
+            "{{\"x0\":{:.4},\"y0\":{:.4},\"x1\":{:.4},\"y1\":{:.4},\"strength\":{:.4},\"length\":{:.4}}}",
+            s.x0, s.y0, s.x1, s.y1, s.strength, s.length
+        ));
+    }
+    json.push_str("]}");
+
+    Ok(WallCueResult { json })
+}

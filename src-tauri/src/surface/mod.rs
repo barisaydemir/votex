@@ -8,7 +8,7 @@ mod field;
 pub(crate) mod models;
 
 pub use models::{
-    Chamber, Evidence, GeometryAnalysis, MetalBody, SiteGeometryReport, Surface3D, Tunnel,
+    Chamber, Evidence, GeometryAnalysis, ImageEdgeAnalysis, MetalBody, SiteGeometryReport, Surface3D, Tunnel,
     UndergroundStructures, WaterBody,
 };
 
@@ -26,9 +26,122 @@ pub const DEFAULT_TOP_DEPTH_RANGE_M: f32 = 30.0;
 /// Yan sınıflandırma eşikleri bu referansa göre ayarlı (normalize blob → metre).
 pub const SIDE_CLASS_REF_M: f32 = 3.0;
 
-/// Colormap → yer altı yapı modeli.
-///
-/// Akış: yeşil zemin (0) + pozitif/negatif alan çıkışları → blob → yapı.
+/// Compute image-processing edge metrics and iso-nT contour segments from the
+/// same signed field used by structure detection. Coordinates are normalized
+/// to the cleaned image (0..1), and contour levels remain in normalized field
+/// units so the report can describe them independently of display size.
+pub fn compute_image_edge_analysis(img: &RgbaImage, grid_w: u32, grid_h: u32) -> ImageEdgeAnalysis {
+    let (field, _) = build_signed_field(img, grid_w.max(2), grid_h.max(2));
+    let gw = grid_w.max(2) as usize;
+    let gh = grid_h.max(2) as usize;
+    let n = gw * gh;
+    let step_x = 1.0 / (gw - 1) as f32;
+    let step_y = 1.0 / (gh - 1) as f32;
+    let mut gradient_x = vec![0.0; n];
+    let mut gradient_y = vec![0.0; n];
+    let mut magnitude = vec![0.0; n];
+    let sample = |x: isize, y: isize| -> Option<f32> {
+        if x < 0 || y < 0 || x >= gw as isize || y >= gh as isize {
+            None
+        } else {
+            Some(field[y as usize * gw + x as usize])
+        }
+    };
+    let derivative = |x: usize, y: usize, axis: bool| -> f32 {
+        let current = sample(x as isize, y as isize);
+        let before = if axis { sample(x as isize - 1, y as isize) } else { sample(x as isize, y as isize - 1) };
+        let after = if axis { sample(x as isize + 1, y as isize) } else { sample(x as isize, y as isize + 1) };
+        let step = if axis { step_x } else { step_y };
+        if before.is_some() && after.is_some() {
+            (after.unwrap() - before.unwrap()) / (2.0 * step)
+        } else if after.is_some() && current.is_some() {
+            (after.unwrap() - current.unwrap()) / step
+        } else if before.is_some() && current.is_some() {
+            (current.unwrap() - before.unwrap()) / step
+        } else {
+            0.0
+        }
+    };
+
+    let mut max_magnitude: f32 = 0.0;
+    let mut sum_magnitude: f32 = 0.0;
+    for y in 0..gh {
+        for x in 0..gw {
+            let i = y * gw + x;
+            let dx = derivative(x, y, true);
+            let dy = derivative(x, y, false);
+            let mag = (dx * dx + dy * dy).sqrt();
+            gradient_x[i] = dx;
+            gradient_y[i] = dy;
+            magnitude[i] = mag;
+            max_magnitude = max_magnitude.max(mag);
+            sum_magnitude += mag;
+        }
+    }
+
+    let edge_threshold = max_magnitude * 0.35;
+    let edge_cell_count = magnitude
+        .iter()
+        .filter(|v| edge_threshold > 0.0 && **v >= edge_threshold)
+        .count() as u32;
+    let contour_count = 8usize;
+    let mut contour_levels = Vec::with_capacity(contour_count);
+    let mut contour_segments = Vec::new();
+    let min_value = field.iter().copied().fold(f32::INFINITY, f32::min);
+    let max_value = field.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    if min_value.is_finite() && max_value.is_finite() && max_value > min_value {
+        for k in 1..=contour_count {
+            contour_levels.push(min_value + (max_value - min_value) * k as f32 / (contour_count + 1) as f32);
+        }
+        let edge_pairs: [[(usize, usize); 2]; 16] = [
+            [(0, 0); 2], [(3, 0), (0, 0)], [(0, 1), (0, 0)], [(3, 1), (0, 0)],
+            [(1, 2), (0, 0)], [(3, 0), (1, 2)], [(0, 2), (0, 0)], [(3, 2), (0, 0)],
+            [(2, 3), (0, 0)], [(0, 2), (0, 0)], [(0, 1), (2, 3)], [(1, 2), (0, 0)],
+            [(1, 3), (0, 0)], [(0, 1), (0, 0)], [(3, 0), (0, 0)], [(0, 0); 2],
+        ];
+        let edge_ends = [(0usize, 1usize), (1, 2), (2, 3), (3, 0)];
+        let point = |edge: usize, values: [f32; 4], level: f32, x: usize, y: usize| -> (f32, f32) {
+            let (a, b) = edge_ends[edge];
+            let points = [(x as f32, y as f32), ((x + 1) as f32, y as f32), ((x + 1) as f32, (y + 1) as f32), (x as f32, (y + 1) as f32)];
+            let denom = values[b] - values[a];
+            let t = if denom.abs() > f32::EPSILON { ((level - values[a]) / denom).clamp(0.0, 1.0) } else { 0.5 };
+            (points[a].0 + (points[b].0 - points[a].0) * t, points[a].1 + (points[b].1 - points[a].1) * t)
+        };
+        for y in 0..gh - 1 {
+            for x in 0..gw - 1 {
+                let values = [field[y * gw + x], field[y * gw + x + 1], field[(y + 1) * gw + x + 1], field[(y + 1) * gw + x]];
+                for &level in &contour_levels {
+                    let mut mask = 0usize;
+                    for (i, value) in values.iter().enumerate() { if *value >= level { mask |= 1 << i; } }
+                    for &(a, b) in &edge_pairs[mask] {
+                        if a == b { continue; }
+                        let p0 = point(a, values, level, x, y);
+                        let p1 = point(b, values, level, x, y);
+                        contour_segments.push([
+                            p0.0 / (gw - 1) as f32, p0.1 / (gh - 1) as f32,
+                            p1.0 / (gw - 1) as f32, p1.1 / (gh - 1) as f32, level,
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    ImageEdgeAnalysis {
+        grid_w: gw as u32,
+        grid_h: gh as u32,
+        gradient_x,
+        gradient_y,
+        magnitude,
+        max_magnitude,
+        mean_magnitude: sum_magnitude / n as f32,
+        edge_cell_count,
+        edge_threshold,
+        contour_segments,
+        contour_levels,
+    }
+}
+
 /// Yeşil/sarı + koyu–açık kontrast → yapı ipucu (yüzeye yakın olasılık yüksek).
 /// Beyaz çizgi alan değildir; duvar/tünel ipucu olarak ayrı okunur.
 pub fn colormap_to_surface(
@@ -72,6 +185,7 @@ pub fn colormap_to_surface(
 
     let (signed_field, colors) = build_signed_field(&cleaned, grid_w, grid_h);
     let heights = synthesize_symmetric_bodies(&signed_field, grid_w, grid_h);
+    let edge_analysis = compute_image_edge_analysis(&cleaned, grid_w, grid_h);
     let (z_min, z_max) = min_max(&heights);
     const MAP_WIDTH_M: f32 = 24.0;
     // Yan/dik: harita ayakizi görüntü en-boyunda — şeride sıkıştırma yok
@@ -134,6 +248,7 @@ pub fn colormap_to_surface(
         depth_range_m,
         view_mode: view_mode.to_string(),
         structures,
+        edge_analysis,
         wall_cues,
         soil_profile: soil.id.clone(),
         soil_depth_scale: soil.depth_scale,

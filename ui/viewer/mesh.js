@@ -109,6 +109,9 @@ export function buildMesh(surface, vertExag, wireframe, depressionScale) {
   const sideView = viewMode === "side";
 
   const { mesh: ground, mapW, mapD } = buildGroundSurface(surface, wireframe, vertExag, depressionScale);
+  // Alarm ile paylaşılan hesaplanmış boyutlar — tekrar hesaplama farklarını önlemek için
+  surface._computedMapW = mapW;
+  surface._computedMapD = mapD;
   state.groundPlane = ground;
   ground.userData.votexLayer = "dta";
   ground.receiveShadow = true;

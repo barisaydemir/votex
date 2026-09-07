@@ -3813,7 +3813,7 @@ mod pipeline_parity_tests {
                 .map(|(k, _)| {
                     // Tünel anahtarını oda anahtarı türüne sığdır: (p,q)->(kind=0,
                     // cx,cy, crown,floor,height,width,bearing,tier)
-                    let ((x0, y0), (x1, y1), crown, floor, height, width, bearing, tier) = k;
+                    let ((x0, y0), (x1, _y1), crown, floor, height, width, bearing, tier) = k;
                     (
                         String::from("tunnel"),
                         x0,
@@ -3863,7 +3863,7 @@ mod pipeline_parity_tests {
                         .any(|r| r == "rewrite:red_interior_host")
                 })
                 .map(|(k, _)| {
-                    let ((x0, y0), (x1, y1), crown, floor, height, width, bearing, tier) = k;
+                    let ((x0, y0), (x1, _y1), crown, floor, height, width, bearing, tier) = k;
                     (
                         String::from("tunnel"),
                         x0,

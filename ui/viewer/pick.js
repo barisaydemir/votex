@@ -63,6 +63,14 @@ function pick(e) {
     }
   }
 
+  if (state.legacyDikGroup?.visible) {
+    const hits = raycaster.intersectObjects(state.legacyDikGroup.children, true);
+    for (const h of hits) {
+      const id = findFocusId(h.object);
+      if (id) return { kind: "st", id };
+    }
+  }
+
   if (state.structureGroup?.visible) {
     const hits = raycaster.intersectObjects(state.structureGroup.children, true);
     for (const h of hits) {
@@ -310,9 +318,19 @@ function findStructureData(id) {
   return null;
 }
 
+function legacyShapeInfo(id) {
+  const group = state.legacyDikGroup;
+  if (!group) return null;
+  const target = state.structureTargets?.[id];
+  const shape = target?.object?.userData?.legacyShape || target?.object?.userData?.legacyAnomaly;
+  if (!shape) return null;
+  const kind = String(shape.kind || "anomaly").toLowerCase();
+  return { kind: kind === "metal" ? "Metal" : kind === "tunnel" ? "Tünel" : "Anomali", data: shape, num: 0 };
+}
+
 function showStructInfoPanel(id) {
   const panel = getStructInfoPanel();
-  const info = findStructureData(id);
+  const info = findStructureData(id) || legacyShapeInfo(id);
   if (!info || !info.data) { panel.style.display = 'none'; return; }
   const d = info.data;
   const num = (state.structureTargets[id]?.title || '').match(/^(\d+)/)?.[1] || (info.num + 1);
@@ -345,14 +363,53 @@ function showStructInfoPanel(id) {
       <div class="si-row"><span class="si-label">Tavan</span><span class="si-value">${(crown * 100).toFixed(0)} cm</span></div>
       <div class="si-row"><span class="si-label">Taban</span><span class="si-value">${(floor * 100).toFixed(0)} cm</span></div>
     `;
-  } else if (info.kind === 'Metal') {
-    const strength = Math.round((d.fieldStrength ?? d.field_strength ?? d.intensity ?? 0) * 100);
+  } else if (info.kind === 'Metal' && !(d.depthTopM != null || d.depth_top_m != null)) {
+    const strength = Math.round((d.fieldStrength ?? d.field_strength ?? d.intensity ?? d.strength ?? 0) * 100);
     const depth = (d.depthFromSurfaceM ?? d.depth_from_surface_m ?? 0);
     const guess = d.metalGuess || d.metal_guess || '';
     rows = `
       <div class="si-row"><span class="si-label">Derinlik</span><span class="si-value">${(depth * 100).toFixed(0)} cm</span></div>
       <div class="si-row"><span class="si-label">Güç</span><span class="si-value">${strength}%</span></div>
       ${guess ? `<div class="si-row"><span class="si-label">Tahmini</span><span class="si-value">${guess}</span></div>` : ''}
+    `;
+  } else {
+    const top = Number(d.depthTopM ?? d.depth_top_m ?? 0);
+    const bottom = Number(d.depthBottomM ?? d.depth_bottom_m ?? top);
+    const center = (top + bottom) * 0.5;
+    const strength = Number(d.peakSigma ?? d.peak_sigma ?? d.strength ?? 0);
+    const fitErrorRaw = Number(d.depthFitError ?? d.depth_fit_error);
+    const fitError = Number.isFinite(fitErrorRaw) && fitErrorRaw >= 0 ? fitErrorRaw : 1;
+    const uncertaintyRaw = Number(d.depthUncertaintyM ?? d.depth_uncertainty_m);
+    const uncertainty = Number.isFinite(uncertaintyRaw) && uncertaintyRaw > 0
+      ? uncertaintyRaw
+      : Math.max((bottom - top) * 0.6, 0.45);
+    const lowRaw = Number(d.depthIntervalLowM ?? d.depth_interval_low_m);
+    const highRaw = Number(d.depthIntervalHighM ?? d.depth_interval_high_m);
+    const low = Number.isFinite(lowRaw) && lowRaw > 0 ? lowRaw : Math.max(0.08, center - uncertainty);
+    const high = Number.isFinite(highRaw) && highRaw > low ? highRaw : center + uncertainty;
+    const method = d.depthMethod ?? d.depth_method ?? "heuristic";
+    const fitSamples = Number(d.depthFitSamples ?? d.depth_fit_samples ?? 0);
+    const fitLabel = method === "dipole" ? "Dipol LS" : method === "peters" ? "Peters" : "Sezgisel";
+    const fitColor = fitError <= 0.2 ? "#4ade80" : fitError <= 0.6 ? "#facc15" : "#f87171";
+    const shapeType = String(d.shapeType ?? d.shape_type ?? "irregular").toLowerCase();
+    const shapeNames = { circle: "Daire", ellipse: "Elips", square: "Kare", rectangle: "Dikdörtgen", capsule: "Kapsül", polygon: "Çokgen", irregular: "Düzensiz" };
+    const shapeName = shapeNames[shapeType] || "Düzensiz";
+    const shapeSource = d.shapeSource ?? d.shape_source ?? "inferred";
+    const shapeSourceLabel = shapeSource === "grid-contour" ? "ölçüm konturu" : "hesaplanmış";
+    const shapeConfidence = Math.round(Math.max(0, Math.min(1, Number(d.shapeConfidence ?? d.shape_confidence) || 0)) * 100);
+    const shapeError = Math.max(0, Number(d.shapeFitError ?? d.shape_fit_error) || 1);
+    const width = Number(d.widthM ?? d.width_m) || Number(d.rx) * 2 || 0;
+    const length = Number(d.lengthM ?? d.length_m) || Number(d.ry) * 2 || 0;
+    const orientation = Number(d.orientationDeg ?? d.orientation_deg) || 0;
+    const roundness = Number(d.roundness) || 0;
+    rows = `
+      <div class="si-row"><span class="si-label">Şekil</span><span class="si-value">${shapeName} · %${shapeConfidence} · ${shapeSourceLabel}</span></div>
+      <div class="si-row"><span class="si-label">Şekil ölçüsü</span><span class="si-value">${width.toFixed(2)} × ${length.toFixed(2)} m · ${orientation.toFixed(0)}°</span></div>
+      <div class="si-row"><span class="si-label">Şekil uyumu</span><span class="si-value" style="color:${shapeError <= 0.2 ? "#4ade80" : shapeError <= 0.6 ? "#facc15" : "#f87171"}">RMS ${shapeError.toFixed(2)} · yuvarlaklık ${(roundness * 100).toFixed(0)}%</span></div>
+      <div class="si-row"><span class="si-label">Derinlik</span><span class="si-value">${top.toFixed(2)}–${bottom.toFixed(2)} m</span></div>
+      <div class="si-row"><span class="si-label">Belirsizlik</span><span class="si-value">${low.toFixed(2)}–${high.toFixed(2)} m (±${uncertainty.toFixed(2)})</span></div>
+      <div class="si-row"><span class="si-label">Derinlik uyumu</span><span class="si-value" style="color:${fitColor}">${fitLabel} · RMS ${fitError.toFixed(2)}${fitSamples > 0 ? ` · ${fitSamples} örnek` : ""}</span></div>
+      <div class="si-row"><span class="si-label">Güç</span><span class="si-value">${strength.toFixed(2)}σ</span></div>
     `;
   }
 

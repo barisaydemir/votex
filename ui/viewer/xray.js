@@ -70,17 +70,21 @@ function xrayMaterialFor(origMat) {
   return mat;
 }
 
-function isXrayable(obj) {
-  return obj.isMesh && !obj.userData?.isBadge && !obj.userData?.isDetailLabel;
+function isXrayable(obj, root) {
+  if (!obj.isMesh || obj.userData?.isBadge || obj.userData?.isDetailLabel) return false;
+  // JSON ölçüm grid'i, kapsama maskesi ve derinlik çerçevesi veri olarak
+  // görünür kalmalı; yalnızca anomali hacimleri X-Ray'e girer.
+  if (root === state.legacyDikGroup && !obj.userData?.legacyAnomaly && !obj.userData?.legacyShape) return false;
+  return true;
 }
 
 /** Açıkken tüm yapı mesh'lerine fresnel malzeme sarar; kapalıyken orijinale döner. */
 export function applyXray(on) {
-  const roots = [state.structureGroup, state.freeDrawGroup];
+  const roots = [state.structureGroup, state.freeDrawGroup, state.legacyDikGroup];
   for (const root of roots) {
     if (!root) continue;
     root.traverse((obj) => {
-      if (!isXrayable(obj)) return;
+      if (!isXrayable(obj, root)) return;
       if (on) {
         if (!obj.userData._origMat) obj.userData._origMat = obj.material;
         obj.material = xrayMaterialFor(obj.userData._origMat);

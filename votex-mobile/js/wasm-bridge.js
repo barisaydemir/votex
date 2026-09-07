@@ -147,6 +147,85 @@ function anomaliesToStructures(wasmResult) {
   }));
 }
 
+/**
+ * Classify WASM anomalies into structure types for 3D markers.
+ * Uses bbox aspect ratio — same heuristic as the desktop Tauri parser.
+ *
+ * Classification rules (from src-tauri parser + structures/classify.rs):
+ *   aspect ratio > 2.0  → tunnel (elongated corridor)
+ *   h / w > 1.6         → shaft  (vertical well/vent)
+ *   otherwise            → room   (compact chamber/tomb)
+ *
+ * @param {object|null} wasmResult — from analyzeColormap()
+ * @param {object|null} imageDims  — { width, height } of source image
+ * @returns {Array|null} — [{ kind, label, cx, cy, rx, ry, intensity, bbox }]
+ */
+function classifyStructures(wasmResult, imageDims) {
+  if (!wasmResult || !Array.isArray(wasmResult.anomalies) || !imageDims) return null;
+
+  const imgW = imageDims.width || 1;
+  const imgH = imageDims.height || 1;
+
+  return wasmResult.anomalies.map((a, i) => {
+    const bw = Math.max(a.w, 1);
+    const bh = Math.max(a.h, 1);
+    const aspect = bw / bh;
+    const invAspect = bh / bw;
+
+    let kind, label;
+    if (aspect > 2.0) {
+      kind = 'tunnel';
+      label = `${i + 1}. Tünel / Koridor`;
+    } else if (invAspect > 1.6) {
+      kind = 'shaft';
+      label = `${i + 1}. Şaft / Kuyu`;
+    } else {
+      kind = a.class === 'positive' ? 'metal' : 'room';
+      label = a.class === 'positive'
+        ? `${i + 1}. Metal Anomali`
+        : `${i + 1}. Oda / Mezar`;
+    }
+
+    return {
+      kind,
+      label,
+      class: a.class,
+      // Normalized center (0–1 relative to image)
+      cx: a.cx / imgW,
+      cy: a.cy / imgH,
+      // Normalized half-extents (0–1)
+      rx: (bw / 2) / imgW,
+      ry: (bh / 2) / imgH,
+      intensity: a.intensity,
+      bbox: { x: a.x, y: a.y, w: a.w, h: a.h },
+    };
+  });
+}
+
+/**
+ * Detect wall cues and extract green-line tunnel segments via WASM.
+ * Same core as desktop `preprocess.rs::detect_wall_cues` +
+ * `extract_green_line_segments`.
+ *
+ * @param {ImageData} imageData
+ * @returns {object|null} — { cues: [...], segments: [...] } or null
+ */
+function detectWallCues(imageData) {
+  if (!_wasmReady || !_wasmModule) return null;
+
+  try {
+    const result = _wasmModule.detect_wall_cues(
+      imageData.data,
+      imageData.width,
+      imageData.height
+    );
+    return JSON.parse(result.json);
+  } catch (err) {
+    console.warn('[VotexWASM] detect_wall_cues failed:', err?.message || err);
+    return null;
+  }
+}
+
 // Export
 window.VotexWasm = {
   init: initWasm,
@@ -155,4 +234,6 @@ window.VotexWasm = {
   imageStats,
   buildSurfaceField,
   anomaliesToStructures,
+  classifyStructures,
+  detectWallCues,
 };

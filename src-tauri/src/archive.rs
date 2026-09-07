@@ -9,6 +9,7 @@ use sha2::{Digest, Sha256};
 
 use crate::commands::AnalyzeSession;
 use crate::structures::StructureHint;
+use crate::legacy_mag_json::LegacyDikResult;
 use crate::surface::Surface3D;
 
 const MAX_ENTRIES: usize = 50;
@@ -33,6 +34,36 @@ pub struct ArchiveIndexEntry {
     pub preview_rel: String,
     #[serde(default)]
     pub soil_profile: String,
+    /// "image" veya "legacy_dik_json".
+    #[serde(default = "default_source_kind")]
+    pub source_kind: String,
+}
+
+fn default_source_kind() -> String {
+    "image".into()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyArchiveMeta {
+    pub id: String,
+    pub created_at: String,
+    pub file_name: String,
+    pub source_kind: String,
+    pub point_count: usize,
+    pub unique_points: usize,
+    pub grid_w: u32,
+    pub grid_h: u32,
+    pub metals: u32,
+    pub anomalies: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyArchiveLoadResult {
+    pub meta: LegacyArchiveMeta,
+    pub content: String,
+    pub result: LegacyDikResult,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +87,8 @@ pub struct ArchiveMeta {
     pub soil_profile: String,
     #[serde(default)]
     pub soil_correction_applied: bool,
+    #[serde(default = "default_source_kind")]
+    pub source_kind: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -262,6 +295,7 @@ pub fn save_entry(
         metals,
         soil_profile: session.soil_profile.clone(),
         soil_correction_applied: surface.soil_correction_applied,
+        source_kind: "image".into(),
     };
     let meta_raw = serde_json::to_string_pretty(&meta).map_err(|e| e.to_string())?;
     fs::write(entry_dir.join("meta.json"), meta_raw).map_err(|e| e.to_string())?;
@@ -281,6 +315,7 @@ pub fn save_entry(
         metals,
         preview_rel: format!("{id}/preview.png"),
         soil_profile: session.soil_profile.clone(),
+        source_kind: "image".into(),
     };
 
     let mut idx = read_index();
@@ -288,6 +323,80 @@ pub fn save_entry(
     enforce_cap(&mut idx);
     write_index(&idx)?;
     Ok(index_entry)
+}
+
+/// Legacy dik JSON analizini arşive kaydet.
+pub fn save_legacy_entry(
+    file_name: &str,
+    content: &str,
+    result: &LegacyDikResult,
+) -> Result<ArchiveIndexEntry, String> {
+    if content.trim().is_empty() {
+        return Err("Legacy JSON içeriği boş".into());
+    }
+    let file_name = if file_name.trim().is_empty() {
+        "legacy_dik.json"
+    } else {
+        file_name.trim()
+    };
+    let id = make_id(file_name);
+    let created_at = now_iso_ish();
+    let entry_dir = archive_dir().join(&id);
+    fs::create_dir_all(&entry_dir).map_err(|e| e.to_string())?;
+    fs::write(entry_dir.join("source.json"), content.as_bytes()).map_err(|e| e.to_string())?;
+    let result_raw = serde_json::to_string(result).map_err(|e| e.to_string())?;
+    fs::write(entry_dir.join("legacy_result.json"), result_raw).map_err(|e| e.to_string())?;
+    let meta = LegacyArchiveMeta {
+        id: id.clone(),
+        created_at: created_at.clone(),
+        file_name: file_name.into(),
+        source_kind: "legacy_dik_json".into(),
+        point_count: result.point_count,
+        unique_points: result.unique_points,
+        grid_w: result.grid_w,
+        grid_h: result.grid_h,
+        metals: result.metals.len() as u32,
+        anomalies: result.anomalies.len() as u32,
+    };
+    let meta_raw = serde_json::to_string_pretty(&meta).map_err(|e| e.to_string())?;
+    fs::write(entry_dir.join("legacy_meta.json"), meta_raw).map_err(|e| e.to_string())?;
+
+    let index_entry = ArchiveIndexEntry {
+        id: id.clone(),
+        created_at,
+        file_name: file_name.into(),
+        view_mode: "top".into(),
+        target_kind: "legacy_dik".into(),
+        min_confidence: 0.0,
+        accepted: (result.anomalies.len() + result.candidates.len()) as u32,
+        rejected: 0,
+        rooms: 0,
+        shafts: 0,
+        tunnels: 0,
+        metals: result.metals.len() as u32,
+        preview_rel: format!("{id}/source.json"),
+        soil_profile: "off".into(),
+        source_kind: "legacy_dik_json".into(),
+    };
+    let mut idx = read_index();
+    idx.entries.insert(0, index_entry.clone());
+    enforce_cap(&mut idx);
+    write_index(&idx)?;
+    Ok(index_entry)
+}
+
+pub fn load_legacy_entry(id: &str) -> Result<LegacyArchiveLoadResult, String> {
+    let id = sanitize_id(id)?;
+    let entry_dir = archive_dir().join(&id);
+    if !entry_dir.is_dir() {
+        return Err("Legacy JSON arşiv kaydı bulunamadı".into());
+    }
+    let meta_raw = fs::read_to_string(entry_dir.join("legacy_meta.json")).map_err(|e| e.to_string())?;
+    let meta: LegacyArchiveMeta = serde_json::from_str(&meta_raw).map_err(|e| e.to_string())?;
+    let content = fs::read_to_string(entry_dir.join("source.json")).map_err(|e| e.to_string())?;
+    let result_raw = fs::read_to_string(entry_dir.join("legacy_result.json")).map_err(|e| e.to_string())?;
+    let result: LegacyDikResult = serde_json::from_str(&result_raw).map_err(|e| e.to_string())?;
+    Ok(LegacyArchiveLoadResult { meta, content, result })
 }
 
 pub fn list_entries() -> Result<Vec<ArchiveIndexEntry>, String> {

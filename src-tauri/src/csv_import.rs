@@ -439,6 +439,7 @@ pub fn csv_to_surface(
         depth_range_m,
         view_mode: view_mode.to_string(),
         structures: crate::surface::UndergroundStructures::default(),
+        edge_analysis: crate::surface::ImageEdgeAnalysis::default(),
         wall_cues: Vec::new(),
         soil_profile: "csv_import".into(),
         soil_depth_scale: 1.0,

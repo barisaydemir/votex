@@ -7,6 +7,8 @@
 let _currentFile = null;
 let _currentImageData = null;
 let _currentSurface = null;
+let _currentStructures = null;
+let _currentWallCues = null;
 
 /**
  * Initialize the application
@@ -156,6 +158,15 @@ function bindAnalysis() {
         // 2c) Build 3D surface field (cached for the 3D button)
         _currentSurface = VotexWasm.buildSurfaceField(_currentImageData, { gridW: 96, gridH: 96 });
 
+        // 2d) Classify structures for 3D markers (room/tunnel/shaft)
+        _currentStructures = VotexWasm.classifyStructures(wasmResult, {
+          width: _currentImageData.width,
+          height: _currentImageData.height
+        });
+
+        // 2e) Detect wall cues (green-line tunnel segments) for 3D view
+        _currentWallCues = VotexWasm.detectWallCues(_currentImageData);
+
         // 3) WASM anomaly summary → toast + console detail
         if (wasmResult) {
           const structures = VotexWasm.anomaliesToStructures(wasmResult);
@@ -194,9 +205,11 @@ function bindSurface3D() {
         showLoading('3D yüzey oluşturuluyor...');
         setTimeout(() => {
           _currentSurface = VotexWasm.buildSurfaceField(_currentImageData, { gridW: 96, gridH: 96 });
+          _currentStructures = null; // structures need analysis first
+          _currentWallCues = null;   // wall cues need analysis first
           hideLoading();
           if (_currentSurface) {
-            VotexSurface3D.show(_currentSurface);
+            VotexSurface3D.show(_currentSurface, _currentStructures, _currentWallCues);
           } else {
             VotexColorizer.showToast('3D yüzey için WASM gerekli', 'error');
           }
@@ -206,7 +219,7 @@ function bindSurface3D() {
       }
       return;
     }
-    VotexSurface3D.show(_currentSurface);
+    VotexSurface3D.show(_currentSurface, _currentStructures, _currentWallCues);
   });
 }
 
@@ -292,6 +305,8 @@ function handleFile(file) {
         // Clear previous anomaly overlay + surface for the new map
         VotexOverlay.clear();
         _currentSurface = null;
+        _currentStructures = null;
+        _currentWallCues = null;
 
         // Save GPS location for this map
         const location = VotexGPS.saveLocationForMap(file.name);

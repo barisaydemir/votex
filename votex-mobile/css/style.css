@@ -830,6 +830,23 @@ html, body {
   cursor: grabbing;
 }
 
+.surface3d-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.surface3d-footer {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.surface3d-hint {
+  font-size: 10px;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+}
+
 /* Utilities */
 .hidden {
   display: none !important;

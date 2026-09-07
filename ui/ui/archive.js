@@ -1,9 +1,11 @@
-import { listArchive, loadArchive, deleteArchive } from "../api/tauri.js";
+import { listArchive, loadArchive, loadLegacyArchive, deleteArchive } from "../api/tauri.js";
 import { $, state } from "../app/state.js";
 import { setStatus } from "../app/status.js";
 import { logLine } from "./telemetry.js";
 import { restoreSoilFromArchive } from "./soilProfile.js";
 import { updateShotHint } from "./shotType.js";
+import { clearStructures, ensureViewer } from "../viewer/scene.js";
+import { addLegacyDikShapesToScene } from "../viewer/legacyDikOverlay.js";
 
 /** @type {((surface: any, minConf?: number) => any) | null} */
 let applySurfaceFn = null;
@@ -39,6 +41,15 @@ function viewLabel(mode) {
   return mode === "top" || mode === "dik" ? "Dik" : "Yan";
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 export async function refreshArchiveList() {
   const host = $("archive-list");
   if (!host) return;
@@ -52,16 +63,20 @@ export async function refreshArchiveList() {
       .map((e) => {
         const id = e.id;
         const name = e.fileName || e.file_name || "harita";
+        const safeName = escapeHtml(name);
         const when = fmtWhen(e.createdAt || e.created_at);
         const view = viewLabel(e.viewMode || e.view_mode);
         const rooms = e.rooms ?? 0;
         const tunnels = e.tunnels ?? 0;
         const metals = e.metals ?? 0;
         const accepted = e.accepted ?? 0;
-        return `<div class="archive-row" data-id="${id}">
+        const sourceKind = e.sourceKind || e.source_kind || "image";
+        const sourceLabel = sourceKind === "legacy_dik_json" ? "JSON dik" : view;
+        return `<div class="archive-row" data-id="${id}" data-source-kind="${sourceKind}">
+
           <div class="archive-meta">
-            <strong class="archive-name" title="${name}">${name}</strong>
-            <span class="archive-sub">${when} · ${view} · kabul ${accepted} · ${rooms} oda · ${tunnels} tünel · ${metals} metal</span>
+            <strong class="archive-name" title="${safeName}">${safeName}</strong>
+            <span class="archive-sub">${when} · ${sourceLabel} · kabul ${accepted} · ${rooms} oda · ${tunnels} tünel · ${metals} metal</span>
           </div>
           <div class="archive-actions">
             <button type="button" class="mil compact archive-open" data-id="${id}">Aç</button>
@@ -73,6 +88,33 @@ export async function refreshArchiveList() {
   } catch (err) {
     host.innerHTML = `<p class="hint compact">Arşiv okunamadı: ${err}</p>`;
     console.warn("archive list:", err);
+  }
+}
+
+async function openLegacyEntry(id) {
+  try {
+    setStatus("JSON arşivi açılıyor…");
+    const loaded = await loadLegacyArchive(id);
+    if (!loaded?.result) throw new Error("JSON analiz sonucu eksik");
+    ensureViewer();
+    clearStructures();
+    state.surfaceState = null;
+    state.pendingFile = null;
+    state.legacyDikResult = loaded.result;
+    state.legacyDikFileName = loaded.meta?.fileName || loaded.meta?.file_name || "legacy_dik.json";
+    state.legacyDikRawContent = loaded.content || null;
+    addLegacyDikShapesToScene(loaded.result);
+    const fileLabel = $("file-name");
+    if (fileLabel) fileLabel.textContent = `${state.legacyDikFileName} (JSON arşiv)`;
+    const status = $("legacy-dik-status");
+    if (status) status.textContent = `${state.legacyDikFileName} · arşivden yüklendi · ${loaded.result.message || ""}`;
+    const clearBtn = $("btn-legacy-dik-clear");
+    if (clearBtn) clearBtn.disabled = false;
+    setStatus(`JSON arşivi yüklendi — ${state.legacyDikFileName}`);
+    logLine(`JSON arşivi açıldı · ${state.legacyDikFileName}`, "ok");
+  } catch (err) {
+    setStatus(`JSON arşivi açılamadı: ${err}`);
+    logLine(`JSON arşivi açma: ${err}`, "err");
   }
 }
 
@@ -137,7 +179,13 @@ export function bindArchiveUi() {
   host?.addEventListener("click", (e) => {
     const openBtn = e.target.closest(".archive-open");
     if (openBtn) {
-      openEntry(openBtn.getAttribute("data-id"));
+      const row = openBtn.closest(".archive-row");
+      const sourceKind = row?.getAttribute("data-source-kind") || "image";
+      if (sourceKind === "legacy_dik_json") {
+        openLegacyEntry(openBtn.getAttribute("data-id"));
+      } else {
+        openEntry(openBtn.getAttribute("data-id"));
+      }
       return;
     }
     const delBtn = e.target.closest(".archive-del");

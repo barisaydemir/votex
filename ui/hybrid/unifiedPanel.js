@@ -186,19 +186,25 @@ async function handleStart() {
 
 // ── Sonuçları Göster ──
 
-function showResults(result) {
+export function showResults(result) {
   const resultsEl = document.getElementById('unified-results');
   if (!resultsEl) return;
 
   // 2D harita
   const mapCanvas = document.getElementById('unified-map-canvas');
   if (mapCanvas) {
-    const drawn = createUnified2DMap(result.imageGrid, state.csvData?.points || [], 300, 150, 500);
+    const drawn = createUnified2DMap(result.imageGrid, state.csvData?.points || [], 300, 150, 500, result.edgeAnalysis);
     const ctx = mapCanvas.getContext('2d');
     mapCanvas.width = 300;
     mapCanvas.height = 150;
     ctx.clearRect(0, 0, 300, 150);
     ctx.drawImage(drawn, 0, 0);
+  }
+
+  const edgeStats = document.getElementById('unified-edge-stats');
+  if (edgeStats && result.edgeAnalysis) {
+    const edge = result.edgeAnalysis;
+    edgeStats.textContent = `Resim işlem çıktısı · Kenar hücresi: ${edge.edgeCellCount} · |∇B| ort: ${edge.gradient.meanMagnitude.toFixed(3)} · ${edge.contours.levels.length} iso-seviye`;
   }
 
   // İstatistikler

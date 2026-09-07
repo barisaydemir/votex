@@ -30,6 +30,9 @@ pub struct Surface3D {
     pub depth_range_m: f32,
     pub view_mode: String,
     pub structures: UndergroundStructures,
+    /// Resimden çıkarılan kenar/gradyan ve iso-nT işlem bulguları.
+    #[serde(default)]
+    pub edge_analysis: ImageEdgeAnalysis,
     /// Beyaz duvar ipu?lar? (normalize 0?1, k?rp?lm?? harita)
     #[serde(default)]
     pub wall_cues: Vec<WallCue>,
@@ -49,6 +52,32 @@ pub struct Surface3D {
 
 fn default_one() -> f32 {
     1.0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageEdgeAnalysis {
+    pub grid_w: u32,
+    pub grid_h: u32,
+    #[serde(default)]
+    pub gradient_x: Vec<f32>,
+    #[serde(default)]
+    pub gradient_y: Vec<f32>,
+    #[serde(default)]
+    pub magnitude: Vec<f32>,
+    #[serde(default)]
+    pub max_magnitude: f32,
+    #[serde(default)]
+    pub mean_magnitude: f32,
+    #[serde(default)]
+    pub edge_cell_count: u32,
+    #[serde(default)]
+    pub edge_threshold: f32,
+    /// [x0, y0, x1, y1, level] — normalize grid coordinates + nT level.
+    #[serde(default)]
+    pub contour_segments: Vec<[f32; 5]>,
+    #[serde(default)]
+    pub contour_levels: Vec<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
