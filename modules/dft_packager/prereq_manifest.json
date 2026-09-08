@@ -1,0 +1,63 @@
+{
+  "product": "DFT_Suite",
+  "version": "1.2.0",
+  "min_disk_gb": 6,
+  "arch": "x64",
+  "note": "VOTEX (Tauri) ve DTA (Python) AYRI programlar. VOTEX saha: Node+Rust+WebView2+VC++. DTA saha: gomulu Python+wheels/venv.",
+  "prereqs": [
+    {
+      "id": "nodejs",
+      "label": "Node.js LTS (VOTEX)",
+      "product": "votex",
+      "detect": "node",
+      "min_version": "18.0.0",
+      "payload": "runtimes/node-lts-x64.msi",
+      "silent_args": ["/qn", "/norestart"]
+    },
+    {
+      "id": "rust",
+      "label": "Rust + Cargo (VOTEX)",
+      "product": "votex",
+      "detect": "cargo",
+      "payload": "runtimes/rustup-init.exe",
+      "silent_args": ["-y", "--default-toolchain", "stable"]
+    },
+    {
+      "id": "webview2",
+      "label": "WebView2 Runtime (VOTEX)",
+      "product": "votex",
+      "detect": "webview2",
+      "payload": "runtimes/MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
+      "silent_args": ["/silent", "/install"]
+    },
+    {
+      "id": "vcredist",
+      "label": "VC++ Redistributable (VOTEX)",
+      "product": "votex",
+      "detect": "vcredist",
+      "payload": "runtimes/VC_redist.x64.exe",
+      "silent_args": ["/install", "/quiet", "/norestart"]
+    },
+    {
+      "id": "python312",
+      "label": "DTA gomulu Python 3.12",
+      "product": "dta",
+      "detect": "python_embed",
+      "payload": "apps/dta/runtime/python312-amd64",
+      "copy_to": "apps/dta/runtime/python312-amd64"
+    }
+  ],
+  "apps": {
+    "votex": {
+      "src": "apps/votex",
+      "dest": "%LOCALAPPDATA%/Programs/VOTEX",
+      "needs": ["nodejs", "rust", "webview2", "vcredist"]
+    },
+    "dta": {
+      "src": "apps/dta",
+      "dest": "%LOCALAPPDATA%/Programs/DerinTaramaAsistan",
+      "needs": ["python312"]
+    }
+  },
+  "deny_list": ["dft_license_issuer", "**/src-tauri/target"]
+}

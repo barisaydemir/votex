@@ -23,3 +23,20 @@ votex-wasm/target/
 # Şekil doğrulama fikstürü (cargo test üretir)
 dev/contour-fixture.js
 dev/contour-verify-standalone.html
+
+# Lisans modülleri — HMAC imza seed'i içerir, public repoya girmez
+modules/dft_license/
+modules/dft_license_issuer/
+
+# Kişisel yazışma / müşteri dokümanları
+docs/
+
+# Packager geliştirme çıktıları (runtimes + staging ~1.5 GB)
+modules/dft_packager/staging/
+modules/dft_packager/payload/
+
+# Python önbellekleri
+__pycache__/
+
+# Freebuff masaüstü durum dosyaları
+.freebuff/
