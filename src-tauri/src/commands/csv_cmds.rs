@@ -192,13 +192,19 @@ pub fn analyze_legacy_dik_json(
     file_name: Option<String>,
     scan_step_count: Option<u32>,
     scan_step_spacing_m: Option<f32>,
+    depth_params: Option<crate::legacy_mag_json::LegacyDepthParams>,
 ) -> Result<crate::legacy_mag_json::LegacyDikResult, String> {
     if content.trim().is_empty() {
         return Err("JSON içeriği boş".into());
     }
     if !crate::legacy_mag_json::looks_like_legacy_dik(content.as_str(), file_name.as_deref()) {
-        // Yine de parse dene — imza gevşek olabilir
-        let _ = file_name;
+        return Err(format!(
+            "Bu dosya Legacy3DMag dik çekim formatında değil{}",
+            file_name
+                .as_deref()
+                .map(|n| format!(" ({n})"))
+                .unwrap_or_default()
+        ));
     }
     if scan_step_count.unwrap_or(0) > 10000 {
         return Err("Adım sayısı 10000 değerinden büyük olamaz".into());
@@ -208,10 +214,14 @@ pub fn analyze_legacy_dik_json(
             return Err("Yatay adım ölçüsü 0'dan büyük ve 1000 m'den küçük olmalıdır".into());
         }
     }
-    crate::legacy_mag_json::analyze_legacy_dik_with_step_spacing(
+    let params = depth_params
+        .unwrap_or_else(|| crate::app_settings::load_settings().legacy_depth_params)
+        .clamped();
+    crate::legacy_mag_json::analyze_legacy_dik_with_options(
         &content,
         scan_step_count,
         scan_step_spacing_m,
+        params,
     )
 }
 

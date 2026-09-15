@@ -9,6 +9,7 @@ import { state } from "../app/state.js";
 import { invalidate } from "./scene.js";
 
 const OVERLAY_GRID = 128;
+const MAX_ADAPTIVE_GRID = 256;
 const OVERLAY_Y_BIAS = 0.02;
 const DEFAULT_OPACITY = 0.45;
 const MAGNETIC_MODE = "magnetic";
@@ -68,6 +69,16 @@ export function binToGroundGrid(points, mapW, mapD, gridRes) {
   return { grid, counts, gridRes };
 }
 
+/**
+ * Choose a useful grid without making sparse surveys needlessly expensive.
+ * Callers can still pass gridRes explicitly for reproducible exports/tests.
+ */
+export function chooseAdaptiveGridResolution(pointCount) {
+  const count = Math.max(0, Number(pointCount) || 0);
+  if (count >= 5000) return MAX_ADAPTIVE_GRID;
+  if (count >= 800) return OVERLAY_GRID;
+  return 64;
+}
 function validCell(grid, counts, idx) {
   return counts[idx] > 0 && Number.isFinite(grid[idx]);
 }
@@ -136,7 +147,7 @@ export function computeGradientField(grid, counts, gridRes, mapW, mapD) {
   return { gradientX, gradientZ, magnitude, maxMagnitude };
 }
 
-function gridToTexture(grid, counts, gridRes, mode) {
+function gridToTexture(grid, counts, gridRes, mode, scaleLow = null, scaleHigh = null) {
   const n = gridRes * gridRes;
   const data = new Uint8Array(n * 4);
   let min = mode === GRADIENT_MODE ? 0 : Infinity;
@@ -149,6 +160,8 @@ function gridToTexture(grid, counts, gridRes, mode) {
   }
   if (!Number.isFinite(min)) min = 0;
   if (!Number.isFinite(max) || max <= min) max = min + 1;
+  if (Number.isFinite(scaleLow)) min = scaleLow;
+  if (Number.isFinite(scaleHigh)) max = Math.max(min + 1e-9, scaleHigh);
   const range = max - min;
 
   for (let i = 0; i < n; i++) {
@@ -260,22 +273,31 @@ export function computeMagneticContourSegments(grid, counts, gridRes, mapW, mapD
 
 function buildMagneticContours(grid, counts, gridRes, mapW, mapD, visible) {
   const levels = getMagneticContourLevels(grid, counts);
-  const positions = computeMagneticContourSegments(grid, counts, gridRes, mapW, mapD, levels);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  const material = new THREE.LineBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.82,
-    depthWrite: false,
+  const group = new THREE.Group();
+  group.name = "magneticIsoContours";
+  group.visible = visible;
+  group.userData.contourLevels = levels;
+
+  levels.forEach((level, index) => {
+    const positions = computeMagneticContourSegments(grid, counts, gridRes, mapW, mapD, [level]);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    const t = (index + 1) / (levels.length + 1);
+    const material = new THREE.LineBasicMaterial({
+      color: new THREE.Color().setHSL(0.08 + t * 0.55, 0.9, 0.68),
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+    });
+    const line = new THREE.LineSegments(geometry, material);
+    line.name = `magneticIsoContour-${index + 1}`;
+    line.renderOrder = 2;
+    line.userData.level = level;
+    group.add(line);
   });
-  const lines = new THREE.LineSegments(geometry, material);
-  lines.name = "magneticIsoContours";
-  lines.visible = visible;
-  lines.renderOrder = 2;
-  lines.userData.contourLevels = levels;
-  return lines;
+  return group;
 }
+
 
 function buildGradientArrows(gradient, counts, gridRes, mapW, mapD, visible) {
   const group = new THREE.Group();
@@ -330,7 +352,7 @@ export function buildGroundMagneticOverlay(csvGroup, surface, opts = {}) {
 
   const mapW = Number(surface.mapWidthM ?? surface.map_width_m ?? surface.mapSizeM ?? 24);
   const mapD = Number(surface.mapDepthM ?? surface.map_depth_m ?? mapW);
-  const gridRes = opts.gridRes || OVERLAY_GRID;
+  const gridRes = opts.gridRes || chooseAdaptiveGridResolution(normPoints.length);
   const opacity = opts.opacity ?? state.magneticOverlayOpacity ?? DEFAULT_OPACITY;
   const mode = opts.mode === GRADIENT_MODE ? GRADIENT_MODE : MAGNETIC_MODE;
   const showArrows = opts.showArrows ?? state.magneticOverlayArrows ?? true;
@@ -346,7 +368,14 @@ export function buildGroundMagneticOverlay(csvGroup, surface, opts = {}) {
 
   const gradient = computeGradientField(grid, counts, gridRes, mapW, mapD);
   const displayGrid = mode === GRADIENT_MODE ? gradient.magnitude : grid;
-  const texture = gridToTexture(displayGrid, counts, gridRes, mode);
+  const texture = gridToTexture(
+    displayGrid,
+    counts,
+    gridRes,
+    mode,
+    opts.scaleLow,
+    opts.scaleHigh,
+  );
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(mapW, mapD).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({
@@ -365,7 +394,7 @@ export function buildGroundMagneticOverlay(csvGroup, surface, opts = {}) {
   const overlay = new THREE.Group();
   overlay.name = "groundMagneticOverlay";
   overlay.userData.votexLayer = "csv";
-  overlay.userData.mode = mode;
+  overlay.userData.gridRes = gridRes;
   overlay.userData.gradientField = gradient;
   overlay.userData.heatmap = mesh;
   overlay.userData.arrows = buildGradientArrows(gradient, counts, gridRes, mapW, mapD, showArrows);
@@ -389,6 +418,8 @@ export function updateGroundMagneticOverlay(csvGroup, surface) {
     opacity: state.magneticOverlayOpacity,
     showArrows: state.magneticOverlayArrows,
     showContours: state.magneticOverlayContours,
+    scaleLow: state.magneticOverlayAutoScale ? null : state.magneticOverlayScaleLow,
+    scaleHigh: state.magneticOverlayAutoScale ? null : state.magneticOverlayScaleHigh,
   });
   if (!overlay) return;
   scene.add(overlay);

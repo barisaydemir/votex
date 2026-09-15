@@ -58,6 +58,8 @@ import { clusterStructures, formatClusterHTML, getClusterStats } from "./viewer/
 import { initBatchDta, batchState } from "./ui/batchDta.js";
 import { metalAlarm } from "./viewer/metalAlarm.js";
 import { bindAutoTune, hideCard as hideAutoTuneCard } from "./ui/autoTunePanel.js";
+import { init3DViewEnhancements, refreshSelectedGuides } from "./viewer/viewEnhancements.js";
+import { initDepthSliceAnimation } from "./viewer/depthSliceAnimator.js";
 
 await initI18n();
 initTheme();
@@ -120,8 +122,8 @@ function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false,
   // İpuçlarını göster (DTA/Image analizinden)
   try {
     showHints(state.scene, surface.structures, {
-      mapW: Number(surface.mapWidthM ?? surface.map_width_m ?? surface.mapSizeM ?? surface.map_size_m ?? 24),
-      mapD: Number(surface.mapDepthM ?? surface.map_depth_m ?? surface.mapWidthM ?? surface.map_width_m ?? 24),
+      mapW: Number(surface._computedMapW ?? surface.mapWidthM ?? surface.map_width_m ?? surface.mapSizeM ?? surface.map_size_m ?? 24),
+      mapD: Number(surface._computedMapD ?? surface.mapDepthM ?? surface.map_depth_m ?? surface.mapWidthM ?? surface.map_width_m ?? 24),
       vertExag,
       source: "dta",
     });
@@ -131,6 +133,7 @@ function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false,
   renderStructureList(surface);
   renderFreeDrawPanel();
   renderIntelSummary(surface);
+  window.dispatchEvent(new CustomEvent("votex:surface-applied"));
   // Kümeleme butonunu aktifleştir
   const clusterBtn2 = $("cluster-run");
   if (clusterBtn2) clusterBtn2.disabled = false;
@@ -536,6 +539,7 @@ async function build3D() {
       );
     }
     setStatus(t("msg.ready3d", { view: stats.viewLabel }));
+    refreshSelectedGuides();
     refreshDtaLink();
     if (focusBestValuableMetal(surface)) logLine(t("msg.metalFocus"), "ok");
   } catch (e) {
@@ -1004,6 +1008,8 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
   });
   // Klavye kısayolları (K kesit · X X-Ray · ↑/↓ yükseklik)
   bindViewerKeys();
+  init3DViewEnhancements();
+  initDepthSliceAnimation();
 
   // ── Undo/Redo Kısayolları ──
   function updateUndoRedoUI() {
@@ -1420,9 +1426,12 @@ import("./viewer/groundMagneticOverlay.js").then((mod) => {
   const modeSelect = document.getElementById("mag-ground-mode");
   const arrowsCheck = document.getElementById("mag-ground-arrows");
   const contoursCheck = document.getElementById("mag-ground-contours");
+  const autoScaleCheck = document.getElementById("mag-ground-auto-scale");
+  const scaleLowInput = document.getElementById("mag-ground-scale-low");
+  const scaleHighInput = document.getElementById("mag-ground-scale-high");
   const rebuild = () => {
     if (state.csvOverlay && state.showMagneticGround) {
-      mod.updateGroundMagneticOverlay(state.csvOverlay, state.surface || state.surfaceState);
+      mod.updateGroundMagneticOverlay(state.csvOverlay, state.surfaceState);
     }
   };
   if (chk) {
@@ -1450,6 +1459,23 @@ import("./viewer/groundMagneticOverlay.js").then((mod) => {
       mod.setMagneticOverlayContours(contoursCheck.checked);
     });
   }
+  if (autoScaleCheck) {
+    autoScaleCheck.addEventListener("change", () => {
+      state.magneticOverlayAutoScale = autoScaleCheck.checked;
+      if (scaleLowInput) scaleLowInput.disabled = autoScaleCheck.checked;
+      if (scaleHighInput) scaleHighInput.disabled = autoScaleCheck.checked;
+      rebuild();
+    });
+  }
+  const updateManualScale = () => {
+    const low = Number(scaleLowInput?.value);
+    const high = Number(scaleHighInput?.value);
+    state.magneticOverlayScaleLow = Number.isFinite(low) ? low : null;
+    state.magneticOverlayScaleHigh = Number.isFinite(high) ? high : null;
+    rebuild();
+  };
+  scaleLowInput?.addEventListener("change", updateManualScale);
+  scaleHighInput?.addEventListener("change", updateManualScale);
   if (slider) {
     slider.addEventListener("input", () => {
       const v = Number(slider.value) / 100;
@@ -1704,7 +1730,7 @@ if (viewerEl3d) {
       const hits = rc.intersectObjects(state.scene.children, true);
       if (handleMeasurementClick(hits)) {
         const result = getMeasurementResult();
-        if (result) setStatus(`Ölçüm: ${result}`);
+        if (result) setStatus(`Ölçüm: ${result.text}`);
       }
     });
   }
@@ -1712,6 +1738,15 @@ if (viewerEl3d) {
 
 // ── Veri Filtreleme Paneli ──
 bindFilterPanel();
+window.addEventListener("votex:highlight-detection", (event) => {
+  const id = event.detail?.id;
+  if (!id || !state.csvData || !state.csvStructures) return;
+  const entry = state.structureTargets?.[id];
+  if (entry?.csvKind != null && entry.csvIndex != null) {
+    state.csvHighlightDet = { type: entry.csvKind, idx: entry.csvIndex };
+    window.dispatchEvent(new CustomEvent("votex:rebuild-csv"));
+  }
+});
 window.addEventListener("votex:filter-change", () => {
   if (state.surfaceState) {
     logLine("Filtre değişikliği — sahne yeniden oluşturuluyor", "info");

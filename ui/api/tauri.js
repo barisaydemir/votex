@@ -40,6 +40,18 @@ export function setHints3dVisible(enabled) {
   return invoke("set_hints_3d_visible", { enabled });
 }
 
+export function setLegacyDepthParams(params = {}) {
+  return invoke("set_legacy_depth_params", {
+    sensorHeightM: params.sensorHeightM ?? null,
+    bipolarSepFactor: params.bipolarSepFactor ?? null,
+    dipoleBlend: params.dipoleBlend ?? null,
+  });
+}
+
+export function setLegacyDepthCalibNotes(notes = []) {
+  return invoke("set_legacy_depth_calib_notes", { notes: Array.isArray(notes) ? notes : [] });
+}
+
 export function setCsvFilterPrefs(prefs) {
   return invoke("set_csv_filter_prefs", prefs);
 }
@@ -164,7 +176,7 @@ export function parseExcelData(base64Content) {
   return invoke("parse_excel_data", { base64Content });
 }
 
-export function analyzeLegacyDikJson(content, fileName, scanStepCount = 0, scanStepSpacingM = 0) {
+export function analyzeLegacyDikJson(content, fileName, scanStepCount = 0, scanStepSpacingM = 0, depthParams = null) {
   return invoke("analyze_legacy_dik_json", {
     content,
     fileName: fileName ?? null,
@@ -172,6 +184,7 @@ export function analyzeLegacyDikJson(content, fileName, scanStepCount = 0, scanS
     scanStepSpacingM: Number.isFinite(Number(scanStepSpacingM)) && Number(scanStepSpacingM) > 0
       ? Number(scanStepSpacingM)
       : null,
+    depthParams: depthParams && typeof depthParams === "object" ? depthParams : null,
   });
 }
 

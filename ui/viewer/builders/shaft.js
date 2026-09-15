@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { state } from "../../app/state.js";
 import { colorByDepth, edgeColorByDepth, formatDepthM } from "../colors.js";
 import { makeBadgeSprite, makeDetailSprite } from "../labels.js";
-import { mapToWorld } from "../coords.js";
+import { recordPointToWorld } from "../coords.js";
 import { t } from "../../i18n/index.js";
 
 /** Dikey şaft — konum blob (cx,cy); gövde −Y. */
@@ -13,7 +13,7 @@ export function makeShaft(ch, mapW, mapD, vertExag, wireframe, id, num, sideView
   const wM = ch.widthM ?? ch.width_m ?? 1.5;
   const lM = ch.lengthM ?? ch.length_m ?? wM;
   const diam = Math.max(Math.min(wM, lM), 0.45);
-  const { x, z } = mapToWorld(Math.max(0, Math.min(1, ch.cx)), Math.max(0, Math.min(1, ch.cy)), mapW, mapD, sideView);
+  const { x, z } = recordPointToWorld(ch, "cx", "cy", mapW, mapD, sideView);
   const rTop = diam * 0.52;
   const rBot = diam * 0.45;
   const sy = hM * vertExag;

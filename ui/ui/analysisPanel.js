@@ -3,10 +3,13 @@
  * analysis_report.rs modülünün çıktısını UI'da sunar.
  */
 import { state } from "../app/state.js";
+import { dimensionsOf, volumeM3Of, formatVolumeM3 } from "../viewer/volume.js";
+
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "../i18n/index.js";
 import { focusStructure } from "../viewer/labels.js";
 import { attachNoteButtons } from "./detectionNotes.js";
+import { buildLegacyFieldModel, statusLabel, escapeLegacyHtml } from "../viewer/legacyDikModel.js";
 
 let _panel = null;
 let _currentReport = null;
@@ -26,6 +29,10 @@ export function toggleAnalysisPanel() {
  * Analiz raporu panelini göster.
  */
 export async function showAnalysisPanel() {
+  if (state.legacyDikResult) {
+    renderLegacyFieldReport(state.legacyDikResult);
+    return;
+  }
   // Mevcut yapısal verileri al
   const surface = state.surfaceState;
   if (!surface) {
@@ -53,6 +60,41 @@ export async function showAnalysisPanel() {
   } catch (err) {
     showEmptyState(`Rapor üretilemedi: ${err}`);
   }
+}
+
+function renderLegacyFieldReport(result) {
+  ensurePanel();
+  const model = state.legacyFieldModel || buildLegacyFieldModel(result);
+  state.legacyFieldModel = model;
+  const strong = model.detections.filter((detection) => detection.status === "strong");
+  const first = strong[0] || model.detections[0];
+  const safe = escapeLegacyHtml;
+  const detectionCards = model.detections.map((detection, index) => `
+    <article class="ap-field-detection" data-legacy-detection="${detection.detectionId}">
+      <div class="ap-field-detection-head"><b>#${index + 1} · ${safe(detection.type)}</b><span class="ap-field-status ${detection.status}">${statusLabel(detection.status)}</span></div>
+      <div>Adım ${detection.stepIndex ?? "—"} · Hat metresi <b>${detection.stationM.toFixed(2)} m</b> · Adım içi offset <b>${detection.offsetM >= 0 ? "+" : ""}${detection.offsetM.toFixed(2)} m</b></div>
+      <div>Derinlik <b>${detection.depthTopM.toFixed(2)}–${detection.depthBottomM.toFixed(2)} m</b> · Güven <b>%${Math.round(detection.confidence * 100)}</b> · Güç ${detection.strength.toFixed(1)}σ</div>
+      <div><b>Ölçü</b> ${detection.dimensions.width.toFixed(2)} × ${detection.dimensions.length.toFixed(2)} × ${detection.dimensions.height.toFixed(2)} m · <b>Yaklaşık hacim</b> ${formatVolumeM3(detection.volumeM3)}</div>
+      <div class="ap-field-recommendation">Öneri: ${safe(detection.recommendation)}</div>
+      <div class="ap-field-actions"><button type="button" class="mil" data-legacy-report-show="${detection.detectionId}">3D’de göster</button><button type="button" class="mil" data-legacy-report-only="${detection.detectionId}">Sadece bunu göster</button></div>
+    </article>`).join("");
+  _panel.innerHTML = `
+    <div class="ap-header"><span class="ap-title">📊 Saha Sonucu · LEGACY3DMAG</span><button class="ap-close" onclick="this.closest('.ap-panel').style.display='none'">×</button></div>
+    <div class="ap-summary"><b>${model.steps.length} adım</b> · <b>${model.detections.length} tespit</b> · <b>${strong.length} güçlü</b>${first ? `<br/><strong>${safe(first.type)}</strong> · Adım ${first.stepIndex ?? "—"} · ${first.stationM.toFixed(2)} m · ${first.depthTopM.toFixed(2)}–${first.depthBottomM.toFixed(2)} m · %${Math.round(first.confidence * 100)}<br/><span class="ap-field-recommendation">${safe(first.recommendation)}</span>` : "<br/>Önemli tespit bulunamadı."}</div>
+    <div class="ap-section"><h3>🔍 Tespitler — ayrı ayrı incele</h3>${detectionCards || `<div class="ap-info">Tespit bulunamadı.</div>`}</div>`;
+  _panel.style.display = "block";
+  _panel.querySelectorAll("[data-legacy-report-show]").forEach((button) => button.addEventListener("click", () => {
+    const id = button.dataset.legacyReportShow;
+    const detection = model.detections.find((item) => item.detectionId === id);
+    if (!detection) return;
+    import("../viewer/legacyDikOverlay.js").then(({ focusLegacyDetection }) => focusLegacyDetection(id));
+    if (!String(id).startsWith("legacy-dik-") && state.structureTargets[id]) focusStructure(id);
+  }));
+  _panel.querySelectorAll("[data-legacy-report-only]").forEach((button) => button.addEventListener("click", () => {
+    const id = button.dataset.legacyReportOnly;
+    import("../viewer/legacyDikOverlay.js").then(({ focusLegacyDetection }) => focusLegacyDetection(id));
+    if (!String(id).startsWith("legacy-dik-") && state.structureTargets[id]) focusStructure(id);
+  }));
 }
 
 /**
@@ -240,7 +282,7 @@ function addStyles() {
       position: fixed;
       top: 60px;
       right: 20px;
-      width: 380px;
+      width: min(720px, calc(100vw - 40px));
       max-height: calc(100vh - 80px);
       background: #1a1a2e;
       border: 1px solid #333;
@@ -278,14 +320,16 @@ function addStyles() {
     }
     .ap-close:hover { color: #fff; }
     .ap-summary {
-      padding: 12px 16px;
+      padding: 14px 18px;
       background: #16213e;
-      font-size: 13px;
-      color: #aaa;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #c7d0da;
       border-bottom: 1px solid #333;
+      overflow-wrap: anywhere;
     }
     .ap-section {
-      padding: 12px 16px;
+      padding: 14px 18px;
       border-bottom: 1px solid #222;
     }
     .ap-section h3 {
@@ -294,19 +338,22 @@ function addStyles() {
       color: #888;
     }
     .ap-priority {
-      padding: 6px 10px;
-      margin: 4px 0;
+      padding: 8px 12px;
+      margin: 5px 0;
       background: #0f3460;
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 13px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
     }
     .ap-card {
-      margin: 8px 0;
-      padding: 10px 12px;
+      margin: 10px 0;
+      padding: 13px 15px;
       background: #16213e;
       border-radius: 8px;
       cursor: pointer;
       transition: background 0.15s, transform 0.15s;
+      overflow-wrap: anywhere;
     }
     .ap-card:hover {
       background: #1b2a4a;
@@ -318,26 +365,34 @@ function addStyles() {
     .ap-card-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 9px;
     }
     .ap-card-title {
-      font-size: 13px;
-      font-weight: 500;
+      min-width: 0;
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 600;
+      overflow-wrap: anywhere;
     }
     .ap-card-badge {
-      font-size: 11px;
-      padding: 2px 8px;
+      flex: 0 0 auto;
+      white-space: nowrap;
+      font-size: 12px;
+      padding: 3px 9px;
       border-radius: 10px;
       color: #000;
       font-weight: 600;
     }
     .ap-card-details {
-      font-size: 12px;
-      color: #aaa;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #b8c2cc;
+      overflow-wrap: anywhere;
     }
     .ap-detail {
-      padding: 2px 0;
+      padding: 3px 0;
     }
     .ap-card-warnings {
       margin-top: 8px;
@@ -345,9 +400,11 @@ function addStyles() {
       border-top: 1px solid #333;
     }
     .ap-warning {
-      font-size: 12px;
+      font-size: 13px;
+      line-height: 1.45;
       color: #f59e0b;
-      padding: 2px 0;
+      padding: 3px 0;
+      overflow-wrap: anywhere;
     }
     .ap-card-recommendations {
       margin-top: 8px;
@@ -355,19 +412,53 @@ function addStyles() {
       border-top: 1px solid #333;
     }
     .ap-recommendation {
-      font-size: 12px;
+      font-size: 13px;
+      line-height: 1.45;
       color: #22c55e;
-      padding: 2px 0;
+      padding: 3px 0;
+      overflow-wrap: anywhere;
     }
     .ap-empty {
-      padding: 24px;
+      padding: 30px;
       text-align: center;
       color: #666;
+    }
+    @media (max-width: 760px) {
+      .ap-panel {
+        top: 12px;
+        right: 12px;
+        width: calc(100vw - 24px);
+        max-height: calc(100vh - 24px);
+      }
+      .ap-card-header {
+        flex-direction: column;
+        gap: 7px;
+      }
+      .ap-card-badge {
+        align-self: flex-start;
+      }
     }
     .ap-info {
       font-size: 12px;
       color: #aaa;
     }
+    .ap-field-detection {
+      margin: 10px 0;
+      padding: 12px 14px;
+      border: 1px solid #334155;
+      border-left: 4px solid #64748b;
+      border-radius: 8px;
+      background: #101a2c;
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+    .ap-field-detection-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:5px; }
+    .ap-field-status { flex:0 0 auto; font-size:11px; font-weight:700; padding:2px 7px; border-radius:10px; color:#07110c; background:#94a3b8; }
+    .ap-field-status.strong { background:#fb7185; }
+    .ap-field-status.attention { background:#facc15; }
+    .ap-field-recommendation { color:#86efac; margin-top:5px; }
+    .ap-field-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
   `;
   document.head.appendChild(style);
 }

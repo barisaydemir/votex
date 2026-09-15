@@ -106,6 +106,13 @@ pub struct AppSettings {
     /// Yeraltı filtresi
     #[serde(default = "default_true")]
     pub csv_underground_only: bool,
+
+    /// Legacy JSON derinlik proxy çarpanları (Parametre)
+    #[serde(default)]
+    pub legacy_depth_params: crate::legacy_mag_json::LegacyDepthParams,
+    /// Saha kalibrasyon defteri (etiket + parametre anlık görüntüleri)
+    #[serde(default)]
+    pub legacy_depth_calib_notes: Vec<crate::legacy_mag_json::LegacyDepthCalibNote>,
 }
 
 fn default_soil_profile() -> String {
@@ -204,6 +211,8 @@ impl Default for AppSettings {
             csv_min_strength: default_csv_min_strength(),
             csv_grid_res: default_csv_grid_res(),
             csv_underground_only: true,
+            legacy_depth_params: crate::legacy_mag_json::LegacyDepthParams::default(),
+            legacy_depth_calib_notes: Vec::new(),
         }
     }
 }

@@ -147,6 +147,21 @@ export function syncClipRange(yMin, yMax) {
   refreshClipState();
 }
 
+function updateGroundLOD() {
+  const mesh = state.groundPlane;
+  const levels = mesh?.userData?.lodLevels;
+  if (!mesh || !levels?.length || !state.camera) return;
+  const distance = state.camera.position.distanceTo(mesh.position);
+  const thresholds = mesh.userData.lodThresholds || [60, 120];
+  let target = distance < thresholds[0] ? 0 : distance < thresholds[1] ? 1 : 2;
+  target = Math.min(target, levels.length - 1);
+  if (target === mesh.userData.lodLevel) return;
+  const next = levels[target];
+  if (!next?.geometry || mesh.geometry === next.geometry) return;
+  mesh.geometry = next.geometry;
+  mesh.userData.lodLevel = target;
+  mesh.userData.lodDistance = distance;
+}
 function tick() {
   // rafId = null: draw=false iken döngüyü durdur; draw=true iken zaten
   // aşağıdaki rAF satırı yeni bir rafId atayacak.
@@ -157,6 +172,7 @@ function tick() {
   needsRender = false;
   if (draw && state.renderer && state.scene && state.camera) {
     rafId = requestAnimationFrame(tick); // döngüyü önce canlandır (invalidate() binden korur)
+    updateGroundLOD();
     updateStageHud();
     updateLabelFade();
     for (const fn of _preRenderHooks) { try { fn(); } catch (_) {} }
@@ -168,6 +184,7 @@ function tick() {
     rafId = null; // çizim yok → döngüyü durdur
   }
 }
+
 
 export function ensureViewer() {
   const host = $("viewer");
@@ -265,8 +282,13 @@ export function clearStructures() {
   state.selectedFreeDrawId = null;
   state.selectedStructureId = null;
   state.legacyDikResult = null;
+  state.legacyFieldModel = null;
+  state.legacySelectedStepIndex = null;
+  state.legacySelectedDetectionId = null;
   state.legacyDikRawContent = null;
   state.legacyDikFileName = null;
+  state.legacyTomographyDepthM = null;
+  state.legacyTomographyPlaying = false;
   if (state.selectionMarker && state.scene) {
     state.scene.remove(state.selectionMarker);
     state.selectionMarker.geometry?.dispose();
@@ -300,7 +322,15 @@ export function clearStructures() {
     state.scene.remove(state.groundPlane);
     // disposeGround textures + geom
     const g = state.groundPlane;
-    g.geometry?.dispose();
+    const lodLevels = g.userData?.lodLevels || [];
+    const disposedGeometries = new Set();
+    lodLevels.forEach(({ geometry }) => {
+      if (geometry && !disposedGeometries.has(geometry)) {
+        geometry.dispose();
+        disposedGeometries.add(geometry);
+      }
+    });
+    if (g.geometry && !disposedGeometries.has(g.geometry)) g.geometry.dispose();
     const tex = g.userData?.mapTexture;
     if (tex) tex.dispose();
     const normalMap = g.userData?.normalMap;
@@ -312,6 +342,14 @@ export function clearStructures() {
     state.groundPlane = null;
   }
   if (state.legacyDikGroup) {
+    state.legacyTomographyVisible = false;
+    state.legacySubsurfaceMapVisible = false;
+    state.legacyGeothermalMapVisible = false;
+    state.legacyDepthMapVisible = false;
+    state.legacyDikGroup.userData.tomographyLayer = null;
+    state.legacyDikGroup.userData.subsurfaceMapLayer = null;
+    state.legacyDikGroup.userData.geothermalMapLayer = null;
+    state.legacyDikGroup.userData.depthMapLayer = null;
     state.scene.remove(state.legacyDikGroup);
     state.legacyDikGroup.traverse((obj) => {
       if (obj.geometry) obj.geometry.dispose();

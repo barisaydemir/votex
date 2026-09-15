@@ -88,8 +88,16 @@ export function handleMeasurementClick(intersects) {
  */
 export function getMeasurementResult() {
   if (_points.length < 2) return null;
-  const dist = _points[0].distanceTo(_points[1]);
-  return `${dist.toFixed(2)} m`;
+  const [a, b] = _points;
+  const dist = a.distanceTo(b);
+  return {
+    distanceM: dist,
+    horizontalM: Math.hypot(b.x - a.x, b.z - a.z),
+    verticalM: Math.abs(b.y - a.y),
+    from: a.clone(),
+    to: b.clone(),
+    text: `${dist.toFixed(2)} m`,
+  };
 }
 
 // ── Dahili ──

@@ -6,6 +6,8 @@ import { restoreSoilFromArchive } from "./soilProfile.js";
 import { updateShotHint } from "./shotType.js";
 import { clearStructures, ensureViewer } from "../viewer/scene.js";
 import { addLegacyDikShapesToScene } from "../viewer/legacyDikOverlay.js";
+import { renderLegacyDikPanel } from "./legacyDikPanel.js";
+import { normalizeLegacyResult } from "../viewer/legacyDikModel.js";
 
 /** @type {((surface: any, minConf?: number) => any) | null} */
 let applySurfaceFn = null;
@@ -100,18 +102,21 @@ async function openLegacyEntry(id) {
     clearStructures();
     state.surfaceState = null;
     state.pendingFile = null;
-    state.legacyDikResult = loaded.result;
-    state.legacyDikFileName = loaded.meta?.fileName || loaded.meta?.file_name || "legacy_dik.json";
+    const fileName = loaded.meta?.fileName || loaded.meta?.file_name || "legacy_dik.json";
+    const normalized = normalizeLegacyResult(loaded.result, state.legacyMatrixHint || null);
     state.legacyDikRawContent = loaded.content || null;
-    addLegacyDikShapesToScene(loaded.result);
+    state.legacySelectedDetectionId = null;
+    const steps = Array.isArray(normalized.scanSteps) ? normalized.scanSteps : [];
+    state.legacySelectedStepIndex = steps.length ? Number(steps[0].index) || 1 : null;
+    addLegacyDikShapesToScene(normalized);
+    renderLegacyDikPanel(normalized, {
+      fileName,
+      statusSuffix: `${normalized.message || "arşivden yüklendi"}`,
+    });
     const fileLabel = $("file-name");
-    if (fileLabel) fileLabel.textContent = `${state.legacyDikFileName} (JSON arşiv)`;
-    const status = $("legacy-dik-status");
-    if (status) status.textContent = `${state.legacyDikFileName} · arşivden yüklendi · ${loaded.result.message || ""}`;
-    const clearBtn = $("btn-legacy-dik-clear");
-    if (clearBtn) clearBtn.disabled = false;
-    setStatus(`JSON arşivi yüklendi — ${state.legacyDikFileName}`);
-    logLine(`JSON arşivi açıldı · ${state.legacyDikFileName}`, "ok");
+    if (fileLabel) fileLabel.textContent = `${fileName} (JSON arşiv)`;
+    setStatus(`JSON arşivi yüklendi — ${fileName}`);
+    logLine(`JSON arşivi açıldı · ${fileName}`, "ok");
   } catch (err) {
     setStatus(`JSON arşivi açılamadı: ${err}`);
     logLine(`JSON arşivi açma: ${err}`, "err");

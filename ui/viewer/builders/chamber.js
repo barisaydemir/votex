@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { state } from "../../app/state.js";
 import { colorByDepth, formatDepthM } from "../colors.js";
 import { makeBadgeSprite, makeDetailSprite } from "../labels.js";
-import { mapToWorld } from "../coords.js";
+import { mapToWorld, recordPointToWorld } from "../coords.js";
 import { makeShaft } from "./shaft.js";
 import { applyTierGhost, makeTierLabel } from "./tierGhost.js";
 import { t } from "../../i18n/index.js";
@@ -48,13 +48,13 @@ export function makeChamber(ch, mapW, mapD, vertExag, wireframe, id, num, sideVi
     return makeShaft(ch, mapW, mapD, vertExag, wireframe, id, num, sideView);
   }
   // Konum = blob (cx,cy) — ortaya çekilmez
-  const { x, z } = mapToWorld(Math.max(0, Math.min(1, ch.cx)), Math.max(0, Math.min(1, ch.cy)), mapW, mapD, sideView);
+  const { x, z } = recordPointToWorld(ch, "cx", "cy", mapW, mapD, sideView);
   const wM = Number(ch.widthM ?? ch.width_m ?? ch.rx * 2 * mapW);
   const lM = Number(ch.lengthM ?? ch.length_m ?? ch.ry * 2 * mapD);
 
   // Yan: Z ince kesit — mavi leke üzerinde; ry×mapD şişirmesi yok
   const sx = Math.max(wM, 0.15);
-  const sz = sideView ? Math.max(Math.min(lM, 1.8), 0.5) : Math.max(lM, 0.15);
+  const sz = Math.max(lM, 0.15);
   const sy = Math.max(hM, 0.15) * vertExag;
   // Yapı gerçek derinliğine gömülür — üst kenarı topM derinliğinde, aşağıya iner
   const y = -(topM * vertExag) - sy * 0.5;

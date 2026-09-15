@@ -1,772 +1,10 @@
-//! Legacy3DMagDevice — dik çekim JSON → anomali / olası yapı şekilleri.
-//!
-//! ELIC colormap ve CSV nokta-bulutu yolundan ayrıdır.
-//! `x,y,z` = manyetik bileşenler; konum = `x_coords` / `y_coords` (metre).
-
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LegacyDikMeta {
-    pub device_code: String,
-    pub date: Option<String>,
-    pub x_meters: f32,
-    pub y_meters: f32,
-    pub version: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LegacyShape {
-    /// anomaly | room | tunnel | metal
-    pub kind: String,
-    pub label: String,
-    /// Plan merkezi (m) — saha orijini sol-alt; UI ortalar
-    pub cx: f32,
-    pub cy: f32,
-    pub rx: f32,
-    pub ry: f32,
-    /// +1 metal/güçlü |B|, -1 zayıf/void benzeri
-    pub polarity: f32,
-    pub strength: f32,
-    pub confidence: f32,
-    pub depth_top_m: f32,
-    pub depth_bottom_m: f32,
-    /// UI mesh: box | cylinder | elongated
-    #[serde(default = "default_mesh_kind")]
-    pub mesh_kind: String,
-    /// Tepe residual (σ biriminde)
-    #[serde(default)]
-    pub peak_sigma: f32,
-    /// Kısa derinlik özeti (TR)
-    #[serde(default)]
-    pub depth_label: String,
-    /// Derinlik tahmin yöntemi: dipole | peters | heuristic.
-    #[serde(default)]
-    pub depth_method: String,
-    /// Normalize edilmiş model uyum hatası (RMS / tepe); 0 daha iyi, 1 zayıf.
-    #[serde(default = "default_depth_fit_error")]
-    pub depth_fit_error: f32,
-    /// Tahmini merkez derinlik çevresindeki belirsizlik yarıçapı (m).
-    #[serde(default)]
-    pub depth_uncertainty_m: f32,
-    /// Belirsizlik aralığı [alt, üst] (m); eski arşivlerde 0 olabilir.
-    #[serde(default)]
-    pub depth_interval_low_m: f32,
-    #[serde(default)]
-    pub depth_interval_high_m: f32,
-    /// Dipol uyumunda kullanılan ölçüm hücresi sayısı.
-    #[serde(default)]
-    pub depth_fit_samples: u32,
-    /// Normalize 0–1 köşe listesi (ayak izi konturu)
-    #[serde(default)]
-    pub polygon: Vec<[f32; 2]>,
-    /// Dairesel, eliptik, kare, dikdörtgen, kapsül, çokgen veya düzensiz.
-    #[serde(default = "default_shape_type")]
-    pub shape_type: String,
-    /// Geometrinin kaynağı: grid-contour veya inferred.
-    #[serde(default)]
-    pub shape_source: String,
-    /// Ana eksenin saha düzlemindeki yönü (derece).
-    #[serde(default)]
-    pub orientation_deg: f32,
-    /// Şekil ayak izinin fiziksel genişliği ve uzunluğu (m).
-    #[serde(default)]
-    pub width_m: f32,
-    #[serde(default)]
-    pub length_m: f32,
-    /// 4πA/P²; 1 daireye, düşük değer düzensiz sınıra yakındır.
-    #[serde(default)]
-    pub roundness: f32,
-    #[serde(default)]
-    pub aspect_ratio: f32,
-    /// Şekil modelinin normalize uyum hatası (0 iyi, 1 zayıf).
-    #[serde(default = "default_shape_fit_error")]
-    pub shape_fit_error: f32,
-    /// Şekil modeline güven skoru (0–1).
-    #[serde(default)]
-    pub shape_confidence: f32,
-    /// Dış konturun içindeki güçlü çekirdek sınırı (%50 tepe konturu).
-    #[serde(default)]
-    pub core_polygon: Vec<[f32; 2]>,
-    /// En güçlü hücrenin gerçek saha koordinatı (m).
-    #[serde(default)]
-    pub peak_x_m: f32,
-    #[serde(default)]
-    pub peak_y_m: f32,
-    /// Ölçülmüş dış konturun fiziksel alanı ve çevresi.
-    #[serde(default)]
-    pub footprint_area_m2: f32,
-    #[serde(default)]
-    pub footprint_perimeter_m: f32,
-    /// Dış konturun üretildiği tepe eşik katsayısı.
-    #[serde(default)]
-    pub contour_threshold_sigma: f32,
-    /// Şablon eşleştirme: room | tunnel | shaft | metal | anomaly ("" eski arşiv).
-    #[serde(default)]
-    pub template_kind: String,
-    /// En iyi şablonun korelasyon + öncül bileşik skoru (0–1).
-    #[serde(default)]
-    pub template_score: f32,
-    /// Tüm şablonların bileşik skorları [(anahtar, skor)].
-    #[serde(default)]
-    pub template_scores: Vec<(String, f32)>,
-}
-
-fn default_mesh_kind() -> String {
-    "box".into()
-}
-
-fn default_depth_fit_error() -> f32 {
-    1.0
-}
-
-fn default_shape_type() -> String {
-    "irregular".into()
-}
-
-fn default_shape_fit_error() -> f32 {
-    1.0
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LegacyScanStep {
-    /// 1 tabanlı kullanıcı adımı.
-    pub index: u32,
-    /// Ham scan.data satır aralığı [başlangıç, bitiş).
-    pub start: usize,
-    pub end: usize,
-    /// Adımın gerçek yatay saha konumu ve kapladığı aralık (m).
-    pub x_start_m: f32,
-    pub x_end_m: f32,
-    pub x_center_m: f32,
-    pub y_start_m: f32,
-    pub y_end_m: f32,
-    pub y_center_m: f32,
-    pub width_m: f32,
-    pub length_m: f32,
-    pub point_count: usize,
-    /// Önceki adım merkezine yatay uzaklık (m); ilk adımda 0.
-    pub spacing_from_previous_m: f32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LegacyDikResult {
-    pub ok: bool,
-    pub message: String,
-    pub view_mode: String,
-    pub meta: LegacyDikMeta,
-    pub point_count: usize,
-    pub grid_w: u32,
-    pub grid_h: u32,
-    pub map_size_m: f32,
-    pub map_depth_m: f32,
-    pub mag_median: f32,
-    pub mag_sigma: f32,
-    pub anomalies: Vec<LegacyShape>,
-    pub candidates: Vec<LegacyShape>,
-    /// Güçlü pozitif tepe — metal adayları (UI’da tam plume)
-    #[serde(default)]
-    pub metals: Vec<LegacyShape>,
-    /// Tahmini tekrar geçiş sayısı (aynı hücre revisit)
-    #[serde(default)]
-    pub pass_estimate: u32,
-    /// Analizde kullanılan tarama adımı/geçiş sayısı; 0 eski arşivlerde bilinmiyor.
-    #[serde(default)]
-    pub scan_step_count: u32,
-    /// Adım sayısının oluşturduğu leveling segment sayısı.
-    #[serde(default)]
-    pub scan_segment_count: u32,
-    /// Her tarama adımının gerçek yatay saha konumu ve açıklığı.
-    #[serde(default)]
-    pub scan_steps: Vec<LegacyScanStep>,
-    /// Kullanıcının girdiği yatay adım açıklığı (m); 0 otomatik/JSON segmentleri.
-    #[serde(default)]
-    pub scan_step_input_m: f32,
-    /// Ardışık adım merkezleri arasındaki ortalama yatay açıklık (m).
-    #[serde(default)]
-    pub scan_step_spacing_m: f32,
-    /// Birleştirme sonrası eşsiz konum sayısı
-    #[serde(default)]
-    pub unique_points: usize,
-    /// Ham örnek sayısı (birleştirmeden önce)
-    #[serde(default)]
-    pub raw_point_count: usize,
-    /// Dosya/analiz ayırıcı: nokta + merkez + σ (aynı objeyi ayırt etmek için)
-    #[serde(default)]
-    pub fingerprint: String,
-    /// UI'nin isteğe bağlı ısı haritası için (ham bulut değil)
-    #[serde(default)]
-    pub residual_preview: Vec<f32>,
-    /// Ölçüm grid'indeki median-düzeltilmiş manyetik residual değerleri.
-    /// Ölçülmemiş hücreler `grid_coverage` ile ayırt edilir ve sıfır kabul edilmez.
-    #[serde(default)]
-    pub grid_values: Vec<f32>,
-    /// Hücre başına ölçüm sayısı; 0 olan hücreler bilinmeyendir.
-    #[serde(default)]
-    pub grid_coverage: Vec<u32>,
-    /// Grid'in gerçek saha koordinatlarındaki sol-alt orijini (m).
-    #[serde(default)]
-    pub grid_origin_x_m: f32,
-    #[serde(default)]
-    pub grid_origin_y_m: f32,
-    /// Grid'in kapsadığı gerçek saha genişliği (m).
-    #[serde(default)]
-    pub grid_width_m: f32,
-    #[serde(default)]
-    pub grid_depth_m: f32,
-}
-
-#[derive(Debug, Deserialize)]
-struct OuterDoc {
-    #[serde(default)]
-    version: Option<String>,
-    metadata: OuterMeta,
-    scan: serde_json::Value,
-    #[serde(default)]
-    segment_ranges: Vec<[usize; 2]>,
-}
-
-#[derive(Debug, Deserialize)]
-struct OuterMeta {
-    #[serde(default)]
-    version: Option<String>,
-    #[serde(default)]
-    date: Option<String>,
-    #[serde(default)]
-    device_code: Option<String>,
-    #[serde(default)]
-    x_meters: Option<f32>,
-    #[serde(default)]
-    y_meters: Option<f32>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ScanTable {
-    columns: Vec<String>,
-    data: Vec<Vec<serde_json::Value>>,
-    #[serde(default)]
-    index: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Clone)]
-struct Sample {
-    x_m: f32,
-    y_m: f32,
-    bx: f32,
-    by: f32,
-    bz: f32,
-}
-
-fn cell_f32(v: &serde_json::Value) -> Option<f32> {
-    match v {
-        serde_json::Value::Number(n) => n.as_f64().map(|x| x as f32),
-        serde_json::Value::String(s) => s.trim().parse().ok(),
-        _ => None,
-    }
-}
-
-fn col_index(columns: &[String], names: &[&str]) -> Option<usize> {
-    columns.iter().position(|c| {
-        let l = c.to_ascii_lowercase();
-        names.iter().any(|n| l == *n)
-    })
-}
-
-/// Dosya / içerik Legacy dik JSON mu?
-pub fn looks_like_legacy_dik(content: &str, file_name: Option<&str>) -> bool {
-    if let Some(name) = file_name {
-        let l = name.to_ascii_lowercase();
-        if l.ends_with(".json") {
-            let t = content.trim_start();
-            if t.starts_with('{')
-                && (t.contains("Legacy3DMag")
-                    || t.contains("x_coords")
-                    || (t.contains("\"scan\"") && t.contains("\"metadata\"")))
-            {
-                return true;
-            }
-        }
-    }
-    let t = content.trim_start();
-    t.starts_with('{')
-        && t.contains("\"scan\"")
-        && t.contains("\"metadata\"")
-        && (t.contains("x_coords") || t.contains("Legacy3DMag") || t.contains("x_meters"))
-}
-
-/// Median of an `f64` slice (clone + sort; does not mutate the caller's order).
-pub fn median_f64(values: &[f64]) -> f64 {
-    if values.is_empty() {
-        return 0.0;
-    }
-    let mut sorted = values.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let n = sorted.len();
-    if n % 2 == 1 {
-        sorted[n / 2]
-    } else {
-        0.5 * (sorted[n / 2 - 1] + sorted[n / 2])
-    }
-}
-
-fn cell_f64(v: &serde_json::Value) -> Option<f64> {
-    match v {
-        serde_json::Value::Number(n) => n.as_f64(),
-        serde_json::Value::String(s) => s.trim().parse().ok(),
-        _ => None,
-    }
-}
-
-fn set_cell_f64(row: &mut [serde_json::Value], idx: usize, v: f64) {
-    if idx < row.len() {
-        row[idx] = serde_json::json!(v);
-    }
-}
-
-/// Clamp half-open `[start, end)` segment into `0..n`.
-fn clamp_segment(start: usize, end: usize, n: usize) -> Option<(usize, usize)> {
-    if n == 0 {
-        return None;
-    }
-    let s = start.min(n);
-    let e = end.min(n);
-    if e <= s {
-        None
-    } else {
-        Some((s, e))
-    }
-}
-
-/// Zero-order median leveling on magnetic `x`/`y` columns (heading-error striping).
-/// `z` and coordinate columns are untouched. Segments are half-open `[start, end)`.
-/// Reference medians come from the first non-empty segment.
-pub fn zero_order_median_level_xy(
-    data: &mut [Vec<serde_json::Value>],
-    ix: usize,
-    iy: usize,
-    segment_ranges: &[[usize; 2]],
-) -> Result<LevelStats, String> {
-    let n = data.len();
-    if n == 0 {
-        return Err("scan.data boş".into());
-    }
-
-    let ranges: Vec<(usize, usize)> = if segment_ranges.is_empty() {
-        vec![(0, n)]
-    } else {
-        segment_ranges
-            .iter()
-            .filter_map(|r| clamp_segment(r[0], r[1], n))
-            .collect()
-    };
-    if ranges.is_empty() {
-        return Err("segment_ranges geçerli satır aralığı üretmedi".into());
-    }
-
-    let mut segment_medians = Vec::with_capacity(ranges.len());
-    let mut ref_mx = 0.0f64;
-    let mut ref_my = 0.0f64;
-    let mut have_ref = false;
-
-    // Pass 1: segment medians + reference from first non-empty segment
-    for &(s, e) in &ranges {
-        let mut xs = Vec::with_capacity(e - s);
-        let mut ys = Vec::with_capacity(e - s);
-        for row in &data[s..e] {
-            if row.len() > ix {
-                if let Some(v) = cell_f64(&row[ix]) {
-                    xs.push(v);
-                }
-            }
-            if row.len() > iy {
-                if let Some(v) = cell_f64(&row[iy]) {
-                    ys.push(v);
-                }
-            }
-        }
-        if xs.is_empty() || ys.is_empty() {
-            segment_medians.push(SegmentMedian {
-                start: s,
-                end: e,
-                median_x: 0.0,
-                median_y: 0.0,
-                point_count: 0,
-            });
-            continue;
-        }
-        let mx = median_f64(&xs);
-        let my = median_f64(&ys);
-        if !have_ref {
-            ref_mx = mx;
-            ref_my = my;
-            have_ref = true;
-        }
-        segment_medians.push(SegmentMedian {
-            start: s,
-            end: e,
-            median_x: mx,
-            median_y: my,
-            point_count: xs.len().min(ys.len()),
-        });
-    }
-    if !have_ref {
-        return Err("Hiçbir segmentte manyetik x/y okunamadı".into());
-    }
-
-    // Pass 2: new = old - segment_median + reference_median
-    for seg in &segment_medians {
-        if seg.point_count == 0 {
-            continue;
-        }
-        let dx = -seg.median_x + ref_mx;
-        let dy = -seg.median_y + ref_my;
-        if dx.abs() < f64::EPSILON && dy.abs() < f64::EPSILON {
-            continue;
-        }
-        for row in &mut data[seg.start..seg.end] {
-            if row.len() > ix {
-                if let Some(old) = cell_f64(&row[ix]) {
-                    set_cell_f64(row, ix, old + dx);
-                }
-            }
-            if row.len() > iy {
-                if let Some(old) = cell_f64(&row[iy]) {
-                    set_cell_f64(row, iy, old + dy);
-                }
-            }
-        }
-    }
-
-    Ok(LevelStats {
-        reference_median_x: ref_mx,
-        reference_median_y: ref_my,
-        segment_count: segment_medians.len(),
-        segment_medians,
-    })
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SegmentMedian {
-    pub start: usize,
-    pub end: usize,
-    pub median_x: f64,
-    pub median_y: f64,
-    pub point_count: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LevelStats {
-    pub reference_median_x: f64,
-    pub reference_median_y: f64,
-    pub segment_count: usize,
-    pub segment_medians: Vec<SegmentMedian>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LegacyLevelResult {
-    pub ok: bool,
-    pub message: String,
-    pub columns: Vec<String>,
-    /// Leveled rows: typically `[time, x, y, z, x_coords, y_coords]`
-    pub data: Vec<Vec<f64>>,
-    pub stats: LevelStats,
-    /// Full document JSON with leveled `scan` (stringified pandas-split) preserved.
-    pub leveled_json: String,
-}
-
-fn parse_outer_and_table(
-    content: &str,
-) -> Result<(OuterDoc, LegacyDikMeta, ScanTable, usize, usize, usize, usize, usize), String> {
-    let outer: OuterDoc = serde_json::from_str(content)
-        .map_err(|e| format!("Legacy JSON okunamadı: {e}"))?;
-
-    let x_meters = outer.metadata.x_meters.unwrap_or(0.0).max(0.1);
-    let y_meters = outer.metadata.y_meters.unwrap_or(0.0).max(0.1);
-    let meta = LegacyDikMeta {
-        device_code: outer
-            .metadata
-            .device_code
-            .clone()
-            .unwrap_or_else(|| "Legacy3DMagDevice".into()),
-        date: outer.metadata.date.clone(),
-        x_meters,
-        y_meters,
-        version: outer.metadata.version.clone().or(outer.version.clone()),
-    };
-
-    let scan_str = match &outer.scan {
-        serde_json::Value::String(s) => s.clone(),
-        other => other.to_string(),
-    };
-    let table: ScanTable = serde_json::from_str(&scan_str)
-        .map_err(|e| format!("scan tablosu okunamadı: {e}"))?;
-
-    let ix = col_index(&table.columns, &["x"])
-        .ok_or_else(|| "scan: 'x' (Bx) kolonu yok".to_string())?;
-    let iy = col_index(&table.columns, &["y"])
-        .ok_or_else(|| "scan: 'y' (By) kolonu yok".to_string())?;
-    let iz = col_index(&table.columns, &["z"])
-        .ok_or_else(|| "scan: 'z' (Bz) kolonu yok".to_string())?;
-    let ixm = col_index(&table.columns, &["x_coords", "x_coord"])
-        .ok_or_else(|| "scan: 'x_coords' kolonu yok".to_string())?;
-    let iym = col_index(&table.columns, &["y_coords", "y_coord"])
-        .ok_or_else(|| "scan: 'y_coords' kolonu yok".to_string())?;
-
-    Ok((outer, meta, table, ix, iy, iz, ixm, iym))
-}
-
-fn scan_step_metrics(
-    table: &ScanTable,
-    segments: &[[usize; 2]],
-    ixm: usize,
-    iym: usize,
-) -> Vec<LegacyScanStep> {
-    let mut steps = Vec::with_capacity(segments.len());
-    let mut previous_center: Option<(f32, f32)> = None;
-    for (step_idx, &[start, end]) in segments.iter().enumerate() {
-        let s = start.min(table.data.len());
-        let e = end.min(table.data.len());
-        let mut xs = Vec::new();
-        let mut ys = Vec::new();
-        for row in table.data.get(s..e).unwrap_or(&[]) {
-            if let (Some(x), Some(y)) = (row.get(ixm).and_then(cell_f32), row.get(iym).and_then(cell_f32)) {
-                if x.is_finite() && y.is_finite() {
-                    xs.push(x);
-                    ys.push(y);
-                }
-            }
-        }
-        if xs.is_empty() {
-            continue;
-        }
-        let x_start_m = xs.iter().copied().fold(f32::INFINITY, f32::min);
-        let x_end_m = xs.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        let y_start_m = ys.iter().copied().fold(f32::INFINITY, f32::min);
-        let y_end_m = ys.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        let x_center_m = xs.iter().sum::<f32>() / xs.len() as f32;
-        let y_center_m = ys.iter().sum::<f32>() / ys.len() as f32;
-        let spacing_from_previous_m = previous_center
-            .map(|(px, py)| (x_center_m - px).hypot(y_center_m - py))
-            .unwrap_or(0.0);
-        previous_center = Some((x_center_m, y_center_m));
-        steps.push(LegacyScanStep {
-            index: (step_idx + 1) as u32,
-            start: s,
-            end: e,
-            x_start_m,
-            x_end_m,
-            x_center_m,
-            y_start_m,
-            y_end_m,
-            y_center_m,
-            width_m: (x_end_m - x_start_m).abs(),
-            length_m: (y_end_m - y_start_m).abs(),
-            point_count: xs.len(),
-            spacing_from_previous_m,
-        });
-    }
-    steps
-}
-
-fn average_step_spacing(steps: &[LegacyScanStep]) -> f32 {
-    let values: Vec<f32> = steps
-        .iter()
-        .skip(1)
-        .map(|step| step.spacing_from_previous_m)
-        .filter(|value| value.is_finite() && *value > 0.0)
-        .collect();
-    if values.is_empty() {
-        0.0
-    } else {
-        values.iter().sum::<f32>() / values.len() as f32
-    }
-}
-
-fn samples_from_table(
-    table: &ScanTable,
-    ix: usize,
-    iy: usize,
-    iz: usize,
-    ixm: usize,
-    iym: usize,
-) -> Result<Vec<Sample>, String> {
-    let mut samples = Vec::with_capacity(table.data.len());
-    let need = ix.max(iy).max(iz).max(ixm).max(iym);
-    for row in &table.data {
-        if row.len() <= need {
-            continue;
-        }
-        let (Some(bx), Some(by), Some(bz), Some(xm), Some(ym)) = (
-            cell_f32(&row[ix]),
-            cell_f32(&row[iy]),
-            cell_f32(&row[iz]),
-            cell_f32(&row[ixm]),
-            cell_f32(&row[iym]),
-        ) else {
-            continue;
-        };
-        if !bx.is_finite() || !by.is_finite() || !bz.is_finite() || !xm.is_finite() || !ym.is_finite() {
-            continue;
-        }
-        samples.push(Sample {
-            x_m: xm,
-            y_m: ym,
-            bx,
-            by,
-            bz,
-        });
-    }
-    if samples.len() < 4 {
-        return Err(format!(
-            "Yetersiz örnek ({}) — en az 4 nokta gerekli",
-            samples.len()
-        ));
-    }
-    Ok(samples)
-}
-
-fn estimate_step_count_from_spacing(
-    table: &ScanTable,
-    ixm: usize,
-    iym: usize,
-    spacing_m: f32,
-) -> u32 {
-    if !spacing_m.is_finite() || spacing_m <= 0.0 {
-        return 0;
-    }
-    let mut xs = Vec::new();
-    let mut ys = Vec::new();
-    for row in &table.data {
-        if let (Some(x), Some(y)) = (
-            row.get(ixm).and_then(cell_f32),
-            row.get(iym).and_then(cell_f32),
-        ) {
-            if x.is_finite() && y.is_finite() {
-                xs.push(x);
-                ys.push(y);
-            }
-        }
-    }
-    if xs.is_empty() || ys.is_empty() {
-        return 1;
-    }
-    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    ys.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    xs.dedup_by(|a, b| (*a - *b).abs() < 1e-3);
-    ys.dedup_by(|a, b| (*a - *b).abs() < 1e-3);
-
-    // Dik taramada bir eksen boyunca yürünür, diğer eksen adımlar arasında
-    // değişir. Daha az benzersiz koordinata sahip ekseni adım ekseni kabul et.
-    let positions = if xs.len() <= ys.len() { xs } else { ys };
-    let span = positions.last().copied().unwrap_or(0.0) - positions.first().copied().unwrap_or(0.0);
-    if span <= spacing_m * 0.5 {
-        1
-    } else {
-        ((span / spacing_m).round() as u32 + 1).clamp(1, table.data.len().max(1) as u32)
-    }
-}
-
-fn resolve_scan_segments(
-    row_count: usize,
-    requested_steps: Option<u32>,
-    json_segments: &[[usize; 2]],
-) -> Result<Vec<[usize; 2]>, String> {
-    if row_count == 0 {
-        return Err("scan.data boş".into());
-    }
-
-    let requested = requested_steps.unwrap_or(0);
-    if requested > 0 {
-        let steps = requested as usize;
-        if steps > row_count {
-            return Err(format!(
-                "Adım sayısı ({requested}) ölçüm satırından ({row_count}) fazla olamaz"
-            ));
-        }
-        // Cihazın ardışık kayıtlarını dengeli yürüyüş/geçiş segmentlerine ayır.
-        return Ok((0..steps)
-            .map(|i| {
-                let start = i * row_count / steps;
-                let end = (i + 1) * row_count / steps;
-                [start, end]
-            })
-            .collect());
-    }
-
-    if json_segments.is_empty() {
-        Ok(vec![[0, row_count]])
-    } else {
-        Ok(json_segments.to_vec())
-    }
-}
-
-fn parse_samples_with_steps(
-    content: &str,
-    requested_steps: Option<u32>,
-) -> Result<(LegacyDikMeta, Vec<Sample>, Vec<[usize; 2]>), String> {
-    let (outer, meta, mut table, ix, iy, iz, ixm, iym) = parse_outer_and_table(content)?;
-    let segments = resolve_scan_segments(table.data.len(), requested_steps, &outer.segment_ranges)?;
-    // Heading-error striping: level Bx/By per walking line before grid/anomaly work.
-    let _ = zero_order_median_level_xy(&mut table.data, ix, iy, &segments)?;
-    let samples = samples_from_table(&table, ix, iy, iz, ixm, iym)?;
-    Ok((meta, samples, segments))
-}
-
-fn parse_samples(content: &str) -> Result<(LegacyDikMeta, Vec<Sample>, Vec<[usize; 2]>), String> {
-    parse_samples_with_steps(content, None)
-}
-
-/// Parse Legacy dik JSON, apply zero-order median leveling, return leveled rows + JSON.
-pub fn level_legacy_mag_json(content: &str) -> Result<LegacyLevelResult, String> {
-    let (outer, _meta, mut table, ix, iy, iz, ixm, iym) = parse_outer_and_table(content)?;
-    let segments = outer.segment_ranges.clone();
-    let stats = zero_order_median_level_xy(&mut table.data, ix, iy, &segments)?;
-
-    let need = ix.max(iy).max(iz).max(ixm).max(iym);
-    let mut data = Vec::with_capacity(table.data.len());
-    for row in &table.data {
-        if row.len() <= need {
-            continue;
-        }
-        let mut out = Vec::with_capacity(6);
-        for i in 0..=need {
-            out.push(cell_f64(&row[i]).unwrap_or(0.0));
-        }
-        data.push(out);
-    }
-
-    let scan_payload = serde_json::to_string(&table)
-        .map_err(|e| format!("leveled scan serialize: {e}"))?;
-
-    let mut root: serde_json::Value = serde_json::from_str(content)
-        .map_err(|e| format!("root JSON: {e}"))?;
-    if let Some(obj) = root.as_object_mut() {
-        obj.insert("scan".into(), serde_json::Value::String(scan_payload));
-    }
-    let leveled_json =
-        serde_json::to_string(&root).map_err(|e| format!("leveled JSON: {e}"))?;
-
-    Ok(LegacyLevelResult {
-        ok: true,
-        message: format!(
-            "Zero-order median leveling · {} satır · {} segment · ref Bx={:.1} By={:.1}",
-            data.len(),
-            stats.segment_count,
-            stats.reference_median_x,
-            stats.reference_median_y
-        ),
-        columns: table.columns,
-        data,
-        stats,
-        leveled_json,
-    })
-}
+use super::parse::{
+    average_step_spacing, cell_f32, estimate_step_count_from_spacing, looks_like_legacy_dik,
+    parse_outer_and_table, parse_samples, parse_samples_with_steps, resolve_scan_segments,
+    samples_from_table, scan_step_metrics, OuterDoc, Sample, ScanTable,
+};
+use super::level::{level_legacy_mag_json, median_f64, zero_order_median_level_xy};
+use super::types::*;
 
 fn magnitude(s: &Sample) -> f32 {
     (s.bx * s.bx + s.by * s.by + s.bz * s.bz).sqrt()
@@ -1554,6 +792,16 @@ fn dipole_kernel(rho: f32, z: f32) -> f32 {
     num / r2.powf(2.5)
 }
 
+fn apply_sensor_height(mut est: DepthEstimate, sensor_height_m: f32) -> DepthEstimate {
+    let h = 0.50;
+    est.center_m = (est.center_m + h).min(10.0);
+    est.top_m = (est.top_m + h).min(9.8);
+    est.bottom_m = (est.bottom_m + h).min(10.0).max(est.top_m + 0.15);
+    est.interval_low_m = (est.interval_low_m + h).max(0.0);
+    est.interval_high_m = (est.interval_high_m + h).min(10.5).max(est.interval_low_m + 0.1);
+    est
+}
+
 /// Peters half-width: küre/dipol z ≈ rh / 0.766
 fn depth_peters_halfwidth(half_width_m: f32) -> DepthEstimate {
     let rh = half_width_m.clamp(0.12, 2.5);
@@ -1576,6 +824,81 @@ fn depth_peters_halfwidth(half_width_m: f32) -> DepthEstimate {
         interval_low_m,
         interval_high_m,
         fit_samples: 0,
+    }
+}
+
+/// Residual haritada pozitif tepe ↔ negatif çukur açıklığı (metre).
+fn peak_trough_separation_m(
+    resid: &[f32],
+    counts: &[u32],
+    ext: Extent,
+    gw: u32,
+    gh: u32,
+    cx: f32,
+    cy: f32,
+    peak: f32,
+) -> Option<(f32, f32)> {
+    if peak <= 1e-6 {
+        return None;
+    }
+    let search = (ext.span_x().min(ext.span_y()) * 0.85)
+        .max(1.2)
+        .min(ext.span_x().hypot(ext.span_y()) * 0.75);
+    let mut trough: Option<(f32, f32, f32)> = None; // x,y,val
+    for gy in 0..gh {
+        for gx in 0..gw {
+            let i = (gy * gw + gx) as usize;
+            if counts.get(i).copied().unwrap_or(0) == 0 {
+                continue;
+            }
+            let v = resid[i];
+            if v >= 0.0 {
+                continue;
+            }
+            let (mx, my) = ext.cell_to_m(gx as f32, gy as f32, gw, gh);
+            let d = (mx - cx).hypot(my - cy);
+            if d > search || d < 0.15 {
+                continue;
+            }
+            match trough {
+                None => trough = Some((mx, my, v)),
+                Some((_, _, tv)) if v < tv => trough = Some((mx, my, v)),
+                _ => {}
+            }
+        }
+    }
+    let (tx, ty, tval) = trough?;
+    let lobe_ratio = (-tval) / peak;
+    if lobe_ratio < 0.22 {
+        return None;
+    }
+    let sep = (tx - cx).hypot(ty - cy);
+    if !(0.45..=6.0).contains(&sep) {
+        return None;
+    }
+    Some((sep, lobe_ratio))
+}
+
+fn depth_from_center(center_m: f32, half_width_m: f32, method: &'static str, rms: f32, fit_samples: u32) -> DepthEstimate {
+    let z = center_m.clamp(0.25, 8.0);
+    let half_h = (half_width_m * 0.55)
+        .max(z * 0.18)
+        .clamp(0.15, z * 0.9);
+    let top = (z - half_h).clamp(0.08, 9.5);
+    let bot = (z + half_h).min(10.0).max(top + 0.2);
+    let uncertainty = ((half_width_m * 0.35).max(0.2) + rms * z * 0.9)
+        .clamp(0.2, (z * 0.85).max(0.35));
+    let (interval_low_m, interval_high_m) = depth_interval(z, uncertainty);
+    DepthEstimate {
+        center_m: z,
+        top_m: top,
+        bottom_m: bot,
+        method,
+        rms,
+        uncertainty_m: uncertainty,
+        interval_low_m,
+        interval_high_m,
+        fit_samples,
     }
 }
 
@@ -1639,27 +962,66 @@ fn estimate_depth_dipole(pts: &[(f32, f32)], half_width_m: f32) -> DepthEstimate
         return depth_peters_halfwidth(half_width_m);
     }
 
-    let half_h = (half_width_m * 0.55)
-        .max(best_z * 0.2)
-        .clamp(0.15, best_z * 0.9);
-    let top = (best_z - half_h).clamp(0.08, 9.5);
-    let bot = (best_z + half_h).min(10.0).max(top + 0.2);
-    // Ölçüm çözünürlüğü + normalize RMS birlikte derinlik belirsizliğini
-    // belirler; kötü uyum daha geniş, iyi uyum daha dar bant üretir.
-    let uncertainty = ((half_width_m * 0.35).max(0.12) + best_rms * best_z * 0.9)
-        .clamp(0.15, (best_z * 0.85).max(0.3));
-    let (interval_low_m, interval_high_m) = depth_interval(best_z, uncertainty);
-    DepthEstimate {
-        center_m: best_z,
-        top_m: top,
-        bottom_m: bot,
-        method: "dipole",
-        rms: best_rms,
-        uncertainty_m: uncertainty,
-        interval_low_m,
-        interval_high_m,
-        fit_samples: pts.iter().filter(|(_, f)| *f > 0.0 && *f <= peak).count() as u32,
+    depth_from_center(
+        best_z,
+        half_width_m,
+        "dipole",
+        best_rms,
+        pts.iter().filter(|(_, f)| *f > 0.0).count() as u32,
+    )
+}
+
+/// Metal derinliği: dipol/Peters + bipolar tepe–çukur düzeltmesi.
+///
+/// Yalnızca pozitif lob üzerinde dipol LS, geniş bipolar anomalilerde sığ kalır
+/// (half-width tavanı + dar pencere). Legacy3DMag saha örneklerinde tepe–çukur
+/// açıklığı Δ ile gömü ~bipolar_sep_factor·Δ bandına oturur; dipolle
+/// dipole_blend / (1−blend) karıştırılır. Sonuçlara cihaz–yüzey ofseti eklenir.
+fn estimate_depth_metal(
+    pts: &[(f32, f32)],
+    half_width_m: f32,
+    resid: &[f32],
+    counts: &[u32],
+    ext: Extent,
+    gw: u32,
+    gh: u32,
+    cx: f32,
+    cy: f32,
+    peak: f32,
+    params: LegacyDepthParams,
+) -> DepthEstimate {
+    let dipole = estimate_depth_dipole(pts, half_width_m);
+    let Some((sep, _lobe_ratio)) =
+        peak_trough_separation_m(resid, counts, ext, gw, gh, cx, cy, peak)
+    else {
+        return apply_sensor_height(dipole, params.sensor_height_m);
+    };
+
+    let z_bi = (sep * params.bipolar_sep_factor).clamp(0.5, 8.0);
+    let r_cap = (ext.span_x().min(ext.span_y()) * 0.2).clamp(0.2, 1.2);
+    let width_capped = half_width_m >= r_cap * 0.92;
+    let dipole_shallow = dipole.center_m < z_bi * 0.72;
+    if !(width_capped || dipole_shallow) {
+        return apply_sensor_height(dipole, params.sensor_height_m);
     }
+
+    let w_dip = params.dipole_blend.clamp(0.0, 1.0);
+    let w_bi = 1.0 - w_dip;
+    let z = (w_dip * dipole.center_m + w_bi * z_bi).clamp(0.4, 8.0);
+    let disagree = (z - dipole.center_m).abs();
+    let mut est = depth_from_center(
+        z,
+        sep.max(half_width_m),
+        "bipolar",
+        (dipole.rms * 0.5 + disagree / z.max(0.5) * 0.35).clamp(0.15, 0.85),
+        dipole.fit_samples,
+    );
+    est.uncertainty_m = (est.uncertainty_m + disagree * 0.25)
+        .clamp(0.35, (z * 0.55).max(0.5));
+    let (lo, hi) = depth_interval(est.center_m, est.uncertainty_m);
+    est.interval_low_m = lo;
+    est.interval_high_m = hi;
+    apply_sensor_height(est, params.sensor_height_m)
 }
 
 fn collect_radial_residuals(
@@ -1948,6 +1310,7 @@ fn metal_from_peak_measured(
     gw: u32,
     gh: u32,
     sigma: f32,
+    params: LegacyDepthParams,
 ) -> Option<LegacyShape> {
     let mut best: Option<(u32, u32, f32)> = None;
     for gy in 0..gh {
@@ -1976,7 +1339,7 @@ fn metal_from_peak_measured(
     let search_m = (ext.span_x().min(ext.span_y()) * 0.35).clamp(0.6, 2.5);
     let r = local_half_max_radius(resid, counts, ext, gw, gh, cx, cy, peak, search_m);
     let pts = collect_radial_residuals(resid, counts, ext, gw, gh, cx, cy, (r * 3.5).max(1.5));
-    let depth = estimate_depth_dipole(&pts, r);
+    let depth = estimate_depth_metal(&pts, r, resid, counts, ext, gw, gh, cx, cy, peak, params);
     Some(build_metal_at(
         cx,
         cy,
@@ -1991,9 +1354,9 @@ fn metal_from_peak_measured(
     ))
 }
 
-/// Blob varsa tercih et; yoksa tepe hücresinden.
-fn metal_from_best_blob(
-    blobs: &[Blob],
+/// Tek pozitif blob → metal şekli.
+fn metal_from_blob(
+    blob: &Blob,
     resid: &[f32],
     counts: &[u32],
     samples: &[Sample],
@@ -2001,20 +1364,8 @@ fn metal_from_best_blob(
     gw: u32,
     gh: u32,
     sigma: f32,
+    params: LegacyDepthParams,
 ) -> Option<LegacyShape> {
-    let blob = blobs
-        .iter()
-        .filter(|b| b.polarity > 0.0)
-        .max_by(|a, b| {
-            a.max_abs
-                .partial_cmp(&b.max_abs)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-    let Some(blob) = blob else {
-        return metal_from_peak_measured(resid, counts, samples, ext, gw, gh, sigma);
-    };
-
     let mut peak = 0.0f32;
     let mut wsum = 0.0f32;
     let mut sx = 0.0f32;
@@ -2033,13 +1384,16 @@ fn metal_from_best_blob(
         wsum += w;
     }
     if peak <= 0.0 || wsum <= 1e-12 {
-        return metal_from_peak_measured(resid, counts, samples, ext, gw, gh, sigma);
+        return None;
+    }
+    if peak < sigma * 0.95 {
+        return None;
     }
     let (cx, cy) = nearest_sample_xy(samples, sx / wsum, sy / wsum);
     let search_m = (ext.span_x().min(ext.span_y()) * 0.35).clamp(0.6, 2.5);
     let r = local_half_max_radius(resid, counts, ext, gw, gh, cx, cy, peak, search_m);
     let pts = collect_radial_residuals(resid, counts, ext, gw, gh, cx, cy, (r * 3.5).max(1.5));
-    let depth = estimate_depth_dipole(&pts, r);
+    let depth = estimate_depth_metal(&pts, r, resid, counts, ext, gw, gh, cx, cy, peak, params);
     let (_, _, peak_abs) = peak_cell(blob, resid, gw);
     let poly = ms_blob_outline(blob, resid, gw, gh, peak_abs * 0.70);
     let core = ms_blob_outline(blob, resid, gw, gh, peak_abs * 0.50);
@@ -2055,6 +1409,64 @@ fn metal_from_best_blob(
         ext.span_x(),
         ext.span_y(),
     ))
+}
+
+/// En güçlü pozitif blob(lar); yoksa tepe hücresinden tek metal.
+fn metal_from_best_blob(
+    blobs: &[Blob],
+    resid: &[f32],
+    counts: &[u32],
+    samples: &[Sample],
+    ext: Extent,
+    gw: u32,
+    gh: u32,
+    sigma: f32,
+    params: LegacyDepthParams,
+) -> Option<LegacyShape> {
+    metals_from_positive_blobs(blobs, resid, counts, samples, ext, gw, gh, sigma, params)
+        .into_iter()
+        .next()
+        .or_else(|| metal_from_peak_measured(resid, counts, samples, ext, gw, gh, sigma, params))
+}
+
+/// Güçlü pozitif bloblardan en fazla 5 metal (örtüşmeyen).
+fn metals_from_positive_blobs(
+    blobs: &[Blob],
+    resid: &[f32],
+    counts: &[u32],
+    samples: &[Sample],
+    ext: Extent,
+    gw: u32,
+    gh: u32,
+    sigma: f32,
+    params: LegacyDepthParams,
+) -> Vec<LegacyShape> {
+    let mut ranked: Vec<&Blob> = blobs.iter().filter(|b| b.polarity > 0.0).collect();
+    ranked.sort_by(|a, b| {
+        b.max_abs
+            .partial_cmp(&a.max_abs)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let mut out: Vec<LegacyShape> = Vec::new();
+    for blob in ranked {
+        if out.len() >= 5 {
+            break;
+        }
+        let Some(metal) = metal_from_blob(blob, resid, counts, samples, ext, gw, gh, sigma, params) else {
+            continue;
+        };
+        let overlaps = out.iter().any(|prev: &LegacyShape| {
+            let dx = prev.cx - metal.cx;
+            let dy = prev.cy - metal.cy;
+            let min_r = (prev.rx.max(0.2) + metal.rx.max(0.2)) * 0.55;
+            (dx * dx + dy * dy).sqrt() < min_r
+        });
+        if overlaps {
+            continue;
+        }
+        out.push(metal);
+    }
+    out
 }
 
 #[derive(Clone)]
@@ -2267,6 +1679,7 @@ fn blob_to_shape(
     ext: Extent,
     sigma: f32,
     as_candidate: bool,
+    params: LegacyDepthParams,
 ) -> LegacyShape {
     let mut min_x = u32::MAX;
     let mut max_x = 0u32;
@@ -2415,14 +1828,17 @@ fn blob_to_shape(
         .and_then(|me| contour_rms_to_ellipse(&polygon, ext, me))
         .map(|rms| rms.clamp(0.0, 2.0));
     let depth_label = format!(
-        "örtü {:.2} m · taban {:.2} m · kalınlık {:.2} m",
-        depth_top,
-        depth_bot,
-        (depth_bot - depth_top).max(0.0)
+        "örtü {:.2} m · taban {:.2} m · kalınlık {:.2} m · cihaz+{:.2} m",
+        depth_top + params.sensor_height_m,
+        depth_bot + params.sensor_height_m,
+        (depth_bot - depth_top).max(0.0),
+        params.sensor_height_m
     );
     // Genel blob şekillerinde fiziksel model fit'i yapılmaz. Bunu açıkça
     // işaretleyip, geometrik derinlik aralığını konservatif belirsizlik olarak
     // yayınlarız; UI böylece bu değerleri kesin ölçüm gibi göstermez.
+    let depth_top = depth_top + params.sensor_height_m;
+    let depth_bot = (depth_bot + params.sensor_height_m).min(10.0).max(depth_top + 0.15);
     let depth_center = (depth_top + depth_bot) * 0.5;
     let depth_uncertainty = ((depth_bot - depth_top) * 0.6).max(0.45);
     let (depth_interval_low_m, depth_interval_high_m) =
@@ -2483,7 +1899,7 @@ fn blob_to_shape(
 }
 
 pub fn analyze_legacy_dik(content: &str) -> Result<LegacyDikResult, String> {
-    analyze_legacy_dik_with_step_spacing(content, None, None)
+    analyze_legacy_dik_with_options(content, None, None, LegacyDepthParams::default())
 }
 
 /// Legacy dik JSON analizini cihazın ardışık tarama adım/geçiş sayısına göre yap.
@@ -2492,41 +1908,80 @@ pub fn analyze_legacy_dik_with_steps(
     content: &str,
     requested_steps: Option<u32>,
 ) -> Result<LegacyDikResult, String> {
-    analyze_legacy_dik_with_step_spacing(content, requested_steps, None)
+    analyze_legacy_dik_with_options(content, requested_steps, None, LegacyDepthParams::default())
 }
 
 /// Legacy dik JSON analizini kullanıcı tanımlı yatay adım açıklığıyla yap.
 /// Açıklık girildiğinde, koordinatlarda ölçülen tarama genişliğinden adım sayısı
 /// hesaplanır ve bu sayı manuel adım sayısına göre önceliklidir.
+///
+/// Önemli: JSON'da fiziksel `segment_ranges` varsa median leveling **yalnızca**
+/// bu geçişler üzerinde yapılır. Matris/adım sayısı ve adım açıklığı yalnızca
+/// UI adım etiketlerini üretir — derinliği değiştirmez. Segment yoksa eski
+/// davranış korunur (adım sayısı leveling'i de böler).
 pub fn analyze_legacy_dik_with_step_spacing(
     content: &str,
     requested_steps: Option<u32>,
     requested_spacing_m: Option<f32>,
 ) -> Result<LegacyDikResult, String> {
+    analyze_legacy_dik_with_options(
+        content,
+        requested_steps,
+        requested_spacing_m,
+        LegacyDepthParams::default(),
+    )
+}
+
+/// Adım + derinlik proxy parametreleriyle Legacy dik analizi.
+pub fn analyze_legacy_dik_with_options(
+    content: &str,
+    requested_steps: Option<u32>,
+    requested_spacing_m: Option<f32>,
+    depth_params: LegacyDepthParams,
+) -> Result<LegacyDikResult, String> {
+    let mut params = depth_params.clamped();
+    params.sensor_height_m = 0.50;
     let (outer, meta, mut table, ix, iy, iz, ixm, iym) = parse_outer_and_table(content)?;
     let spacing = requested_spacing_m
         .filter(|value| value.is_finite() && *value > 0.0);
-    // Açıkça girilen adım sayısı her zaman önceliklidir. Yatay açıklık yalnızca
-    // adım sayısı boş/0 olduğunda koordinatlardan adım sayısı türetir.
-    let (segments, scan_step_input_m) = if let Some(requested) = requested_steps.filter(|steps| *steps > 0) {
-        (
-            resolve_scan_segments(table.data.len(), Some(requested), &outer.segment_ranges)?,
-            0.0,
-        )
+    let has_json_passes = !outer.segment_ranges.is_empty();
+
+    // Leveling geçişleri: JSON segmentleri varsa asla matris/adım ile ezme.
+    let level_step_override = if has_json_passes {
+        None
+    } else if let Some(requested) = requested_steps.filter(|steps| *steps > 0) {
+        Some(requested)
     } else if let Some(spacing_m) = spacing {
-        let inferred_steps = estimate_step_count_from_spacing(&table, ixm, iym, spacing_m);
-        (
-            resolve_scan_segments(table.data.len(), Some(inferred_steps.max(1)), &outer.segment_ranges)?,
-            spacing_m,
-        )
+        Some(estimate_step_count_from_spacing(&table, ixm, iym, spacing_m).max(1))
     } else {
-        (
-            resolve_scan_segments(table.data.len(), requested_steps, &outer.segment_ranges)?,
-            0.0,
-        )
+        requested_steps.filter(|steps| *steps > 0)
     };
-    zero_order_median_level_xy(&mut table.data, ix, iy, &segments)?;
-    let scan_steps = scan_step_metrics(&table, &segments, ixm, iym);
+    let level_segments =
+        resolve_scan_segments(table.data.len(), level_step_override, &outer.segment_ranges)?;
+
+    // UI adım listesi: matris / açıklık burada etkili (etiket + 3D halkalar).
+    let (display_segments, scan_step_input_m) =
+        if let Some(requested) = requested_steps.filter(|steps| *steps > 0) {
+            (
+                resolve_scan_segments(table.data.len(), Some(requested), &outer.segment_ranges)?,
+                0.0,
+            )
+        } else if let Some(spacing_m) = spacing {
+            let inferred_steps = estimate_step_count_from_spacing(&table, ixm, iym, spacing_m);
+            (
+                resolve_scan_segments(
+                    table.data.len(),
+                    Some(inferred_steps.max(1)),
+                    &outer.segment_ranges,
+                )?,
+                spacing_m,
+            )
+        } else {
+            (level_segments.clone(), 0.0)
+        };
+
+    zero_order_median_level_xy(&mut table.data, ix, iy, &level_segments)?;
+    let scan_steps = scan_step_metrics(&table, &display_segments, ixm, iym);
     let scan_step_spacing_m = average_step_spacing(&scan_steps);
     let raw_samples = samples_from_table(&table, ix, iy, iz, ixm, iym)?;
     let x_m = meta.x_meters;
@@ -2555,24 +2010,53 @@ pub fn analyze_legacy_dik_with_step_spacing(
     let mut anomalies = Vec::new();
     let mut candidates = Vec::new();
     for (i, blob) in blobs.iter().enumerate() {
-        let anomaly = blob_to_shape(blob, &resid, gw_d, gh_d, ext, sigma, false);
+        let anomaly = blob_to_shape(blob, &resid, gw_d, gh_d, ext, sigma, false, params);
         anomalies.push(anomaly);
         if i < 10 && blob.max_abs >= sigma * 0.95 {
-            let cand = blob_to_shape(blob, &resid, gw_d, gh_d, ext, sigma, true);
+            let cand = blob_to_shape(blob, &resid, gw_d, gh_d, ext, sigma, true, params);
             candidates.push(cand);
         }
     }
 
-    // Metal: en güçlü pozitif blob — ağırlıklı merkez + yerel r (global half-max yok)
-    let mut metals = Vec::new();
-    if let Some(metal) = metal_from_best_blob(&blobs, &resid, &counts, &samples, ext, gw_d, gh_d, sigma) {
-        metals.push(metal);
+    // Metal: güçlü pozitif bloblar (en fazla 5, örtüşmeyen)
+    let mut metals = metals_from_positive_blobs(
+        &blobs, &resid, &counts, &samples, ext, gw_d, gh_d, sigma, params,
+    );
+    if metals.is_empty() {
+        if let Some(metal) =
+            metal_from_peak_measured(&resid, &counts, &samples, ext, gw_d, gh_d, sigma, params)
+        {
+            metals.push(metal);
+        }
+    }
+
+    // Kompakt invert: her metal için ayrı proxy (CAD değil)
+    let mut invert_proxies = Vec::new();
+    for metal in metals.iter() {
+        if let Some(mut proxy) = super::invert::fit_compact_dipole(
+            &ui_resid,
+            &ui_counts,
+            gw,
+            gh,
+            ext.x0,
+            ext.y0,
+            ext.span_x(),
+            ext.span_y(),
+            metal.cx,
+            metal.cy,
+            params.sensor_height_m,
+        ) {
+            proxy.detection_id = None; // JS cx/cy ile bağlar
+            invert_proxies.push(proxy);
+        }
     }
 
     let fingerprint = if let Some(m) = metals.first() {
         let zc = 0.5 * (m.depth_top_m + m.depth_bottom_m);
         let method = if m.depth_label.contains("dipole") {
             "dipole"
+        } else if m.depth_label.contains("bipolar") {
+            "bipolar"
         } else if m.depth_label.contains("peters") {
             "peters"
         } else {
@@ -2599,14 +2083,20 @@ pub fn analyze_legacy_dik_with_step_spacing(
         }
     }
 
-    let scan_step_count = segments.len() as u32;
+    let scan_step_count = display_segments.len() as u32;
+    let level_pass_count = level_segments.len() as u32;
     let interp_txt = if interp_factor > 1 {
         format!(" · IDW ×{interp_factor}")
     } else {
         String::new()
     };
+    let pass_note = if has_json_passes && level_pass_count != scan_step_count {
+        format!(" · leveling {level_pass_count} geçiş")
+    } else {
+        String::new()
+    };
     let msg = format!(
-        "Dik çekim · median-level · {raw_n}→{unique_n} · {scan_step_count} adım/geçiş · ~{pass_est} tekrar{interp_txt} · {} metal · {:.1}×{:.1} m · {fingerprint}",
+        "Dik çekim · median-level · {raw_n}→{unique_n} · {scan_step_count} adım/geçiş{pass_note} · ~{pass_est} tekrar{interp_txt} · {} metal · {:.1}×{:.1} m · {fingerprint}",
         metals.len(),
         x_m,
         y_m
@@ -2643,12 +2133,14 @@ pub fn analyze_legacy_dik_with_step_spacing(
         grid_origin_y_m: ext.y0,
         grid_width_m: ext.span_x(),
         grid_depth_m: ext.span_y(),
+        invert_proxies,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::level::{cell_f64, zero_order_median_level_xy};
 
     fn mini_json() -> String {
         let rows: Vec<String> = (0..40)
@@ -2679,11 +2171,70 @@ mod tests {
         )
     }
 
+    fn mini_json_rtl() -> String {
+        // Yüksek X satırları önce — kayıt sırası sağdan; Adım 1 yine sol olmalı.
+        let rows: Vec<String> = (0..40)
+            .map(|i| {
+                let xm = if i < 20 { 2.0 } else { 0.0 };
+                let ym = (i % 20) as f32 * 0.25;
+                let bump = if (8..12).contains(&(i % 20)) && xm < 1.0 {
+                    200_000.0
+                } else {
+                    0.0
+                };
+                let b = 500_000.0 + bump;
+                format!("[{},{},{},{},{},{}]", i as f32 * 0.1, b, b, b, xm, ym)
+            })
+            .collect();
+        let data = rows.join(",");
+        let scan = format!(
+            "{{\"columns\":[\"time\",\"x\",\"y\",\"z\",\"x_coords\",\"y_coords\"],\"data\":[{data}],\"index\":[]}}"
+        );
+        let scan_escaped = serde_json::to_string(&scan).unwrap();
+        format!(
+            r#"{{
+              "version":"1.0",
+              "metadata":{{"device_code":"Legacy3DMagDevice","x_meters":4.0,"y_meters":5.0,"date":"2025-01-01"}},
+              "scan":{scan_escaped},
+              "segment_ranges":[[0,20],[20,40]]
+            }}"#
+        )
+    }
+
+    #[test]
+    fn scan_steps_keep_source_physical_order() {
+        let rtl = analyze_legacy_dik(&mini_json_rtl()).expect("analyze rtl");
+        assert!(rtl.scan_steps.len() >= 2, "expected at least 2 steps");
+        // Adım numarası koordinata göre değil, JSON içindeki fiziksel tarama sırasına göre.
+        // Bu fixture sağdan sola kayıtlıdır; sıra korunmalı ve ilk nokta sağda kalmalıdır.
+        assert!(
+            rtl.scan_steps[0].x_center_m > rtl.scan_steps[rtl.scan_steps.len() - 1].x_center_m,
+            "kaynak sırası korunmalı: first={:?} last={:?}",
+            rtl.scan_steps[0].x_center_m,
+            rtl.scan_steps[rtl.scan_steps.len() - 1].x_center_m
+        );
+        assert_eq!(rtl.scan_steps[0].index, 1);
+        assert!(rtl.scan_steps[0].x_center_m > 1.0);
+        // Bump yalnız sol geçişte; metal X ≈ 0.
+        if let Some(m) = rtl.metals.first() {
+            assert!(
+                m.cx < 1.0,
+                "metal should stay on left pass, got ({}, {})",
+                m.cx,
+                m.cy
+            );
+        }
+    }
+
     #[test]
     fn detect_legacy_signature() {
         let j = mini_json();
         assert!(looks_like_legacy_dik(&j, Some("scan.json")));
         assert!(!looks_like_legacy_dik("x,y,z,magnetic\n1,2,3,4", Some("a.csv")));
+        assert!(
+            !looks_like_legacy_dik(r#"{"rows":[[1,2,3]],"hello":true}"#, Some("rows.json")),
+            "rastgele rows JSON kabul edilmemeli"
+        );
     }
 
     #[test]
@@ -2790,6 +2341,132 @@ mod tests {
         assert!(result.scan_steps.iter().all(|step| step.point_count > 0));
         assert!(result.scan_step_spacing_m > 0.0);
         assert!(result.message.contains("4 adım/geçiş"));
+        assert!(result.message.contains("leveling 2 geçiş"));
+    }
+
+    #[test]
+    fn matrix_steps_do_not_change_metal_depth_when_json_passes_exist() {
+        let auto = analyze_legacy_dik(&mini_json()).expect("auto");
+        let matrix = analyze_legacy_dik_with_steps(&mini_json(), Some(8)).expect("matrix");
+        assert_eq!(auto.scan_step_count, 2);
+        assert_eq!(matrix.scan_step_count, 8);
+        let (Some(a), Some(b)) = (auto.metals.first(), matrix.metals.first()) else {
+            panic!("expected metal on both runs");
+        };
+        assert!(
+            (a.depth_top_m - b.depth_top_m).abs() < 0.05
+                && (a.depth_bottom_m - b.depth_bottom_m).abs() < 0.05,
+            "depth drifted: auto {:.2}-{:.2} vs matrix {:.2}-{:.2}",
+            a.depth_top_m,
+            a.depth_bottom_m,
+            b.depth_top_m,
+            b.depth_bottom_m
+        );
+        assert_eq!(a.depth_method, b.depth_method);
+    }
+
+    #[test]
+    fn bakir_tava_matrix_keeps_json_pass_depth() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("examples")
+            .join("bakir_tava_6-3.json");
+        if !path.is_file() {
+            return;
+        }
+        let content = std::fs::read_to_string(&path).expect("read bakir");
+        let auto = analyze_legacy_dik(&content).expect("auto");
+        let matrix = analyze_legacy_dik_with_steps(&content, Some(18)).expect("6x3");
+        assert_eq!(auto.scan_step_count, 3);
+        assert_eq!(matrix.scan_step_count, 18);
+        assert!(matrix.message.contains("leveling 3 geçiş"));
+        let (Some(a), Some(b)) = (auto.metals.first(), matrix.metals.first()) else {
+            panic!("expected metal");
+        };
+        let mid_a = 0.5 * (a.depth_top_m + a.depth_bottom_m);
+        let mid_b = 0.5 * (b.depth_top_m + b.depth_bottom_m);
+        assert!(
+            (mid_a - mid_b).abs() < 0.08,
+            "bakır depth drifted: auto {mid_a:.2} vs matrix {mid_b:.2}"
+        );
+        assert_eq!(a.depth_method, "bipolar");
+        // Yumuşatılmış bipolar + 0.40 m cihaz ofseti (~2.9 m).
+        assert!(
+            (2.7..=3.5).contains(&mid_b),
+            "expected softened+offset ~2.9 m bipolar depth, got {mid_b:.2}"
+        );
+        assert!(
+            !auto.invert_proxies.is_empty(),
+            "expected compact invert proxy on bakır"
+        );
+        let p = &auto.invert_proxies[0];
+        assert_eq!(p.method, "compact-dipole");
+        assert!(p.disclaimer.contains("CAD"));
+        assert!(p.depth_m.is_finite() && p.depth_m > 0.2);
+        assert!(p.misfit_rms.is_finite());
+        assert!(p.polygon.len() >= 8);
+    }
+
+    #[test]
+    fn depth_params_defaults_and_clamp() {
+        let d = LegacyDepthParams::default();
+        assert!((d.sensor_height_m - 0.50).abs() < 1e-6);
+        assert!((d.bipolar_sep_factor - 1.85).abs() < 1e-6);
+        assert!((d.dipole_blend - 0.30).abs() < 1e-6);
+        let raw = serde_json::json!({});
+        let parsed: LegacyDepthParams = serde_json::from_value(raw).expect("empty object");
+        assert_eq!(parsed, LegacyDepthParams::default());
+        let clamped = LegacyDepthParams {
+            sensor_height_m: 9.0,
+            bipolar_sep_factor: 0.1,
+            dipole_blend: 2.0,
+        }
+        .clamped();
+        assert!((clamped.sensor_height_m - 0.50).abs() < 1e-6);
+        assert!((clamped.bipolar_sep_factor - 0.5).abs() < 1e-6);
+        assert!((clamped.dipole_blend - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn bakir_sensor_height_is_fixed_at_half_meter() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("examples")
+            .join("bakir_tava_6-3.json");
+        if !path.is_file() {
+            return;
+        }
+        let content = std::fs::read_to_string(&path).expect("read bakir");
+        let with_h = analyze_legacy_dik_with_options(
+            &content,
+            None,
+            None,
+            LegacyDepthParams {
+                sensor_height_m: 0.50,
+                ..LegacyDepthParams::default()
+            },
+        )
+        .expect("h=0.50");
+        let without_h = analyze_legacy_dik_with_options(
+            &content,
+            None,
+            None,
+            LegacyDepthParams {
+                sensor_height_m: 0.0,
+                ..LegacyDepthParams::default()
+            },
+        )
+        .expect("h=0 is clamped to 0.50");
+        let (Some(a), Some(b)) = (with_h.metals.first(), without_h.metals.first()) else {
+            panic!("expected metal");
+        };
+        let mid_a = 0.5 * (a.depth_top_m + a.depth_bottom_m);
+        let mid_b = 0.5 * (b.depth_top_m + b.depth_bottom_m);
+        let delta = mid_a - mid_b;
+        assert!(
+            delta.abs() < 0.001,
+            "fixed 0.50 m boundary must ignore zero override: {mid_a:.3} vs {mid_b:.3}"
+        );
     }
 
     #[test]
@@ -2812,6 +2489,36 @@ mod tests {
         assert_eq!(result.scan_step_input_m, 0.0);
     }
     #[test]
+    fn analyze_records_format_without_scan_wrapper() {
+        let json = r#"{
+          "metadata": {"deviceCode":"Legacy3DMagDevice", "xMeters":4.0, "yMeters":4.0},
+          "columns": ["bx", "by", "bz", "pos_x", "pos_y"],
+          "data": [
+            {"bx":100,"by":100,"bz":100,"pos_x":0,"pos_y":0},
+            {"bx":100,"by":100,"bz":100,"pos_x":0,"pos_y":1},
+            {"bx":100,"by":100,"bz":100,"pos_x":1,"pos_y":0},
+            {"bx":100,"by":100,"bz":100,"pos_x":1,"pos_y":1},
+            {"bx":900,"by":900,"bz":900,"pos_x":0.5,"pos_y":0.5}
+          ]
+        }"#;
+        let result = analyze_legacy_dik(json).expect("records format should analyze");
+        assert!(result.ok);
+        assert_eq!(result.point_count, 5);
+        assert!(result.grid_width_m > 0.0 && result.grid_depth_m > 0.0);
+    }
+
+    #[test]
+    fn analyze_split_format_with_numeric_rows() {
+        let json = r#"{
+          "meta": {"device": "Legacy3DMagDevice", "width_m": 3.0, "depth_m": 3.0},
+          "columns": ["x", "y", "z", "x_coord", "y_coord"],
+          "data": [[100,100,100,0,0],[100,100,100,0,1],[100,100,100,1,0],[100,100,100,1,1],[700,700,700,0.5,0.5]]
+        }"#;
+        let result = analyze_legacy_dik(json).expect("root split format should analyze");
+        assert!(result.ok);
+        assert_eq!(result.point_count, 5);
+    }
+    #[test]
     fn analyze_example_file_if_present() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
@@ -2827,6 +2534,45 @@ mod tests {
         assert_eq!(r.meta.x_meters, 4.0);
         assert_eq!(r.meta.y_meters, 5.0);
         assert!(r.point_count >= 10);
+    }
+
+    #[test]
+    fn analyze_golden_records_fixture() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("examples")
+            .join("legacy_dik_records_fixture.json");
+        let content = std::fs::read_to_string(&path).expect("records fixture");
+        assert!(looks_like_legacy_dik(&content, Some("legacy_dik_records_fixture.json")));
+        let r = analyze_legacy_dik(&content).expect("analyze records fixture");
+        assert!(r.ok);
+        assert_eq!(r.point_count, 8);
+    }
+
+    #[test]
+    fn analyze_golden_root_split_fixture() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("examples")
+            .join("legacy_dik_root_split_fixture.json");
+        let content = std::fs::read_to_string(&path).expect("root split fixture");
+        assert!(looks_like_legacy_dik(&content, Some("legacy_dik_root_split_fixture.json")));
+        let r = analyze_legacy_dik(&content).expect("analyze root split fixture");
+        assert!(r.ok);
+        assert_eq!(r.point_count, 8);
+    }
+
+    #[test]
+    fn ambiguous_magnetic_position_columns_error() {
+        // Bx yok; x hem manyetik hem konum olarak çözülmeye çalışılırsa çakışma.
+        // Burada x_coords yok ve bx yok → konum hatası (çakışmadan önce).
+        let json = r#"{
+          "metadata": {"device_code":"Legacy3DMagDevice","x_meters":2.0,"y_meters":2.0},
+          "columns": ["x","y","z"],
+          "data": [[1,1,1],[2,2,2]]
+        }"#;
+        let err = analyze_legacy_dik(json).expect_err("konum kolonu olmadan hata");
+        assert!(err.contains("konum"), "got: {err}");
     }
 
     #[test]
@@ -3104,7 +2850,7 @@ mod tests {
         let mut anomalies_json = Vec::new();
         let mut saw_strong = 0usize;
         for blob in &blobs {
-            let s = blob_to_shape(blob, &resid, gw, gh, ext, sigma, false);
+            let s = blob_to_shape(blob, &resid, gw, gh, ext, sigma, false, LegacyDepthParams::default());
             if s.strength >= 3.0 {
                 saw_strong += 1;
                 let (area_norm, _) = polygon_area_perimeter(&s.polygon);

@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { state } from "../../app/state.js";
 import { colorByDepth, formatDepthM } from "../colors.js";
 import { makeBadgeSprite, makeDetailSprite } from "../labels.js";
-import { mapToWorld } from "../coords.js";
+import { recordPointToWorld } from "../coords.js";
 import { applyTierGhost, makeTierLabel } from "./tierGhost.js";
 import { t } from "../../i18n/index.js";
 import { metalCueTitle } from "../../i18n/labels.js";
@@ -34,7 +34,7 @@ export function makeMetal(m, mapW, mapD, vertExag, wireframe, id, num, sideView 
   // Host yoksa bile çiz — her metal haritada görünsün
   // if (!host || !inside) return null;  // eskisi: sadece chamber içi
 
-  const { x, z } = mapToWorld(Math.max(0, Math.min(1, m.cx)), Math.max(0, Math.min(1, m.cy)), mapW, mapD, sideView);
+  const { x, z } = recordPointToWorld(m, "cx", "cy", mapW, mapD, sideView);
   const dM = m.depthFromSurfaceM ?? m.depth_from_surface_m ?? 1;
   const wM = Math.max(m.widthM ?? m.width_m ?? 1.2, 0.4);
   const lM = Math.max(m.lengthM ?? m.length_m ?? wM, 0.4);
@@ -242,7 +242,7 @@ export function makeMetal(m, mapW, mapD, vertExag, wireframe, id, num, sideView 
 
 /** 3D mesh yoksa bile (yapı dışı alan) kameranın gideceği nokta. */
 export function ensureMetalFocusTarget(m, id, mapW, mapD, vertExag, sideView = false) {
-  if (!m || !id || state.structureTargets[id]) return;    const { x, z } = mapToWorld(Math.max(0, Math.min(1, m.cx)), Math.max(0, Math.min(1, m.cy)), mapW, mapD, sideView);
+  if (!m || !id || state.structureTargets[id]) return;  const { x, z } = recordPointToWorld(m, "cx", "cy", mapW, mapD, sideView);
     const dM = Number(m.depthFromSurfaceM ?? m.depth_from_surface_m ?? 1);
     const wM = Math.max(m.widthM ?? m.width_m ?? 1.2, 0.4);
   const lM = Math.max(m.lengthM ?? m.length_m ?? wM, 0.4);

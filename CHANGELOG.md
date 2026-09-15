@@ -1,10 +1,777 @@
-# VOTEX CHANGELOG
+## 0.4.89 — 15 Eylül 2026
 
-Tüm sürümlerin değişiklik kaydı.
+### Adım ızgarası haritaya tam oturur
+
+- Matris hücreleri artık kareye sıkıştırılmaz; `width/cols × depth/rows` ile harita kenarına kadar uzanır.
+- 9×3 / 3×6 m gibi dikdörtgen sahalarda yandaki boş şerit kalkar.
+- VOTEX 0.4.89 Windows NSIS setup üretildi.
 
 ---
 
-## 0.4.21 — 7 Eylül 2026
+## 0.4.88 — 15 Eylül 2026
+
+### Adım numaralandırma LTR / RTL
+
+- Soldan sağa / sağdan sola seçimi artık aynı fiziksel noktada görünen adım numarasını değiştirir.
+- 3D hücre etiketleri ve sol panel listesi birlikte güncellenir (matris satır×sütun gerekli).
+- VOTEX 0.4.88 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.87 — 15 Eylül 2026
+
+### Sol menü tespit tıklanınca boş 3D ekran
+
+- Tespit seçiminde `legacyRealisticLayer` ve diğer detectionId’siz katman kökleri artık gizlenmez.
+- Odak yolu `selectedStructureId` + seçim rehberi + ebeveyn zincirini açar.
+- Legacy JSON yüklenince JPG placeholder kapanır.
+- VOTEX 0.4.87 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.86 — 15 Eylül 2026
+
+### Legacy JSON görüntüleme onarımı
+
+- Bozuk Saha görünümü yaması kaldırıldı; `legacyDikOverlay.js` tekrar parse edilir.
+- **Birleşik 3D / Saha planı / Sadece objeler** gerçek katman ayrımı yapar (her şeyi gizlemez).
+- Tomografi / yüzey altı / jeotermal / derinlik haritası tespit seçiminde kapanmaz.
+- Saha görünümü HTML satırı düzeltildi; panel `applyFocusSafeStepVisibility` importu eklendi.
+- Kontür↔sinyal karışım opaklığı okunur hale getirildi; uzak invert proxy zorla bağlanmaz.
+- VOTEX 0.4.86 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.85 — 14 Eylül 2026
+
+### Sol menü seçiminde boş 3D ekran düzeltmesi
+
+- Sol menüden obje seçildiğinde seçilen objenin alt gövde/container parçaları artık gizlenmez.
+- Basit/Saha görünüm profilleri seçili objenin gövdesini, etiketi ve yardımcı parçalarını kapatamaz.
+- Seçili objenin kimliği ebeveyn grupta bulunduğunda da doğru şekilde çözülür.
+- İlgili seçim regresyonları doğrulandı.
+
+---
+
+## 0.4.84 — 14 Eylül 2026
+
+### Etiket görünürlüğü ve adım numaralandırma yönü
+
+- 3D etiket seçeneği açıkça **Göster · rozet**, **Göster · tam kart** ve **Etiketleri kaldır** olarak ayrıldı.
+- Adım numaralandırması için **Soldan sağa** ve **Sağdan sola** seçenekleri eklendi.
+- Yön değiştiğinde mevcut JSON yeniden analiz edilerek panel, hücre, adım ve obje eşleştirmesi birlikte güncellenir.
+- VOTEX 0.4.84 Windows setup üretildi.
+
+---
+
+
+### Sol menü adım ve obje seçim düzeltmesi
+
+- Sol menüdeki adım kartları artık ortak seçim ve kamera odaklama akışını doğru çalıştırır.
+- Obje kartları, “3D’de göster” ve “Sadece bunu göster” eylemleri ilgili adım filtresini uygular.
+- Liste filtrelerinde tıklama hatası giderildi.
+
+---
+
+## 0.4.82 — 14 Eylül 2026
+
+### Ortak adım–obje–kamera seçimi
+
+- Adım, obje kartı, rapor kartı ve 3D tıklaması ortak Legacy seçim/odaklama akışına bağlandı.
+- Seçili adım dışında kalan Legacy görsel katmanları ve yardımcı objeler gizlenir.
+- Tümü seçimi adım, obje ve kamera seçim durumunu birlikte sıfırlar.
+
+---
+
+## 0.4.81 — 14 Eylül 2026
+
+### Adım filtresi ve temiz 3D kurulum
+
+- Seçili adım görünürlük düzeltmeleriyle birlikte yeni Windows kurulum paketi üretildi.
+- Tauri ve birleşik DFT Suite paketleri aynı sürüm metadata’sını kullanır.
+
+---
+
+## 0.4.80 — 14 Eylül 2026
+
+### Adım numarasıyla doğrudan odaklama
+
+- Adım numarası girilip Git seçildiğinde kamera doğrudan ilgili hücreye gider.
+- Yalnız seçilen adıma bağlı kare, işaretler ve 3D objeler görünür.
+- Tümü seçeneğiyle saha görünümü geri alınabilir.
+
+---
+
+Tüm sürümlerin değişiklik kaydı.
+
+## 0.4.79 — 14 Eylül 2026
+
+### Adım seçimi görünürlüğü
+
+- Adım seçildiğinde yalnız seçilen hücre, tarama işareti ve o hücreye bağlı objeler görünür.
+- Tümü seçildiğinde tüm hücreler ve objeler geri gelir.
+
+## 0.4.78 — 14 Eylül 2026
+
+### Saha görünüm modları
+
+- Legacy3DMAG için Birleşik 3D, Saha planı ve Sadece objeler görünümleri eklendi.
+- Saha planında adım kareleri ve numaraları korunurken derinlik objeleri gizlenebilir.
+- Görünüm değiştiğinde seçili adım ve filtre durumu korunur.
+
+---
+
+## 0.4.77 — 13 Eylül 2026
+
+### Adım–obje koordinat hizalaması
+
+- 6×3 şablonunda hücreler gerçek fiziksel tarama adımlarının merkezlerine bağlandı.
+- Obje konumu ile adım etiketi aynı `cx/cy` koordinat sözleşmesini kullanıyor.
+- JSON’daki 3 fiziksel geçiş, manuel 18 hücreye global bölünmek yerine her geçiş içinde 6 hücreye ayrılıyor.
+- Tespit seçimi ve 3D hücre görünürlüğü hizalı hale getirildi.
+- VOTEX 0.4.77 Windows setup üretildi.
+
+---
+
+
+
+### Kare tabanlı tarama şablonu
+
+- `6×3` girişi artık 6 satır × 3 sütun olarak gerçek kare hücre şablonuna dönüştürülür.
+- 3D sahnede her ölçüm adımı kare hücre, numara ve gidiş/dönüş yönüyle gösterilir.
+- Kare şablonu ile cihazın fiziksel tarama yolu birbirinden ayrılır; adım seçimi hücre bazında çalışır.
+- 38 test dosyası ve 373 JavaScript testi doğrulandı.
+- VOTEX 0.4.76 Windows setup üretildi.
+
+---
+
+
+
+### Adım bazlı obje görünümü
+
+- Taramadaki adım kartına tıklanınca yalnız o adımda çıkan 3D objeler, sinyal katmanları ve bağlantı kılavuzları gösterilir.
+- **Tümü** düğmesiyle tüm objeler yeniden görünür.
+- Başlangıçta tüm objeler görünür; seçili adım durumu panel, 3D ve tespit eşlemesinde ortak kullanılır.
+- VOTEX 0.4.75 Windows setup üretildi.
+
+---
+
+## 0.4.74 — 13 Eylül 2026
+
+### Cihaz–yüzey sınırı 50 cm
+
+- Legacy JSON Parametrelerinde cihaz–yüzey sınırı sabit **0,50 m (50 cm)** yapıldı.
+- Cihaz–yüzey alanı kullanıcı tarafından değiştirilemez; hedef derinlik bipolar çarpan ve dipol karışımıyla ayarlanır.
+- Derinlik kalibrasyon önerileri sabit 0,50 m değerini korur.
+- VOTEX 0.4.74 Windows setup üretildi.
+
+---
+
+## 0.4.73 — 13 Eylül 2026
+
+### Fiziksel gidiş-dönüş tarama sırası
+
+- Adım numaraları artık koordinata göre yeniden sıralanmaz; JSON/cihazın gerçek kaynak sırası korunur.
+- Soldan tutulan cihazın gidiş-dönüş hareketi ve hatlar arasındaki bir adım kayması panel, 3D ve raporda aynı görünür.
+- Rust analiz hattı ile JavaScript normalizasyon hattı aynı fiziksel sıra sözleşmesini kullanır.
+- 6'lı gidiş-dönüş ve kaydırılmış hatlar için regresyon testleri eklendi.
+- VOTEX 0.4.73 Windows setup üretildi.
+
+---
+
+## 0.4.72 — 13 Eylül 2026
+
+### Görsel adım sıralaması ve yeni Windows setup
+
+- Legacy3DMAG adımları artık sol-alt noktadan başlayıp satır içinde soldan sağa, satır bitince üst satıra geçecek şekilde numaralandırılır.
+- Serpantin/ters numaralandırma kaldırıldı; panel, 3D cetvel, rapor ve tespit eşleştirmesi aynı görsel sıra sözleşmesini kullanır.
+- VOTEX 0.4.72 Windows setup üretildi.
+
+---
+
+
+### JSON 3D geometri ayrımı ve kurulum paketi
+
+- Normalize edilmiş JSON sonuçları tekrar işlendiğinde tarama adımları tersine dönmez.
+- 3D görsel kaynakları ölçülmüş kontur, tahmini şekil ve yalnız manyetik sinyal olarak ayrıştırılır.
+- Obje etiketlerinde geometri kaynağı açıkça gösterilir.
+- VOTEX 0.4.71 Windows NSIS setup üretildi.
+
+---
+
+
+### Kalibrasyon · Saha özeti · Karşılaştır · Tutarlılık · Multi-invert · Rehber
+
+- **Kalibrasyon defteri**: Parametre çekmecesinde saha etiketi + derinlik çarpanlarını kaydet / yükle / sil.
+- **Saha özeti**: Yazdırılabilir HTML (PDF) — seçili bulgu, lejant, Parametre; CSV/GeoJSON yanına.
+- **Karşılaştır** kaydırıcısı: kontür ↔ sinyal karışımı; Invert açıksa ortada proxy vurgusu.
+- **Çoklu çekim tutarlılık**: aynı saha adına göre arşiv Δz rozeti (tutarlı / orta / dağınık).
+- **Invert proxy** tüm metallere (en fazla 5 örtüşmeyen blob).
+- **İlk 5 dk rehberi**: dik çekim kutusunda kapatılabilir kontrol listesi.
+- VOTEX 0.4.70 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.69 — 13 Eylül 2026
+
+### Matris uyarı · Invert seçim · Tomografi peaking · Export
+
+- Tarama matrisi etiketi vs analiz adım sayısı uyumsuzsa kırmızı uyarı.
+- Invert proxy seçili tespitte görünür; z belirsizlik bandı (misfit) eklendi.
+- Tomografi peaking sıkılaştırıldı; odak tespitte dilimler yeniden boyanır.
+- Tespitler **CSV** / **GeoJSON** dışa aktarım (plan metre + Parametre özeti).
+- VOTEX 0.4.69 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.68 — 12 Eylül 2026
+
+### Tarama matrisi giriş kutuları
+
+- Satır × sütun kutuları genişletildi; rakam rahat girilir.
+- VOTEX 0.4.68 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.67 — 12 Eylül 2026
+
+### 3D tıklama düzeltmesi + AI → Parametre
+
+- Yüzey tıklaması y=0 düzlemine sabitlendi; duvar/taban hit’ine aldanmadan en yakın bulguya kamera odaklanır.
+- **AI öner** sonucu Parametre alanlarına otomatik yazılır (kaydetmek için Uygula).
+- VOTEX 0.4.67 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.66 — 12 Eylül 2026
+
+### 3D yüzey tıklama → kamera odak
+
+- Manyetik harita / yüzeydeki bulguya tıklanınca en yakın Legacy tespit seçilir ve kamera oraya uçar.
+- Liste kartı kaydırılır; saha özeti / seçim senkronu korunur.
+- VOTEX 0.4.66 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.65 — 12 Eylül 2026
+
+### Invert proxy + dürüst şekil dili + AI kalibrasyon
+
+- Kompakt manyetik **Invert proxy** (dipol uydurma ayak izi): ölçülen kontürü değiştirmez; CAD / gerçek şekil iddiası yok.
+- 3D çizim etiketleri: **Anomali kontürü** / aday dil; “Net şekil / Tünel / Oda” yanıltıcı etiketleri kaldırıldı.
+- Parametre çekmecesinde **saha etiketi + AI öner / Öneriyi yaz** (AI yoksa yerel öneri).
+- VOTEX 0.4.65 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.64 — 12 Eylül 2026
+
+### Parametre çekmecesi (derinlik çarpanları)
+
+- Legacy JSON panelinde **Parametre** katlanır ayar: cihaz–yüzey (m), bipolar çarpan, dipol karışım (%).
+- Değerler `%APPDATA%\Votex\settings.json` içinde kalıcı; Uygula kaydeder ve yüklü JSON’u yeniden analiz eder.
+- Varsayılanlar: 0,40 m / 1,85 / %30 dipol (önceki sabitlerle aynı).
+- VOTEX 0.4.64 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.63 — 12 Eylül 2026
+
+### Ters adım numarası + cihaz–yüzey 40 cm
+
+- Adım indeksleri serpantin yolun **tersinden** yazılır (eski son konum = Adım 1).
+- Derinlik tahminlerine cihaz–yüzey boşluğu **+0,40 m** eklenir (metal + heuristic).
+- VOTEX 0.4.63 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.62 — 12 Eylül 2026
+
+### Serpantin adım dizilişi + derinlik yumuşatma
+
+- Matris numaralandırma artık **serpantin**: çift sütun Y↑, tek sütun Y↓ (cihaz yürüyüşü).
+- 3D adım yolu sütun içi bağlanır; sütunlar arası uzun atlama çizgisi kesilir.
+- Bipolar derinlik: `z ≈ 1.85·Δ`, dipolle %30/%70 karışım (~2,5 m; önceki ~3,1 m abartısı azaltıldı).
+- VOTEX 0.4.62 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.61 — 12 Eylül 2026
+
+### 3D adım etiketleri daha ince/küçük
+
+- “Adım N” yazıları ince (400) ve daha küçük punto; sahne kalabalığı azaldı.
+- VOTEX 0.4.61 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.60 — 11 Eylül 2026
+
+### Bipolar metal derinliği (tepe–çukur)
+
+- Yalnızca pozitif lobdaki dipol fit ~1,5 m’ye sığ kalabiliyordu; net negatif çukur varken **bipolar proxy** (z ≈ 2·Δ) kullanılır.
+- Bakır tava örneği: merkez ~3,1 m, örtü ~2,2–3,9 m (saha etiketi 3,3–3,5 m bandı).
+- Matris girişi derinliği hâlâ değiştirmez (0.4.59 davranışı korunur).
+- VOTEX 0.4.60 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.59 — 11 Eylül 2026
+
+### Matris girişi derinliği bozmaz
+
+- JSON’da fiziksel `segment_ranges` varken **satır×sütun matrisi yalnızca adım etiketleri** üretir; median leveling geçişleri ezilmez.
+- Böylece (ör. bakır tava 6×3) matris girince derinlik ~1,5 m’ye çökmez; JSON geçişleriyle aynı proxy derinlik kalır.
+- Segmenti olmayan dosyalarda eski davranış korunur (adım sayısı leveling’i de bölebilir).
+- VOTEX 0.4.59 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.58 — 11 Eylül 2026
+
+### Tarama matrisi girişi (satır × sütun)
+
+- “Adım sayısı” yerine **Satır × Sütun** girilir (ör. 6×3 = 18 adım).
+- Toplam adım = satır×sütun; numaralandırma matris sırasıyla (sol→sağ sütun, alttan üste).
+- İkisi 0 ise otomatik (JSON segment / adım ölçüsü) devam eder.
+- VOTEX 0.4.58 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.57 — 11 Eylül 2026
+
+### Tarama adımları matris sırası
+
+- Cihaz ızgarası (ör. **6×3 = 18 adım**) matris gibi numaralanır: sol sütundan sağa, her sütunda alttan üste.
+- X/Y kümeleri otomatik bulunur; net ızgara yoksa önceki kararlı yedek sıra kullanılır.
+- Panel, 3D cetvel ve tespit–adım eşlemesi aynı matris numarasını paylaşır.
+- VOTEX 0.4.57 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.56 — 11 Eylül 2026
+
+### Panel adımı = 3D adım (serpentine düzeltmesi)
+
+- `orderScanStepsLeftFirst` ekseni artık X/Y **açıklığına** göre seçer (ardışık dx/dy değil) → idempotent.
+- `legacyStepsOf` ikinci kez sıralamazdı; panel “Adım 19” / 3D “Adım 13–14” kayması giderildi.
+- En yakın adım: segment mesafesi (uzun geçişlerde doğru hat).
+- Adım etiketleri halkanın üstünde (yan offset yok).
+- VOTEX 0.4.56 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.55 — 11 Eylül 2026
+
+### 3D obje–adım hizası
+
+- Ölçüm poligonu artık tespit tepesine (`cx/cy`) ankrajlanır; adım eşlemesi ile aynı nokta.
+- Ölçülmüş kontura `orientationDeg` tekrar uygulanmaz (çift döndürme kaymasını giderir).
+- Adım merkezi ile tepe arasında yüzey bağlantı çizgisi (uzaksa).
+- Adım etiketleri işaretçiye daha yakın.
+- VOTEX 0.4.55 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.54 — 11 Eylül 2026
+
+### 3D adımlar + etiket / menü okunabilirliği
+
+- 3D çizimde tarama adımları (yol, halka, “Adım N”) tespit seçiliyken de görünür kalır.
+- Nesne etiketlerinde kenar boşluğu sıkılaştırıldı; yazı punto aynı.
+- Sol menü Legacy yazı boyutları eşitlendi (küçük punto override’ları kaldırıldı).
+- VOTEX 0.4.54 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.53 — 11 Eylül 2026
+
+### Tarama Adımları Soldan
+
+- `scan_steps` leveling sonrası **küçük X → büyük X** sıralanır; Adım 1 solda.
+- Leveling segment sırası (manyetik referans) değişmez; blob/metal konumu aynı.
+- Eski arşiv RTL sonuçları JS normalize ile de sol-önce yeniden numaralanır.
+- VOTEX 0.4.53 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.52 — 11 Eylül 2026
+
+### Bilimsel etiket düzeltmesi
+
+- Manyetik tepki: “Ferromanyetik” iddiası kaldırıldı → **güçlü pozitif (metal-benzeri)** / **negatif (boşluk-benzeri)**.
+- Lejant ölçeği: ham residual vs `magSigma` ile gerçek σ ayrımı; kalibre nT yok.
+- VOTEX 0.4.52 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.51 — 11 Eylül 2026
+
+### Lejant · Sayısal Güven · Manyetik Tepki
+
+- Ana ekran lejantı: tür renkleri + **+σ / −σ** kutup satırı; not: `residual σ · kalibre nT değil`; grid max |residual| ölçeği.
+- 3D kart / saha özeti: `güven orta (%72) · 3.4σ` (peakSigma = SNR proxy).
+- Manyetik tepki yorumu (metal-benzeri / boşluk-benzeri) + **χ ölçülmedi · malzeme kimliği değil**.
+- Analiz / Rust sözleşmesi değişmez.
+- VOTEX 0.4.51 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.50 — 11 Eylül 2026
+
+### Kesit ↔ Obje Senkronu · Saha Özeti · Güven Kabuğu
+
+- **Tomografi dilimi** açıkken dilim bandındaki objeler parlak, dışı soluk (X-Ray’de opaklık `_origMat` üzerinden; ortak shader sızdırmaz); seçili bulgu okunur kalır.
+- Tespit seçince **SAHA ÖZETİ** kartı: derinlik, konum, boyut, güven + metni kopyala.
+- Tahmini gövdede düşük güven → daha geniş **belirsizlik kabuğu** (yalnız görsel).
+- Analiz / tespit sonucu değişmez.
+- VOTEX 0.4.50 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.49 — 11 Eylül 2026
+
+### Tahmini Gövde (Her Bulgu)
+
+- Her tespitte okunabilir **tahmini gövde**: ölçüm poligonu ≥3 ise o kontür; değilse `shapeType` şablonu (daire/elips/dikdörtgen/kapsül).
+- Yüzeyde ayak izi halkası; düşük güven → daha şeffaf / kesikli kenar.
+- **Net şekil** bakışında görünür; analiz sonucu değişmez.
+- VOTEX 0.4.49 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.48 — 10 Eylül 2026
+
+### Saha Kullanıcısı 3D Çizimleri
+
+- Varsayılan **Net şekil** bakışı: sinyal bulutu kapalı; dolu çekirdek / oda / tünel okunur.
+- Panelde **3D çizim**: Net şekil / Sinyal bulutu / İkisi birlikte.
+- Tür renkleri (Metal / Anomali / Tünel / Oda) + efsane.
+- İlk bulgularda **1 m ölçek çubuğu** ve sade derinlik oku.
+- Etiket metni sade dil: “Ne kadar derin / Haritada nerede / Ne kadar net” (RMS/σ yok).
+- Seçili bulgu parlak, diğerleri soluk — hesap sonucu değişmez.
+- VOTEX 0.4.48 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.47 — 10 Eylül 2026
+
+### Çift 3D Etiket Düzeltmesi
+
+- Metal seçiminde `shape.label` + rank kartı çakışması kaldırıldı; tek kanonik detay kartı.
+- Yedek `makeDetailSprite` / çift rozet artık açılmaz.
+- VOTEX 0.4.47 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.46 — 10 Eylül 2026
+
+### 3D Etiket Çorbası Düzeltmesi
+
+- Varsayılan **Rozet** modu: küçük `#N` pin’ler; tam kart yalnız seçili tespitte.
+- Panelde **3D etiket** seçici: Rozet / Tam kart / Kapalı.
+- Adım ve tespit filtresi etiketlere de uygulanır; obje geometrisi kapanmaz.
+- Metal seçiminde çift kart (`shape.label` + rank) kaldırıldı; tek kanonik detay kartı.
+- VOTEX 0.4.46 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.45 — 10 Eylül 2026
+
+### Tahmini Derinlik Haritası
+
+- LEGACY3DMAG panelinde bağımsız **▤ Derinlik** aç/kapa düğmesi.
+- Residual `|σ|` → derinlik proxy planı (güçlü=sığ, zayıf=derin); sığ→derin renk efsanesi.
+- Invert / tespit / pick etkilenmez; manyetik grid üstünde bakış katmanı.
+- VOTEX 0.4.45 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.44 — 10 Eylül 2026
+
+### Jeotermal AI Yorumu
+
+- Jeotermal açıkken **🤖 AI yorumla** düğmesi: `|σ|` proxy özeti + sıcak odaklar + tespit bağlamı.
+- Yerel AI sunucusu (`aiClient` / Ollama) varsa Türkçe yorum; yoksa deterministik yerel özet.
+- 3D harita ve tespit mesh’leri değişmez; sonuç panelde metin olarak gösterilir.
+- °C olmadığı her yanıtta hatırlatılır.
+- VOTEX 0.4.44 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.43 — 10 Eylül 2026
+
+### Jeotermal 3D Proxy Haritası
+
+- LEGACY3DMAG panelinde bağımsız **♨ Jeotermal** aç/kapa düğmesi.
+- Residual `|σ|` tabanlı ısı anomalisi skoru + Termal LUT (gerçek °C değil; proxy).
+- Çok dilimli yarı saydam hacim; tespit peaking / odak yok; pick tespitlere geçer.
+- Tomografi ve yüzey altı haritasından ayrı katman.
+- VOTEX 0.4.43 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.42 — 10 Eylül 2026
+
+### Yüzey Altı 3D Renk Haritası
+
+- LEGACY3DMAG panelinde bağımsız **▣ Yüzey altı** aç/kapa düğmesi.
+- Residual grid’den çok dilimli yarı saydam renk hacmi; tespit peaking / odak yok.
+- Adım veya tespit seçimi haritayı gizlemez; pick ışını tespit mesh’lerine geçer.
+- Tomografi inceleme aracı ayrı kalır (slider / play / tespit odağı).
+- VOTEX 0.4.42 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.41 — 10 Eylül 2026
+
+### Tomografi İnceleme Aracı
+
+- Tek dilim modu: derinlik slider + metre etiketi, Play/Durdur, opaklık kontrolü.
+- Tespit tıklanınca tomografi o hedefin derinlik aralığına odaklanır.
+- Renk efsanesi (−σ / 0 / +σ / ölçülmedi), |σ| eşik slider, NormalBlending ile okunabilir katman.
+- Dilim başına derinlik peaking: tespit merkezlerinde Gaussian tepe, yüzey residual kopyası değil.
+- VOTEX 0.4.41 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.40 — 10 Eylül 2026
+
+### JSON Hattı Sözleşmesi ve Parser Sertleştirme
+
+- Tek JS DTO adaptörü (`normalizeLegacyResult`): eski arşiv `snake_case` yalnız burada çözülür; overlay, tomografi, 3D motor ve panel camelCase okur.
+- Şekil birleştirme (`cx:cy` + metal önceliği) tek fonksiyonda toplandı.
+- JSON UI `legacyDikPanel.js` modülüne taşındı; arşiv açılışı dosya seçimiyle aynı sol liste / özet / tomografi yolunu kullanır.
+- Zero-order median leveling panele bağlandı (Leveling → yeniden analiz).
+- Parser imzası substring yerine gerçek parse denemesine bağlandı; analiz komutu geçersiz JSON’u reddeder.
+- Belirsiz manyetik/konum kolon çakışmasında açıklayıcı hata.
+- Desteklenen biçim matrisi: pandas-split string `scan` · kök `columns`+sayısal `data` · records (`bx`/`pos_x`).
+- Altın fixture’lar: `examples/legacy_dik_sample.json`, `legacy_dik_records_fixture.json`, `legacy_dik_root_split_fixture.json`.
+- Rust `legacy_mag_json` parse / level / analyze modüllerine bölündü; public API aynı kaldı.
+- VOTEX 0.4.40 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.39 — 9 Eylül 2026
+
+### Legacy Obje Etiketlerinde Net Metre Bilgisi
+
+- 3D obje etiketlerinde derinlik aralığı ve merkez derinliği açıkça `m` birimiyle gösterilir.
+- Obje plan konumu X/Y değerleri metre olarak etiketlenir.
+- Obje genişlik × uzunluk × yükseklik ölçüsü doğrudan etiket üzerinde metre birimiyle gösterilir.
+- Etiketler Basit görünümde ve adım filtresi uygulanırken korunur.
+- VOTEX 0.4.39 Windows setup üretildi.
+
+---
+
+## 0.4.38 — 9 Eylül 2026
+
+### Legacy Etiket ve Tomografi Görünürlük Düzeltmesi
+
+- Legacy3DMAG obje etiketleri artık adım filtresi ve Basit görünüm profili nedeniyle kaybolmuyor.
+- Tomografi dilimleri adım/tespit görünürlük filtresinden bağımsız korunuyor.
+- Eski arşivlerde yalnızca `residual_preview` bulunan sonuçlardan da tomografi katmanı üretilebiliyor.
+- JSON arşivi açıldığında Tomografi butonu kullanılabilirlik durumunu doğru yansıtıyor.
+- Tomografi katmanı daha okunabilir olacak şekilde opaklık ve çizim harmanlama ayarları iyileştirildi.
+- Legacy etiket ve tomografi regresyon testleri eklendi/güncellendi.
+- VOTEX 0.4.38 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.37 — 9 Eylül 2026
+
+### İsteğe Bağlı Legacy3DMAG Yeraltı Tomografi Katmanı
+
+- JSON `gridValues/gridCoverage` verisinden türetilen çoklu derinlik dilimleri eklendi.
+- LEGACY3DMAG paneline tek butonla açılıp kapatılabilen `▦ Tomografi` kontrolü eklendi.
+- Tomografi katmanı ana yapı geometrilerinden ayrı tutulur; oda, tünel, şaft, metal, seçim, X-Ray ve kesit akışlarını bozmaz.
+- Ölçülmemiş grid hücreleri şeffaf bırakılır; pozitif/negatif manyetik değerler farklı renklerle gösterilir.
+- Tomografi materyalleri ve texture'ları kapatılırken dispose edilerek tekrar açma/kapama sızıntısı önlendi.
+- Basit görünüm profilinde tomografi katmanı teknik grid gibi yanlışlıkla gizlenmez.
+- Tomografi katmanı için 3 yeni test eklendi.
+- VOTEX 0.4.37 Windows NSIS setup metadata'sı güncellendi.
+
+---
+
+## 0.4.36 — 9 Eylül 2026
+
+### Prosedürel 3D Çizim Motoru İlk Sürümü
+
+- Legacy3DMAG JSON verisi için ortak normalize edilmiş renderer modeli eklendi.
+- Oda, kemerli tünel ve şaft geometrileri nesne türüne göre prosedürel olarak üretilir.
+- Ölçüm konturları oda hacmine dönüştürülür; iç hacim, taban ve kenar detayları eklenir.
+- Metal sonuçları polarity, güç ve confidence değerlerine göre çekirdek, sinyal kabuğu ve deterministik plume noktalarıyla gösterilir.
+- Yeni gerçekçi katman mevcut Legacy3DMAG çizimlerinin üzerine bağlanarak eski seçim, adım filtresi, X-Ray ve derinlik cetveli akışları korunur.
+- Renderer normalizasyonu ve tür bazlı geometri için 4 yeni test eklendi; ilgili toplam doğrulama 19 teste ulaştı.
+- VOTEX 0.4.36 Windows NSIS setup metadata'sı güncellendi.
+
+---
+
+## 0.4.35 — 9 Eylül 2026
+
+### 2D–3D Kontur Hizalama Düzeltmesi
+
+- Normalize ölçüm konturları 3D gövdeye aynı global plan dönüşümüyle aktarılır.
+- Ölçülmüş poligon gövdesi lokal merkez etrafında üretilir; merkez ikinci kez uygulanmaz.
+- 2D kontur, 3D gövde, yüzey izdüşümü ve derinlik kılavuzu aynı fiziksel ayak izini kullanır.
+- 2D/3D koordinat hizalama regresyon testleri eklendi.
+- VOTEX 0.4.35 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.34 — 9 Eylül 2026
+
+### JSON 3D Akış Hata Düzeltmesi
+
+- JSON seçimi sonrası 3D üretimini durduran tanımsız koordinat değişkeni giderildi.
+- Metal tespit etiketindeki tanımsız derinlik değişkeni düzeltildi; analiz sonucu ve 3D sahne aynı akışta tamamlanır.
+- JSON analizinden sonra boş ekran yerine sonuçların görünmesi sağlandı.
+- VOTEX 0.4.34 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.33 — 9 Eylül 2026
+
+### JSON Analiz Uyumluluk Düzeltmesi
+
+- JSON analizinde `scan` içindeki pandas biçiminin yanında kök `columns/data`, `rows` ve `records` biçimleri desteklendi.
+- `x/y/z`, `Bx/By/Bz`, `magnetic_*` ve `pos_*` konum/manyetik sütun adları tanınır hale getirildi.
+- Metadata alanlarında camelCase ve alternatif metre alanları desteklendi.
+- JSON veri okunamadığında boş sonuç yerine açıklayıcı hata döndürülmesi sağlandı.
+- JSON parser için iki regresyon testi eklendi.
+- VOTEX 0.4.33 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.32 — 9 Eylül 2026
+
+### Tespit Ölçüsü ve Hacim Tutarlılığı
+
+- Tespitlerin genişlik, uzunluk ve yükseklik ölçülerinden hacim `m³` olarak hesaplanır.
+- 3D tespit gövdeleri rapordaki fiziksel ölçülerle aynı ölçekte çizilir.
+- Tespit kartları ve 3D bilgi pencerelerinde ölçü ve hacim gösterilir.
+- Hacim hesaplama yardımcıları ve regresyon testleri eklendi.
+- VOTEX 0.4.32 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.31 — 9 Eylül 2026
+
+### 3D Koordinat Sözleşmesi ve Kenar/Köşe Konumlandırma Düzeltmesi
+
+- Normalize görüntü koordinatları ile metre tabanlı CSV/terrain koordinatları ortak dönüşüm yardımcılarında ayrıştırıldı.
+- Oda, şaft, metal, su, tünel ve metal alarm katmanları aynı koordinat sözleşmesini kullanıyor.
+- Metre cinsinden tünel uçlarının ve tespit merkezlerinin `0–1` aralığına kıskaçlanıp köşeye kayması engellendi.
+- CSV yapı sonuçlarında koordinat birimi açıkça `meters` olarak işaretlendi.
+- Kenar/köşe konumlandırması için regresyon testleri eklendi.
+- VOTEX 0.4.31 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.30 — 9 Eylül 2026
+
+### Tespit Paneli Görünürlük ve Genişlik Düzeltmesi
+
+- `modelById` kapsam hatası giderildi; analiz sonrası tespit kartlarının yeniden görünmesi sağlandı.
+- Sol paneldeki tespit/adım listesi dar kutu yerine daha geniş ve kaydırılabilir alana taşındı.
+- Tespit filtreleri ve adım kartları korunarak okunabilirlik iyileştirildi.
+- VOTEX 0.4.30 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.29 — 9 Eylül 2026
+
+### Sol Panel Tespit Filtreleri ve Okunabilirlik
+
+- LEGACY3DMAG sol panelindeki tarama adımları; adım numarası, hat metresi, adım aralığı, tespit sayısı ve açıklık bilgileriyle düzenli kartlara ayrıldı.
+- Tespit kartları ayrı başlık altında gösterilir; hat metresi, adım aralığı, derinlik, güven, offset ve boyut bilgileri birlikte okunabilir.
+- Tümü, Sadece tespitler, Güçlü, Dikkat ve Normal filtreleri eklendi.
+- Filtreler adım kartlarını ve tespit kartlarını aynı saha modeli üzerinden birlikte süzer.
+- Dar ekranlarda kart metrikleri tek sütuna düşürülerek taşma azaltıldı.
+- VOTEX 0.4.29 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.28 — 8 Eylül 2026
+
+### 3D Kullanıcı Görünümü ve İnceleme Araçları
+
+- Tespit odaklı kamera, seçili tespit kılavuzları ve üstten/önden/yandan/perspektif hazır kamera görünümleri eklendi.
+- Basit, Teknik ve Saha görünüm profilleriyle teknik katmanlar ve saha işaretleri hızlıca sadeleştirilebilir.
+- Terrain LOD, derinlik dilimi animasyonu, kesit düzlemi ve manuel manyetik renk ölçeği kontrolleri kullanıcı akışına bağlandı.
+- 3D ölçüm, seçili tespit ile 2D harita vurgusu ve rapor akışı birbirine bağlandı.
+- VOTEX 0.4.28 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.27 — 8 Eylül 2026
+
+### LEGACY3DMAG Şekil Konumlandırma Düzeltmesi
+
+- Ölçüm konturları artık gerçek tespit merkezine alan ağırlıklı merkez ile ankrajlanır; şekillerin harita köşesine kayması engellenir.
+- Normalize `0–1` konturlar ile eski metre tabanlı konturlar ayrıştırılarak doğru dünya koordinatına çevrilir.
+- Ölçülmüş geometri, merkez koordinatının ikinci kez uygulanmasını önlemek için lokal koordinat sisteminde oluşturulur.
+- Metal gövdesi, çekirdeği, yüzey izdüşümü ve derinlik kılavuzu aynı hedef merkezini kullanır.
+- Polygon dönüşümü için regresyon testleri eklendi.
+- VOTEX 0.4.27 Windows NSIS setup üretildi.
+
+---
+
+## 0.4.26 — 8 Eylül 2026
+
+### Saha Sonucu ve Adım–Tespit Birleşimi
+
+- LEGACY3DMAG için ortak adım–tespit saha modeli eklendi; hat metresi, adım içi offset ve derinlik aralığı birbirinden ayrıştırıldı.
+- Her tespit bağlı olduğu tarama adımı, güven seviyesi, güç değeri, geometri kaynağı ve saha doğrulama önerisiyle gösterilir.
+- Sol panelde adımlar tespit sayısı ve NORMAL/DİKKAT/GÜÇLÜ durumuyla listelenir; adım seçimi kamerayı ilgili hatta taşır.
+- Tespitler bağımsız kartlar olarak "3D’de göster" ve "Sadece bunu göster" eylemleriyle ayrıştırılır.
+- Sağ Analiz Raporu, LEGACY3DMAG verisinde Saha Sonucu özetine ve ayrı tespit kartlarına dönüşür.
+- 3D, sol panel ve sağ rapor seçimleri aynı tespit/step state’ini kullanır.
+- Ortak saha modeli için 3 yeni regresyon testi eklendi.
+- VOTEX 0.4.26 Windows NSIS setup üretildi.
+
+
+## 0.4.25 — 8 Eylül 2026
+
+### Terrain LOD ve Derinlik Dilimi Görünümü
+
+- Kamera mesafesine göre terrain geometrisi yakın/orta/uzak LOD seviyeleri arasında otomatik değiştirilir.
+- Uzak görünümde daha hafif geometri kullanılarak büyük haritalarda GPU ve bellek maliyeti azaltılır.
+- CSV derinlik dilimi görünümü seçili Y bandını 3D hacimde yarı saydam plaka ve kenar çizgileriyle gösterir.
+- Derinlik slider'ı seçilen dilimin noktalarını, 2D heatmap'i, 3D overlay'i ve yapı raporunu birlikte günceller.
+- Seçili dilim bilgisi overlay metadata'sında korunur.
+- Yeni LOD regresyon testi eklendi.
+- VOTEX 0.4.25 Windows NSIS setup üretildi.
+
+## 0.4.24 — 8 Eylül 2026
+
+### Terrain ve Manyetik Overlay İyileştirmeleri
+
+- Seyrek veri alanları için deterministik multi-octave procedural terrain relief eklendi; veri kabartması korunurken yüzeye düşük genlikli doğal mikro-relief verilir.
+- Heightfield türevlerinden tangent-space normal map ile zemin ışıklandırması ve mikro-relief görünümü güçlendirildi.
+- Manyetik overlay yoğunluğa göre adaptif 64/128/256 grid kullanır; yüksek yoğunluklu CSV verilerinde ayrıntı korunurken seyrek veride gereksiz maliyet azaltılır.
+- Manyetik gradyan modu, yön okları ve iso-nT kontur çizgileri korunarak daha okunabilir hale getirildi.
+- Yeni terrain noise ve adaptif grid regresyon testleri eklendi.
+- VOTEX 0.4.24 Windows NSIS setup üretildi.
+
+## 0.4.23 — 8 Eylül 2026
+
+### Seçili Tarama Adımı Görünümü
+
+- LEGACY3DMAG panelinde tarama adımları artık ayrı ve tıklanabilir kartlar olarak gösterilir.
+- Seçilen adımın işareti, etiketi ve ilgili anomalileri 3D ekranda görünür; diğer adımlar gizlenir.
+- Seçim değiştiğinde 3D görünüm anında güncellenir.
+- VOTEX 0.4.23 Windows NSIS setup üretildi.
+
+## 0.4.22 — 8 Eylül 2026
+
+### 3D Tarama Adımları ve Okunabilirlik
+
+- Tüm tarama adımları 3D ekranda aynı anda, birbirinden bağımsız işaret ve etiketlerle gösterilir.
+- Adım etiketleri yolun iki tarafına dağıtılarak üst üste binme azaltılır.
+- Analiz raporu penceresi genişletildi ve uzun sonuç metinleri için satır taşması düzeltildi.
+
+
 
 ### Geçişler Arası Interpolasyon (IDW) — Kontür Doğruluğu
 

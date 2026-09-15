@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeHeightfieldNormalData } from "./ground.js";
+import { computeHeightfieldNormalData, lodLevelForDistance, multiOctaveTerrainNoise } from "./ground.js";
 
 function decode(data, index) {
   const offset = index * 4;
@@ -10,6 +10,24 @@ function decode(data, index) {
   ];
 }
 
+
+describe("deterministic multi-octave terrain relief", () => {
+  it("is deterministic and stays within the normalized range", () => {
+    const a = multiOctaveTerrainNoise(1.25, 2.5);
+    const b = multiOctaveTerrainNoise(1.25, 2.5);
+
+    expect(a).toBe(b);
+    expect(a).toBeGreaterThanOrEqual(-1);
+    expect(a).toBeLessThanOrEqual(1);
+  });
+});
+describe("terrain distance LOD", () => {
+  it("selects progressively lighter geometry at distance", () => {
+    expect(lodLevelForDistance(20, [60, 120])).toBe(0);
+    expect(lodLevelForDistance(80, [60, 120])).toBe(1);
+    expect(lodLevelForDistance(160, [60, 120])).toBe(2);
+  });
+});
 describe("ground heightfield tangent-space normal map", () => {
   it("encodes an upward normal for a flat heightfield", () => {
     const data = computeHeightfieldNormalData([0, 0, 0, 0], 2, 2, 2, 2);

@@ -1,18 +1,17 @@
 import { $, state } from "../app/state.js";
-import { buildSurfaceFromCsv, pickCsvFile, analyzeCsvData, parseExcelData, deepStructureScan, getAppSettings, setCsvFilterPrefs, pickLegacyDikJson, analyzeLegacyDikJson, saveLegacyArchive } from "../api/tauri.js";
+import { buildSurfaceFromCsv, pickCsvFile, analyzeCsvData, parseExcelData, deepStructureScan, getAppSettings, setCsvFilterPrefs } from "../api/tauri.js";
 import { initMultiCsv, addFile, addFiles, addCsvContent, removeDataset, clearAll, selectDataset, setMergeMode, getMergedData, getDatasets, getDatasetCount, setDatasetVisible } from "./multiCsvLoader.js";
 import { selectedShotType, selectedTargetKind } from "./shotType.js";
 import { ensureViewer } from "../viewer/scene.js";
 import { addCsvOverlayToScene, removeCsvOverlay, toggleCsvOverlay, anomalyStatsString, renderCsvHeatmap } from "../viewer/csvOverlay.js";
-import { addLegacyDikShapesToScene, removeLegacyDikShapes, legacyDikSummary, selectLegacyMetals, selectLegacyAnomalies } from "../viewer/legacyDikOverlay.js";
-import { refreshArchiveList } from "./archive.js";
+import { bindLegacyDikPanel } from "./legacyDikPanel.js";
 import { detectStructuresFromTerrain } from "../viewer/csvAnalysis.js";
 import { filterUnderground, sliceDepths, autoBoxFor } from "../viewer/csvFilter.js";
 import { analyzeDepthSlices } from "../viewer/csvAnalysis.js";
 import { bindHeatmapPick } from "../viewer/csvHeatmap.js";
 import { flyCameraTo, focusStructure } from "../viewer/labels.js";
 import * as THREE from "three";
-import { t } from "../i18n/index.js";
+import { dimensionsOf, volumeM3Of, formatVolumeM3 } from "../viewer/volume.js";
 
 // Havuz boyutunu otomatik geçir — yapılar havuz-relative koordinatlarda
 function _heatmap(csvData, opts = {}) {
@@ -435,6 +434,8 @@ export function renderCsvPanel() {
       sliceSlider.max = "0";
       sliceSlider.value = "0";
       sliceLabel.textContent = "Tümü";
+      const playButton = $("csv-depth-play");
+      if (playButton) playButton.disabled = true;
     } else {
       sliceSlider.max = String(sliceCount);
       const v = Number(sliceSlider.value) || 0;
@@ -444,6 +445,8 @@ export function renderCsvPanel() {
       } else {
         sliceLabel.textContent = "Tümü";
       }
+      const playButton = $("csv-depth-play");
+      if (playButton) playButton.disabled = false;
     }
   }
 
@@ -897,24 +900,51 @@ export function renderCsvStructInfo(hit) {
   }
   const { type, data: d, dist } = hit;
   const num = d._num || '';
+  const typeKey = String(type || '').toLowerCase();
+  const topForVolume = Number(d.topFromSurfaceM ?? d.top_from_surface_m);
+  const bottomForVolume = Number(d.bottomFromSurfaceM ?? d.bottom_from_surface_m);
+  const heightForVolume = typeKey === 'oda'
+    ? Math.max((Number.isFinite(topForVolume) && Number.isFinite(bottomForVolume) ? bottomForVolume - topForVolume : 0) || 0.2, 0.2)
+    : typeKey === 'metal'
+      ? Math.max(Number(d.heightM ?? d.height_m ?? d.plumeHeightM ?? d.plume_height_m) || (Number(d.widthM ?? d.width_m) || 1) * 0.5, 0.2)
+      : Math.max(Number(d.heightM ?? d.height_m) || 1.5, 0.2);
+  const volumeRecord = typeKey === 'tünel'
+    ? { ...d, kind: 'tunnel' }
+    : typeKey === 'metal'
+      ? { ...d, kind: 'metal', shapeType: 'rectangle', lengthM: Number(d.lengthM ?? d.length_m) || Number(d.widthM ?? d.width_m) }
+      : { ...d, kind: 'room' };
+  const overlayDims = state.csvOverlay?.userData?.anomalyStats?.dims || {};
+  const volume = volumeM3Of(volumeRecord, {
+    mapWidthM: Number(overlayDims.w) || Number(state.csvOverlay?.userData?.anomalyStats?.poolSizeM) || 30,
+    mapDepthM: Number(overlayDims.d) || Number(state.csvOverlay?.userData?.anomalyStats?.poolSizeM) || 30,
+    height: heightForVolume,
+    tunnelProfile: 'cylinder',
+  });
   let rows = '';
   if (type === 'oda') {
     const top = Number(d.topFromSurfaceM) || 0;
     const bot = Number(d.bottomFromSurfaceM) || (top + 2.5);
     const w = Number(d.widthM) || 0;
-    const l = Number(d.lengthM) || 0;
+    const l = Number(d.lengthM) || w;
+    const h = heightForVolume;
     const strength = d.strength != null ? d.strength.toFixed(3) : '—';
     rows = [
       `<div class="si-row"><span class="si-label">Konum (X,Z)</span><span class="si-value">${Number(d.cx||0).toFixed(1)}m, ${Number(d.cy||0).toFixed(1)}m</span></div>`,
       `<div class="si-row"><span class="si-label">Derinlik</span><span class="si-value">${top.toFixed(1)}m – ${bot.toFixed(1)}m</span></div>`,
       `<div class="si-row"><span class="si-label">Boyut</span><span class="si-value">${w.toFixed(1)} × ${l.toFixed(1)} m</span></div>`,
-      `<div class="si-row"><span class="si-label">Yükseklik</span><span class="si-value">${(bot - top).toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Yükseklik</span><span class="si-value">${h.toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Hacim</span><span class="si-value">${formatVolumeM3(volume)}</span></div>`,
       `<div class="si-row"><span class="si-label">Manyetik güç</span><span class="si-value" style="color:#7eb6ff">${strength}</span></div>`,
     ].join('');
   } else if (type === 'tünel') {
     const x0 = Number(d.x0)||0, z0 = Number(d.y0)||0;
     const x1 = Number(d.x1)||0, z1 = Number(d.y1)||0;
-    const len = Math.hypot(x1-x0, z1-z0);
+    const len = volumeM3Of(volumeRecord, {
+      mapWidthM: Number(overlayDims.w) || 30,
+      mapDepthM: Number(overlayDims.d) || 30,
+      height: heightForVolume,
+      tunnelProfile: 'cylinder',
+    }) > 0 ? Math.hypot(x1-x0, z1-z0) : 0;
     const depth = Number(d.floorFromSurfaceM) || 0;
     const w = Number(d.widthM) || 0;
     const strength = d.strength != null ? d.strength.toFixed(3) : '—';
@@ -924,16 +954,20 @@ export function renderCsvStructInfo(hit) {
       `<div class="si-row"><span class="si-label">Uzunluk</span><span class="si-value">${len.toFixed(1)} m</span></div>`,
       `<div class="si-row"><span class="si-label">Derinlik</span><span class="si-value">${depth.toFixed(1)} m</span></div>`,
       `<div class="si-row"><span class="si-label">Genişlik</span><span class="si-value">${w.toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Hacim</span><span class="si-value">${formatVolumeM3(volume)}</span></div>`,
       `<div class="si-row"><span class="si-label">Manyetik güç</span><span class="si-value" style="color:#4ec0d4">${strength}</span></div>`,
     ].join('');
   } else if (type === 'metal') {
     const depth = Number(d.depthFromSurfaceM) || 0;
     const w = Number(d.widthM) || 0;
+    const l = Number(d.lengthM ?? d.length_m) || w;
+    const h = heightForVolume;
     const strength = d.strength != null ? d.strength.toFixed(3) : '—';
     rows = [
       `<div class="si-row"><span class="si-label">Konum (X,Z)</span><span class="si-value">${Number(d.cx||0).toFixed(1)}m, ${Number(d.cy||0).toFixed(1)}m</span></div>`,
       `<div class="si-row"><span class="si-label">Derinlik</span><span class="si-value">${depth.toFixed(1)} m</span></div>`,
-      `<div class="si-row"><span class="si-label">Boyut</span><span class="si-value">${w.toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Boyut</span><span class="si-value">${w.toFixed(1)} × ${l.toFixed(1)} × ${h.toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Hacim</span><span class="si-value">${formatVolumeM3(volume)}</span></div>`,
       `<div class="si-row"><span class="si-label">Manyetik güç</span><span class="si-value" style="color:#ff6a4a">${strength}</span></div>`,
     ].join('');
   }
@@ -1293,122 +1327,7 @@ export function bindCsvPanel() {
   pickBtn?.addEventListener("click", () => { console.log('[CSV-BTN] pickBtn CLICKED'); pickCsv(); });
   buildBtnEl?.addEventListener("click", () => { console.log('[CSV-BTN] buildBtn CLICKED, csvContent=', !!state.csvContent); build3dFromCsv(); });
 
-  // ── Legacy dik çekim (ayrı cihaz) ──
-  async function runLegacyDik() {
-    try {
-      const picked = await pickLegacyDikJson();
-      if (!picked?.content) return;
-      setStatus("Dik çekim analiz ediliyor…");
-      await ensureViewer();
-      try { removeCsvOverlay(); } catch (_) {}
-      try { removeLegacyDikShapes(); } catch (_) {}
-      const fileName = picked.fileName || picked.file_name || "scan.json";
-      const stepInput = $("legacy-dik-step-count");
-      const rawStepCount = String(stepInput?.value ?? "0").trim();
-      const scanStepCount = rawStepCount === "" ? 0 : Number(rawStepCount);
-      if (!Number.isInteger(scanStepCount) || scanStepCount < 0 || scanStepCount > 10000) {
-        throw new Error("Tarama adım sayısı 0–10000 arasında tam sayı olmalıdır");
-      }
-      const rawStepSpacing = String($("legacy-dik-step-spacing")?.value ?? "0").trim();
-      const scanStepSpacingM = rawStepSpacing === "" ? 0 : Number(rawStepSpacing);
-      if (!Number.isFinite(scanStepSpacingM) || scanStepSpacingM < 0 || scanStepSpacingM > 1000) {
-        throw new Error("Yatay adım ölçüsü 0–1000 metre arasında olmalıdır");
-      }
-      // Adım sayısı girildiyse onu kesin talimat kabul et; yatay ölçü yalnız
-      // adım sayısı 0/boş olduğunda otomatik adım hesabına katılır.
-      const effectiveStepSpacingM = scanStepCount > 0 ? 0 : scanStepSpacingM;
-      const result = await analyzeLegacyDikJson(picked.content, fileName, scanStepCount, effectiveStepSpacingM);
-      state.legacyDikResult = result;
-      state.legacyDikFileName = fileName;
-      addLegacyDikShapesToScene(result);
-      try {
-        await saveLegacyArchive(fileName, picked.content, result);
-        await refreshArchiveList();
-      } catch (archiveError) {
-        console.warn("[legacy-dik] arşiv kaydı yapılamadı:", archiveError);
-      }
-      const st = $("legacy-dik-status");
-      if (st) {
-        const fp = result.fingerprint || "";
-        st.textContent = `${fileName} · ${legacyDikSummary(result)} · ${fp}`;
-      }
-      const list = $("legacy-dik-list");
-      if (list) {
-        const anomalies = selectLegacyAnomalies(result);
-        const scanSteps = Array.isArray(result.scanSteps) ? result.scanSteps : (Array.isArray(result.scan_steps) ? result.scan_steps : []);
-        const averageSpacing = Number(result.scanStepSpacingM ?? result.scan_step_spacing_m) || 0;
-        const inputSpacing = Number(result.scanStepInputM ?? result.scan_step_input_m) || 0;
-        const stepSummary = scanSteps.length
-          ? `<div style="color:#f4c875;margin-bottom:0.25rem;">Yatay adım açıklığı: ${inputSpacing > 0 ? inputSpacing.toFixed(2) + " m girildi" : averageSpacing > 0 ? averageSpacing.toFixed(2) + " m ölçüldü" : "ölçülemedi"} · analiz adımı: ${scanSteps.length}</div><div style="color:var(--muted);margin-bottom:0.25rem;">${scanSteps.map((step) => {
-              const idx = Number(step.index) || 0;
-              const x = Number(step.xCenterM ?? step.x_center_m);
-              const y = Number(step.yCenterM ?? step.y_center_m);
-              const spacing = Number(step.spacingFromPreviousM ?? step.spacing_from_previous_m) || 0;
-              const width = Number(step.widthM ?? step.width_m) || 0;
-              const length = Number(step.lengthM ?? step.length_m) || 0;
-              return `Adım ${idx}: yatay merkez (${Number.isFinite(x) ? x.toFixed(2) : "—"}, ${Number.isFinite(y) ? y.toFixed(2) : "—"}) m · açıklık ${width.toFixed(2)} × ${length.toFixed(2)} m${idx > 1 ? ` · öncekiyle ${spacing.toFixed(2)} m` : ""}`;
-            }).join("<br/>")}</div>`
-          : "";
-        const rows = anomalies.map((c, i) => {
-          const top = Number(c.depthTopM ?? c.depth_top_m ?? 0);
-          const bot = Number(c.depthBottomM ?? c.depth_bottom_m ?? top);
-          const mid = (top + bot) / 2;
-          const sig = Number(c.peakSigma ?? c.peak_sigma ?? c.strength) || 0;
-          const mx = Number(c.cx) || 0;
-          const my = Number(c.cy) || 0;
-          const shapeNames = { circle: "daire", ellipse: "elips", square: "kare", rectangle: "dikdörtgen", capsule: "kapsül", polygon: "çokgen", irregular: "düzensiz" };
-          const shapeType = String(c.shapeType ?? c.shape_type ?? "irregular").toLowerCase();
-          const shapeName = shapeNames[shapeType] || "düzensiz";
-          const shapeConfidence = Math.round((Number(c.shapeConfidence ?? c.shape_confidence) || 0) * 100);
-          const shapeError = Number(c.shapeFitError ?? c.shape_fit_error);
-          const width = Number(c.widthM ?? c.width_m ?? c.rx * 2) || 0;
-          const length = Number(c.lengthM ?? c.length_m ?? c.ry * 2) || 0;
-          const source = String(c.shapeSource ?? c.shape_source ?? "inferred") === "grid-contour" ? "ölçüm konturu" : "hesaplanmış";
-          const nearestStep = scanSteps.reduce((best, step) => {
-            const sx = Number(step.xCenterM ?? step.x_center_m);
-            const sy = Number(step.yCenterM ?? step.y_center_m);
-            const distance = Number.isFinite(sx) && Number.isFinite(sy) ? Math.hypot(mx - sx, my - sy) : Infinity;
-            return distance < best.distance ? { step, distance } : best;
-          }, { step: null, distance: Infinity }).step;
-          const nearestStepText = nearestStep ? ` · en yakın Adım ${Number(nearestStep.index) || "—"} (${Number(nearestStep.xCenterM ?? nearestStep.x_center_m).toFixed(2)}, ${Number(nearestStep.yCenterM ?? nearestStep.y_center_m).toFixed(2)} m)` : "";
-          const strong = i === 0 ? "border-color:#f4c875;background:rgba(244,200,117,0.10);" : "";
-          const kind = String(c.kind || "anomali").toLowerCase();
-          return `<button type="button" class="legacy-anomaly-card" data-legacy-focus="legacy-dik-shape-${i + 1}" style="display:block;width:100%;text-align:left;color:var(--text);${strong}"><span style="color:${kind === "metal" ? "#e85858" : "#f4c875"};">${i === 0 ? "★" : "◆"} #${i + 1}</span> <b>${kind === "metal" ? "Metal" : "Anomali"}</b> · ${shapeName} · ${source}<br/><span>merkez (${mx.toFixed(2)}, ${my.toFixed(2)}) m · derinlik ${top.toFixed(2)}–${bot.toFixed(2)} m</span><br/><span>${sig.toFixed(1)}σ · şekil güveni %${shapeConfidence} · RMS ${Number.isFinite(shapeError) ? shapeError.toFixed(2) : "—"} · boyut ${width.toFixed(2)} × ${length.toFixed(2)} m${nearestStepText}</span></button>`;
-        });
-        list.innerHTML = `${stepSummary}${rows.length
-          ? `<div style="color:var(--muted);margin:0.3rem 0 0.2rem;">${rows.length} anomali ayrı ayrı gösteriliyor · güçlüden zayıfa sıralı</div>${rows.join("")}`
-          : `<div>Analiz anomalisi bulunamadı · ${fileName} · ${result.fingerprint || ""}</div>`}`;
-      }
-      const clr = $("btn-legacy-dik-clear");
-      if (clr) clr.disabled = false;
-      setStatus(result.message || "Dik çekim hazır");
-    } catch (e) {
-      console.warn("[legacy-dik]", e);
-      setStatus(`Dik çekim: ${e}`);
-    }
-  }
-  const legacyList = $("legacy-dik-list");
-  legacyList?.addEventListener("click", (event) => {
-    const card = event.target.closest("[data-legacy-focus]");
-    if (!card) return;
-    const id = card.dataset.legacyFocus;
-    if (id && state.structureTargets?.[id]) {
-      focusStructure(id);
-      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  });
-  $("btn-legacy-dik-pick")?.addEventListener("click", () => runLegacyDik());
-  $("btn-legacy-dik-clear")?.addEventListener("click", () => {
-    removeLegacyDikShapes();
-    state.legacyDikResult = null;
-    const st = $("legacy-dik-status");
-    if (st) st.textContent = "";
-    const list = $("legacy-dik-list");
-    if (list) list.innerHTML = "";
-    const clr = $("btn-legacy-dik-clear");
-    if (clr) clr.disabled = true;
-    setStatus("Dik çekim şekilleri temizlendi");
-  });
+  bindLegacyDikPanel();
 
   // Sigma slider label + 3D overlay otomatik yeniden oluşturma
   const sigmaSlider = $("csv-sigma");
@@ -1487,6 +1406,8 @@ export function bindCsvPanel() {
       ? "Tümü"
       : `${v}/${total} (${fmtSlice(sd.yMin)}..${fmtSlice(sd.yMax)})`;
     if (sliceLabel) sliceLabel.textContent = labelText;
+    const playButton = $("csv-depth-play");
+    if (playButton) playButton.disabled = !state.csvData || !sliceSlider || Number(sliceSlider.max) <= 0;
     const bounds = {
       xMin: state.csvData.xMin,
       xMax: state.csvData.xMax,

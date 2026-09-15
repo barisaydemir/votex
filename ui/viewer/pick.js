@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { state } from "../app/state.js";
+import { dimensionsOf, volumeM3Of, formatVolumeM3 } from "./volume.js";import { state } from "../app/state.js";
 import { focusFreeDraw, focusStructure, flyCameraTo } from "./labels.js";
 import { isRulerEnabled } from "../ui/mapRuler.js";
 import { renderFreeDrawPanel } from "../ui/freeDrawPanel.js";
@@ -8,6 +8,7 @@ import { renderFreeDrawPanel } from "../ui/freeDrawPanel.js";
 const raycaster = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 let downPos = null;
+let lastPickHandledAt = 0;
 
 // CSV pick tooltip
 let _csvPickTooltip = null;
@@ -41,6 +42,89 @@ function findCsvStructInfo(obj) {
   return null;
 }
 
+const _localRayOrigin = new THREE.Vector3();
+const _localRayDir = new THREE.Vector3();
+const _planeHitLocal = new THREE.Vector3();
+const _invGroup = new THREE.Matrix4();
+const _surfacePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+/**
+ * Manyetik yüzey / katman tıklaması → en yakın Legacy tespit.
+ * Gömülü gövde yerine haritadaki renkli ayak izine tıklanınca da kamera odaklanır.
+ * @param {THREE.Vector3} localOrWorldPoint
+ * @param {number} [maxDistM]
+ * @param {{ local?: boolean }} [opts]
+ */
+export function nearestLegacyDetectionId(localOrWorldPoint, maxDistM = 3.5, opts = {}) {
+  const group = state.legacyDikGroup;
+  if (!group || !localOrWorldPoint || !state.structureTargets) return null;
+  const local = opts.local
+    ? localOrWorldPoint
+    : group.worldToLocal(localOrWorldPoint.clone());
+  const selectedStep = state.legacySelectedStepIndex;
+  const mapSpan = Math.max(
+    Number(group.userData?.gridWidthM) || 0,
+    Number(group.userData?.gridDepthM) || 0,
+    4,
+  );
+  const defaultLimit = Math.max(Number(maxDistM) || 3.5, Math.min(mapSpan * 0.35, 8));
+
+  function search(restrictStep) {
+    let bestId = null;
+    let bestDist = Infinity;
+    for (const [id, target] of Object.entries(state.structureTargets)) {
+      if (!String(id).startsWith("legacy-dik-") || !target?.position) continue;
+      const step = target.object?.userData?.legacyStepIndex
+        ?? target.badge?.userData?.legacyStepIndex
+        ?? null;
+      if (restrictStep && selectedStep != null && step != null && Number(step) !== Number(selectedStep)) {
+        continue;
+      }
+      const dx = target.position.x - local.x;
+      const dz = target.position.z - local.z;
+      const dist = Math.hypot(dx, dz);
+      const radius = Math.max(Number(target.radius) || 0.8, 0.55);
+      const limit = Math.max(defaultLimit, radius * 1.8);
+      if (dist <= limit && dist < bestDist) {
+        bestDist = dist;
+        bestId = id;
+      }
+    }
+    return bestId;
+  }
+
+  return search(true) || search(false);
+}
+
+/** Işını Legacy grubunun yerel y=0 yüzeyine düşür → en yakın tespit. */
+export function pickLegacyDetectionOnSurface() {
+  const group = state.legacyDikGroup;
+  if (!group?.visible || !state.camera) return null;
+  group.updateMatrixWorld(true);
+  _invGroup.copy(group.matrixWorld).invert();
+  _localRayOrigin.copy(raycaster.ray.origin).applyMatrix4(_invGroup);
+  _localRayDir.copy(raycaster.ray.direction).transformDirection(_invGroup).normalize();
+  const localRay = new THREE.Ray(_localRayOrigin, _localRayDir);
+  if (!localRay.intersectPlane(_surfacePlane, _planeHitLocal)) return null;
+
+  const hw = Math.max(0.5, Number(group.userData.gridWidthM) || 4) * 0.5;
+  const hd = Math.max(0.5, Number(group.userData.gridDepthM) || 5) * 0.5;
+  if (Math.abs(_planeHitLocal.x) > hw * 1.35 || Math.abs(_planeHitLocal.z) > hd * 1.35) {
+    return null;
+  }
+  const maxDist = Math.max(3.5, Math.min(hw, hd) * 0.65, 2.2);
+  return nearestLegacyDetectionId(_planeHitLocal, maxDist, { local: true });
+}
+
+function isLegacyPickLabel(object) {
+  return !!(
+    object?.userData?.isBadge
+    || object?.userData?.isDetailLabel
+    || object?.userData?.legacyRankLabel
+    || object?.userData?.legacyDetailCard
+  );
+}
+
 function pick(e) {
   if (!state.renderer || !state.camera) return null;
   const el = state.renderer.domElement;
@@ -49,7 +133,9 @@ function pick(e) {
   ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(ndc, state.camera);
-  raycaster.params.Line = { threshold: 0.28 };
+  raycaster.params.Line = { threshold: 0.35 };
+  raycaster.params.Points = { threshold: 0.28 };
+  raycaster.params.Sprite = { threshold: 0.35 };
 
   // 1) CSV nokta pick (öncelikli — Points nesneleri için special params)
   if (state.csvOverlay?.visible && state.csvOverlay.userData.pointsMesh) {
@@ -65,10 +151,23 @@ function pick(e) {
 
   if (state.legacyDikGroup?.visible) {
     const hits = raycaster.intersectObjects(state.legacyDikGroup.children, true);
+    // Rozet / etiket: doğrudan seç
     for (const h of hits) {
+      if (!isLegacyPickLabel(h.object)) continue;
       const id = findFocusId(h.object);
       if (id) return { kind: "st", id };
     }
+    // Gövde / sinyal mesh
+    for (const h of hits) {
+      if (isLegacyPickLabel(h.object)) continue;
+      if (h.object.userData?.legacyInvertProxy) continue;
+      if (h.object.userData?.legacyTomography) continue;
+      const id = findFocusId(h.object);
+      if (id) return { kind: "st", id };
+    }
+    // Yüzey (y=0) projeksiyonu — dikey duvar / taban hit'ine aldanma
+    const surfaceId = pickLegacyDetectionOnSurface();
+    if (surfaceId) return { kind: "st", id: surfaceId };
   }
 
   if (state.structureGroup?.visible) {
@@ -102,7 +201,9 @@ function pick(e) {
 }
 
 function scrollCardIntoView(id) {
-  const card = document.querySelector(`.structure-card[data-focus-id="${id}"]`);
+  const card = document.querySelector(`.structure-card[data-focus-id="${id}"]`)
+    || document.querySelector(`.legacy-anomaly-card[data-legacy-focus="${id}"]`)
+    || document.querySelector(`[data-legacy-focus="${id}"]`);
   card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
@@ -116,13 +217,10 @@ function onDown(e) {
   downPos = { x: e.clientX, y: e.clientY };
 }
 
-function onUp(e) {
-  if (e.button !== 0 || !downPos) return;
-  const dx = e.clientX - downPos.x;
-  const dy = e.clientY - downPos.y;
-  downPos = null;
-  if (dx * dx + dy * dy > 36) return;
+function handleStructureClick(e) {
   if (isRulerEnabled()) return;
+  const now = performance.now();
+  if (now - lastPickHandledAt < 280) return;
   const hit = pick(e);
   if (!hit) {
     hideCsvPickTooltip();
@@ -130,7 +228,8 @@ function onUp(e) {
     hideCsvStructInfoPanel();
     return;
   }
-  e.preventDefault();
+  lastPickHandledAt = now;
+  e.preventDefault?.();
   if (hit.kind === "csv") {
     showCsvPickTooltip(e, hit.pointIndex);
     focusCsvPoint(hit.pointIndex);
@@ -149,10 +248,36 @@ function onUp(e) {
     scrollFdIntoView(hit.id);
     return;
   }
-  focusStructure(hit.id);
+  if (String(hit.id).startsWith("legacy-dik-")) {
+    import("./legacyDikOverlay.js").then(({ focusLegacyDetection }) => focusLegacyDetection(hit.id));
+    document.querySelectorAll(".legacy-anomaly-card").forEach((el) => {
+      const active = el.dataset.legacyFocus === hit.id;
+      el.style.borderColor = active ? "#f4c875" : "";
+      el.style.background = active ? "rgba(244,200,117,0.12)" : "";
+    });
+  }
   scrollCardIntoView(hit.id);
   // Info panelde yapı detayını göster
   showStructInfoPanel(hit.id);
+}
+
+function onUp(e) {
+  if (e.button !== 0 || !downPos) return;
+  const dx = e.clientX - downPos.x;
+  const dy = e.clientY - downPos.y;
+  downPos = null;
+  // Orbit sürüklemesi: sonraki click olayını da yut
+  if (dx * dx + dy * dy > 100) {
+    lastPickHandledAt = performance.now();
+    return;
+  }
+  handleStructureClick(e);
+}
+
+function onClick(e) {
+  // pointerup kaçarsa (capture dışı) click yedeği
+  if (e.button !== 0) return;
+  handleStructureClick(e);
 }
 
 function onMove(e) {
@@ -325,7 +450,7 @@ function legacyShapeInfo(id) {
   const shape = target?.object?.userData?.legacyShape || target?.object?.userData?.legacyAnomaly;
   if (!shape) return null;
   const kind = String(shape.kind || "anomaly").toLowerCase();
-  return { kind: kind === "metal" ? "Metal" : kind === "tunnel" ? "Tünel" : "Anomali", data: shape, num: 0 };
+  return { kind: kind === "metal" ? "Metal adayı" : kind === "tunnel" ? "Uzun aday" : "Anomali", data: shape, num: 0 };
 }
 
 function showStructInfoPanel(id) {
@@ -470,5 +595,6 @@ export function bindStructurePicking() {
   el.dataset.pickBound = "1";
   el.addEventListener("pointerdown", onDown);
   el.addEventListener("pointerup", onUp);
+  el.addEventListener("click", onClick);
   el.addEventListener("pointermove", onMove);
 }

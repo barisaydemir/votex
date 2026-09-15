@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { state } from "../../app/state.js";
 import { colorByDepth, edgeColorByDepth, formatDepthM } from "../colors.js";
 import { makeBadgeSprite, makeDetailSprite } from "../labels.js";
-import { mapToWorld } from "../coords.js";
+import { recordSegmentToWorld } from "../coords.js";
 import { applyTierGhost, makeTierLabel } from "./tierGhost.js";
 import { t } from "../../i18n/index.js";
 
@@ -28,13 +28,10 @@ export function makeTunnel(t, mapW, mapD, vertExag, wireframe, id, num, sideView
   const crownM = Number(t.crownFromSurfaceM ?? t.crown_from_surface_m ?? 0.5);
   const spanM = Math.max(Math.abs(floorM - crownM), 0.4);
   const hM0 = Math.max(Number(t.heightM ?? t.height_m ?? spanM), 0.4);
-  // x0/y0/x1/y1 0-1 dışında olabilir — harita sınırlarıyla kıskaçla
-  const x0c = Math.max(0, Math.min(1, t.x0 || 0));
-  const y0c = Math.max(0, Math.min(1, t.y0 || 0));
-  const x1c = Math.max(0, Math.min(1, t.x1 || 0));
-  const y1c = Math.max(0, Math.min(1, t.y1 || 0));
-  const a = mapToWorld(x0c, y0c, mapW, mapD, sideView);
-  const b = mapToWorld(x1c, y1c, mapW, mapD, sideView);
+  const segment = recordSegmentToWorld(t, mapW, mapD, sideView);
+  if (!segment) return null;
+  const a = segment.a;
+  const b = segment.b;
   const hM = hM0;
   const wM = Number(t.widthM ?? t.width_m ?? hM);
 
@@ -46,8 +43,8 @@ export function makeTunnel(t, mapW, mapD, vertExag, wireframe, id, num, sideView
   const widthDraw = Math.max(wM, 0.5);
 
   // Aspect ratio kontrolü — kısa tünel için basit koridor çiz
-  const dx = (t.x1 || 0) - (t.x0 || 0);
-  const dz = (t.y1 || 0) - (t.y0 || 0);
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
   const tunnelLen = Math.hypot(dx, dz);
   const aspect = tunnelLen / (wM || 1);
   const isShortTunnel = aspect < 2.5;

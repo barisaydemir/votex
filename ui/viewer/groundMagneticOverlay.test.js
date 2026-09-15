@@ -3,6 +3,7 @@ import {
   computeGradientField,
   computeMagneticContourSegments,
   getMagneticContourLevels,
+  chooseAdaptiveGridResolution,
 } from "./groundMagneticOverlay.js";
 
 function field(values, gridRes) {
@@ -87,11 +88,16 @@ describe("ground magnetic iso-nT contours", () => {
     expect(positions[2]).toBeCloseTo(-1);
     expect(positions[5]).toBeCloseTo(0);
   });
-
   it("does not bridge missing grid cells", () => {
     const grid = Float32Array.from([0, 10, 10, 0]);
     const counts = new Uint32Array([1, 0, 1, 1]);
 
     expect(computeMagneticContourSegments(grid, counts, 2, 2, 2, [5])).toHaveLength(0);
+  });
+
+  it("selects a higher grid for dense surveys", () => {
+    expect(chooseAdaptiveGridResolution(100)).toBe(64);
+    expect(chooseAdaptiveGridResolution(1000)).toBe(128);
+    expect(chooseAdaptiveGridResolution(6000)).toBe(256);
   });
 });

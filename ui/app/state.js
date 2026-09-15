@@ -15,6 +15,9 @@ export const $ = (id) => document.getElementById(id);
   selectionMarker: import("three").Object3D | null,
   structureKotM: Record<string, number>,
   legacyDikGroup: import("three").Group | null,
+  legacySelectedStepIndex: number | null,
+  legacySelectedDetectionId: string | null,
+  legacyListFilter: string,
 }} */
 export const state = {
   pendingFile: null,
@@ -45,8 +48,56 @@ export const state = {
   csvOverlay: null,
   /** Legacy dik JSON ölçüm grid'i ve anomali katmanı */
   legacyDikGroup: null,
+  /** Legacy JSON'dan türetilen isteğe bağlı tomografi dilimleri görünür mü? */
+  legacyTomographyVisible: false,
+  /** Tomografi aktif derinlik kesiti (m) */
+  legacyTomographyDepthM: null,
+  /** Tomografi dilim opaklığı 0.12–0.95 */
+  legacyTomographyOpacity: 0.55,
+  /** Tomografi otomatik dilim gezintisi */
+  legacyTomographyPlaying: false,
+  /** |σ| eşiğinin altı şeffaf/gri gösterilir */
+  legacyTomographySigmaFloor: 0,
+  /** Yüzey altı 3D renk haritası (aç/kapa; tespitlerden bağımsız) */
+  legacySubsurfaceMapVisible: false,
+  /** Yüzey altı harita dilim opaklığı 0.08–0.55 */
+  legacySubsurfaceMapOpacity: 0.28,
+  /** Jeotermal 3D proxy haritası (aç/kapa; |σ| ısı skoru, °C değil) */
+  legacyGeothermalMapVisible: false,
+  /** Jeotermal proxy dilim opaklığı 0.08–0.55 */
+  legacyGeothermalMapOpacity: 0.26,
+  /** Son jeotermal AI / yerel yorum metni */
+  legacyGeothermalAiText: null,
+  /** Son derinlik kalibrasyon AI / yerel öneri metni */
+  legacyDepthCalibAiText: null,
+  /** Son önerilen Parametre (alanlara yazılana kadar) */
+  legacyDepthCalibSuggestion: null,
+  /** Tahmini derinlik haritası (aç/kapa bakış; invert değil) */
+  legacyDepthMapVisible: false,
+  /** Derinlik haritası plan opaklığı 0.2–0.95 */
+  legacyDepthMapOpacity: 0.72,
+  /** Kompakt dipol invert proxy ayak izi (CAD değil; varsayılan kapalı) */
+  legacyInvertProxyVisible: false,
+  /** 3D etiket modu: off | badge | full */
+  legacyLabelMode: "badge",
+  /** Adım numaralandırma yönü: ltr = soldan sağa, rtl = sağdan sola */
+  legacyStepNumberingDirection: "ltr",
+  /** 3D obje bakışı: shape | signal | both (varsayılan shape — saha kullanıcısı) */
+  legacyObjectViewMode: "shape",
+  /** Kontür(0) ↔ sinyal(1) karışım; both modunda kullanılır */
+  legacyObjectViewBlend: 0.5,
+  /** Map detectionId → { n, spreadM, midM } çoklu çekim tutarlılığı */
+  legacyArchiveDepthSpread: null,
+  /** Legacy 3D görünümünde seçili tespit; null ise seçili adımın tüm tespitleri */
+  legacySelectedDetectionId: null,
+  /** Legacy 3D sahne görünümü: combined, plan veya objects */
+  legacySceneViewMode: "combined",
+  /** Sol LEGACY3DMAG listesi filtresi: all, detections, strong, attention veya normal */
+  legacyListFilter: "all",
   /** Son yüklenen Legacy dik JSON analiz sonucu */
   legacyDikResult: null,
+  /** Adım, tespit ve saha metrelerini birleştiren ortak görünüm modeli */
+  legacyFieldModel: null,
   legacyDikRawContent: null,
   legacyDikFileName: null,
   /** CSV verisi (CsvImportResult) */
@@ -65,6 +116,11 @@ export const state = {
   magneticOverlayArrows: true,
   /** Iso-nT manyetik kontur çizgilerini göster */
   magneticOverlayContours: true,
+  /** Manyetik renk ölçeği otomatik mi? */
+  magneticOverlayAutoScale: true,
+  /** Manuel manyetik renk ölçeği alt/üst sınırı (nT) */
+  magneticOverlayScaleLow: null,
+  magneticOverlayScaleHigh: null,
   /** Kesit (clipping) modu: zemini yatay düzlemle kes */
   clipEnabled: false,
   /** Kesit düzlemi yüksekliği (dünya Y, metre) */
@@ -75,4 +131,6 @@ export const state = {
   splitClipPlanes: null,
   /** Her tespit için saha notları ve fotoğrafları — { [focusId]: { notes: string, photos: [{dataUrl, name, ts}] } } */
   detectionNotes: {},
+  /** 3D kullanıcı görünüm profili: simple, technical veya field */
+  viewProfile: "simple",
 };

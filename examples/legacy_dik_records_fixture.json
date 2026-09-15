@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "deviceCode": "Legacy3DMagDevice",
+    "xMeters": 4.0,
+    "yMeters": 4.0,
+    "date": "2026-09-10"
+  },
+  "columns": ["bx", "by", "bz", "pos_x", "pos_y"],
+  "data": [
+    {"bx": 100, "by": 100, "bz": 100, "pos_x": 0.0, "pos_y": 0.0},
+    {"bx": 100, "by": 100, "bz": 100, "pos_x": 0.0, "pos_y": 1.0},
+    {"bx": 100, "by": 100, "bz": 100, "pos_x": 1.0, "pos_y": 0.0},
+    {"bx": 100, "by": 100, "bz": 100, "pos_x": 1.0, "pos_y": 1.0},
+    {"bx": 900, "by": 900, "bz": 900, "pos_x": 0.5, "pos_y": 0.5},
+    {"bx": 850, "by": 850, "bz": 850, "pos_x": 0.5, "pos_y": 0.75},
+    {"bx": 120, "by": 120, "bz": 120, "pos_x": 2.0, "pos_y": 2.0},
+    {"bx": 110, "by": 110, "bz": 110, "pos_x": 3.0, "pos_y": 3.0}
+  ]
+}

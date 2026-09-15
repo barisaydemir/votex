@@ -15,7 +15,7 @@ import * as THREE from "three";
 import { state } from "../app/state.js";
 import { invalidate } from "./scene.js";
 import { onPreRender, offPreRender } from "./scene.js";
-import { mapToWorld } from "./coords.js";
+import { recordPointToWorld } from "./coords.js";
 
 /* ── Alarm Durumu ──────────────────────────────────────── */
 const alarmState = {
@@ -358,11 +358,7 @@ export const metalAlarm = {
     if (!group) return;
 
     metals.forEach((m, i) => {
-      const { x, z } = mapToWorld(
-        Math.max(0, Math.min(1, m.cx)),
-        Math.max(0, Math.min(1, m.cy)),
-        mapW, mapD, sideView
-      );
+      const { x, z } = recordPointToWorld(m, "cx", "cy", mapW, mapD, sideView);
 
       const sphere = createAlarmSphere();
       // Alarm topu zeminin hemen üstünde — resimdeki metal tespitinin tam üzeri

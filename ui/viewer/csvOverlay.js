@@ -986,6 +986,12 @@ export function buildCsvOverlay(csvData, options = {}) {
   group.userData.csvBounds = bounds;
   group.userData.normCenter = center;
   group.userData.pointsMesh = pointsMesh;
+  group.userData.depthSlice = {
+    slice: Number(options.slice) || 0,
+    sliceCount: Math.max(1, Number(options.sliceCount) || 1),
+    band: bandBox,
+    enabled: !!bandBox,
+  };
 
   console.log(`[CSV] Overlay hazır: ${n} nokta, hacim=${dims.w.toFixed(1)}×${dims.h.toFixed(1)}×${dims.d.toFixed(1)}m (${elapsed}ms)`);
   return group;

@@ -2,7 +2,7 @@
 ; Derleme: build_single_setup.py → ISCC
 
 #define MyAppName "DFT Suite"
-#define MyAppVersion "0.4.21"
+#define MyAppVersion "0.4.89"
 #define MyAppPublisher "Digital Future Tech"
 #define MyAppURL "https://digitalfuture.tech"
 
@@ -16,7 +16,7 @@ DefaultDirName={localappdata}\Programs\DFT_Suite
 DefaultGroupName=DFT Suite
 DisableProgramGroupPage=yes
 OutputDir=dist
-OutputBaseFilename=DFT_Suite_Setup_0.4.21
+OutputBaseFilename=DFT_Suite_Setup_0.4.89
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

@@ -198,10 +198,19 @@ export function focusStructure(id) {
   document.querySelectorAll(".fd-item").forEach((el) => el.classList.remove("active"));
 
   Object.entries(state.structureTargets).forEach(([key, t]) => {
-    if (t.detailLabel) t.detailLabel.visible = key === id;
+    if (!t.detailLabel) return;
+    // Legacy: yalnız kanonik rank kartı ve etiket modu rozet/tam iken
+    if (String(key).startsWith("legacy-dik-")) {
+      const mode = String(state.legacyLabelMode || "badge").toLowerCase();
+      const canonical = !!(t.detailLabel.userData?.legacyDetailCard && t.detailLabel.userData?.legacyRankLabel);
+      t.detailLabel.visible = canonical && mode !== "off" && key === id;
+      return;
+    }
+    t.detailLabel.visible = key === id;
   });
 
   flyCameraTo(entry.position, entry.radius, entry.title || id);
+  window.dispatchEvent(new CustomEvent("votex:selection-change", { detail: { id } }));
 }
 
 export function focusBestValuableMetal(surface) {
@@ -252,4 +261,5 @@ export function focusFreeDraw(id) {
 
   const pos = worldPosOf(entry.object, entry.position);
   flyCameraTo(pos, entry.radius, entry.title || id);
+  window.dispatchEvent(new CustomEvent("votex:selection-change", { detail: { id } }));
 }

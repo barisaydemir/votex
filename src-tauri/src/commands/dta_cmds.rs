@@ -75,6 +75,69 @@ pub fn set_hints_3d_visible(enabled: bool) -> Result<AppSettings, String> {
     Ok(s)
 }
 
+/// Legacy JSON derinlik proxy çarpanlarını kaydet (Parametre çekmecesi).
+#[tauri::command]
+pub fn set_legacy_depth_params(
+    sensor_height_m: Option<f32>,
+    bipolar_sep_factor: Option<f32>,
+    dipole_blend: Option<f32>,
+) -> Result<AppSettings, String> {
+    let mut s = app_settings::load_settings();
+    let mut p = s.legacy_depth_params;
+    if let Some(v) = sensor_height_m {
+        if !v.is_finite() {
+            return Err("Cihaz–yüzey yüksekliği sayı olmalıdır".into());
+        }
+        p.sensor_height_m = v;
+    }
+    if let Some(v) = bipolar_sep_factor {
+        if !v.is_finite() {
+            return Err("Bipolar çarpan sayı olmalıdır".into());
+        }
+        p.bipolar_sep_factor = v;
+    }
+    if let Some(v) = dipole_blend {
+        if !v.is_finite() {
+            return Err("Dipol karışım sayı olmalıdır".into());
+        }
+        p.dipole_blend = v;
+    }
+    s.legacy_depth_params = p.clamped();
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
+/// Kalibrasyon defteri notlarını kaydet (en fazla 20).
+#[tauri::command]
+pub fn set_legacy_depth_calib_notes(
+    notes: Vec<crate::legacy_mag_json::LegacyDepthCalibNote>,
+) -> Result<AppSettings, String> {
+    let mut s = app_settings::load_settings();
+    let mut cleaned = Vec::new();
+    for note in notes.into_iter().take(20) {
+        if !note.label_depth_m.is_finite() || note.label_depth_m <= 0.0 || note.label_depth_m > 20.0 {
+            continue;
+        }
+        let params = crate::legacy_mag_json::LegacyDepthParams {
+            sensor_height_m: note.sensor_height_m,
+            bipolar_sep_factor: note.bipolar_sep_factor,
+            dipole_blend: note.dipole_blend,
+        }
+        .clamped();
+        cleaned.push(crate::legacy_mag_json::LegacyDepthCalibNote {
+            label_depth_m: note.label_depth_m.clamp(0.1, 20.0),
+            file_name: note.file_name.chars().take(120).collect(),
+            sensor_height_m: params.sensor_height_m,
+            bipolar_sep_factor: params.bipolar_sep_factor,
+            dipole_blend: params.dipole_blend,
+            saved_at: note.saved_at.chars().take(40).collect(),
+        });
+    }
+    s.legacy_depth_calib_notes = cleaned;
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
 /// CSV filtre tercihlerini toplu olarak kaydet (yeniden başlasa da hatırlanır).
 #[tauri::command]
 pub fn set_csv_filter_prefs(

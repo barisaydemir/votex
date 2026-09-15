@@ -1,7 +1,7 @@
-//! Votex Tauri backend — manyetik anomali + ekran yakalama.
+﻿//! Votex Tauri backend â€” manyetik anomali + ekran yakalama.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![allow(dead_code)] // Kullanılmayan fonksiyonlar API/gelecek kullanımı için korunuyor
+#![allow(dead_code)] // KullanÄ±lmayan fonksiyonlar API/gelecek kullanÄ±mÄ± iÃ§in korunuyor
 
 mod analysis;
 mod app_settings;
@@ -35,7 +35,7 @@ pub fn run() {
         .manage(AppState::default())
         .setup(|app| {
             dta_bridge::start_bridge(app.handle().clone());
-            // Son kayıtlı 3D oturum + DTA ipuçlarını yükle
+            // Son kayÄ±tlÄ± 3D oturum + DTA ipuÃ§larÄ±nÄ± yÃ¼kle
             if let Some(work) = session_persist::load_work() {
                 let state = app.state::<AppState>();
                 if let Some(session) = work.session {
@@ -78,7 +78,7 @@ pub fn run() {
                         serde_json::json!({
                             "ok": true,
                             "hintCount": state.dta_last_hint_count.load(std::sync::atomic::Ordering::Relaxed),
-                            "message": "Son kayıtlı 3D yüklendi",
+                            "message": "Son kayÄ±tlÄ± 3D yÃ¼klendi",
                             "surface": surface,
                             "restored": true,
                         }),
@@ -91,7 +91,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event {
-                // Ana pencere kapanırken DTA'yı da kapat
+                // Ana pencere kapanÄ±rken DTA'yÄ± da kapat
                 if window.label() == "main" {
                     app_settings::shutdown_owned_dta();
                 }
@@ -121,6 +121,8 @@ pub fn run() {
             commands::dta_cmds::set_soil_correction_enabled,
             commands::dta_cmds::set_structures_through_red,
             commands::dta_cmds::set_hints_3d_visible,
+            commands::dta_cmds::set_legacy_depth_params,
+            commands::dta_cmds::set_legacy_depth_calib_notes,
             commands::dta_cmds::set_csv_filter_prefs,
             commands::dta_cmds::deep_structure_scan,
             commands::dta_cmds::staged_depth_scan,
@@ -154,7 +156,7 @@ pub fn run() {
             commands::update_cmds::apply_suite_update,
         ])
         .build(tauri::generate_context!())
-        .expect("Votex başlatılamadı")
+        .expect("Votex baÅŸlatÄ±lamadÄ±")
         .run(|_app, event| {
             match event {
                 RunEvent::ExitRequested { .. } | RunEvent::Exit => {
@@ -164,3 +166,4 @@ pub fn run() {
             }
         });
 }
+
