@@ -4,6 +4,7 @@
  */
 import * as THREE from "three";
 import { state } from "../app/state.js";
+import { selectedDetectionOf } from "./legacyTargetSession.js";
 import { invalidate, refreshClipState } from "./scene.js";
 import { normalizeLegacyResult, mergeLegacyShapes } from "./legacyNormalize.js";
 
@@ -100,7 +101,7 @@ export function peakWeightAt(depthM, xM, zM, detections, maxDepthM, focusDetecti
     const t = clamp(depthM / Math.max(maxDepthM, 1e-6), 0, 1);
     return Math.max(0.12, 1 - t * 0.82);
   }
-  const focusId = focusDetectionId || state.legacySelectedDetectionId || null;
+  const focusId = focusDetectionId || selectedDetectionOf(state.legacyTargetSession) || null;
   let best = 0.02;
   for (const detection of detections) {
     const dx = (xM - detection.cx) / Math.max(detection.rx, 0.15);
@@ -307,7 +308,7 @@ export function addLegacyTomography(result = state.legacyDikResult, options = {}
   const detections = detectionsOf(result || grid.result);
   const sliceStepM = maxDepthM / slices;
   const focusDetectionId = options.focusDetectionId
-    ?? state.legacySelectedDetectionId
+    ?? selectedDetectionOf(state.legacyTargetSession)
     ?? null;
 
   state.legacyTomographyOpacity = opacity;

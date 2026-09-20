@@ -7,7 +7,7 @@ import { state } from "../app/state.js";
 import { normalizeLegacyResult } from "./legacyNormalize.js";
 
 const DEFAULTS = Object.freeze({
-  sensorHeightM: 0.5,
+  sensorHeightM: 0.1,
   bipolarSepFactor: 1.85,
   dipoleBlend: 0.3,
 });
@@ -24,6 +24,22 @@ function clamp(value, min, max) {
 function round(value, digits = 2) {
   const f = 10 ** digits;
   return Math.round(Number(value) * f) / f;
+}
+
+/** Tekrarlı 1 m kazık okumalarını tek referans istatistiğine dönüştürür. */
+export function summarizeFieldStakeReadings(readings, measuredAfterM = null) {
+  const values = (Array.isArray(readings) ? readings : [])
+    .map(Number)
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const averageM = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  const afterM = Number.isFinite(Number(measuredAfterM)) ? Number(measuredAfterM) : null;
+  return {
+    count: values.length,
+    averageM,
+    beforeErrorM: averageM == null ? null : Math.abs(1 - averageM),
+    afterM,
+    afterErrorM: afterM == null ? null : Math.abs(1 - afterM),
+  };
 }
 
 function pickMetal(result) {
@@ -58,7 +74,7 @@ export function buildDepthCalibSummary(labelDepthM, params, result = state.legac
   if (!metal || !(metal.midM > 0)) return null;
 
   const current = {
-    sensorHeightM: 0.5,
+    sensorHeightM: clamp(numberOf(params?.sensorHeightM, DEFAULTS.sensorHeightM), 0, 0.2),
     bipolarSepFactor: clamp(numberOf(params?.bipolarSepFactor, DEFAULTS.bipolarSepFactor), 0.5, 4),
     dipoleBlend: clamp(numberOf(params?.dipoleBlend, DEFAULTS.dipoleBlend), 0, 1),
   };
@@ -67,6 +83,7 @@ export function buildDepthCalibSummary(labelDepthM, params, result = state.legac
   const ratio = labelM / Math.max(metal.midM, 0.2);
 
   return {
+    calibrationMode: String(params?.calibrationMode || "single-object"),
     disclaimer:
       "Derinlik proxy kalibrasyonu — invert değil. Öneri operatör onayı ister; JSON dosyasını değiştirmez.",
     fileName: state.legacyDikFileName || null,
@@ -81,7 +98,7 @@ export function buildDepthCalibSummary(labelDepthM, params, result = state.legac
     metalAt: { x: round(metal.cx, 2), y: round(metal.cy, 2) },
     currentParams: current,
     clamps: {
-      sensorHeightM: [0.5, 0.5],
+      sensorHeightM: [0, 0.2],
       bipolarSepFactor: [0.5, 4],
       dipoleBlend: [0, 1],
     },
@@ -103,7 +120,7 @@ export function proposeDepthParamsLocal(summary) {
   }
 
   const cur = { ...summary.currentParams };
-  let h = 0.5;
+  let h = clamp(summary.currentParams.sensorHeightM, 0, 0.2);
   let factor = cur.bipolarSepFactor;
   let blend = cur.dipoleBlend;
   const reasons = [];
@@ -122,7 +139,7 @@ export function proposeDepthParamsLocal(summary) {
 
   // 1) Küçük–orta kayma: önce ofset (cihaz–yüzey)
   if (absDelta <= 0.65) {
-    const hNext = clamp(h + summary.deltaM, 0, 2);
+    const hNext = clamp(h + summary.deltaM, 0, 0.2);
     if (Math.abs(hNext - h) >= 0.02) {
       reasons.push(
         `Sabit kayma ~${summary.deltaM > 0 ? "+" : ""}${summary.deltaM} m → cihaz–yüzey ${h.toFixed(2)} → ${hNext.toFixed(2)} m`,
@@ -142,8 +159,8 @@ export function proposeDepthParamsLocal(summary) {
       factor = factorNext;
     }
     // Kalan farkın bir kısmını ofsete ver
-    const residual = clamp(summary.deltaM * 0.25, -0.4, 0.4);
-    const hNext = clamp(round(h + residual, 2), 0, 2);
+    const residual = clamp(summary.deltaM * 0.25, -0.1, 0.1);
+    const hNext = clamp(round(h + residual, 2), 0, 0.2);
     if (Math.abs(hNext - h) >= 0.03) {
       reasons.push(`Kalan ofset → cihaz–yüzey ${h.toFixed(2)} → ${hNext.toFixed(2)} m`);
       h = hNext;
@@ -169,8 +186,8 @@ export function proposeDepthParamsLocal(summary) {
     }
   }
 
-  // Cihaz–yüzey sınırı saha kuralıdır; kalibrasyon önerisi bunu değiştiremez.
-  h = 0.5;
+  // Cihaz–yüzey mesafesi saha kuralıdır; öneri 0,20 m üstüne çıkamaz.
+  h = clamp(h, 0, 0.2);
   const suggested = {
     sensorHeightM: round(h, 2),
     bipolarSepFactor: round(factor, 2),
@@ -194,6 +211,9 @@ function formatSuggestionText(summary, suggested, reasons, source) {
       ? "AI kalibrasyon önerisi (proxy — invert değil)"
       : "Yerel kalibrasyon önerisi (AI yok veya yanıt yok)",
     summary.disclaimer,
+    summary.calibrationMode === "field-stake"
+      ? "Kalibrasyon türü: 1,00 m metal uçlu referans kazığı — cihaz derinlik ölçeği mihenk noktası."
+      : "Kalibrasyon türü: bilinen derinlikte tek obje.",
     "",
     `Etiket: ${summary.labelDepthM} m · VOTEX orta: ${summary.votexMidM} m · fark: ${summary.deltaM > 0 ? "+" : ""}${summary.deltaM} m · yöntem: ${summary.depthMethod || "—"}`,
     "",
@@ -225,7 +245,11 @@ function extractJsonObject(text) {
 function clampSuggested(obj, fallback) {
   const base = fallback || DEFAULTS;
   return {
-    sensorHeightM: 0.5,
+    sensorHeightM: clamp(
+      numberOf(obj?.sensorHeightM ?? obj?.sensor_height_m, base.sensorHeightM),
+      0,
+      0.2,
+    ),
     bipolarSepFactor: clamp(
       numberOf(obj?.bipolarSepFactor ?? obj?.bipolar_sep_factor, base.bipolarSepFactor),
       0.5,
@@ -240,15 +264,23 @@ function clampSuggested(obj, fallback) {
 }
 
 function buildPrompt(summary, localSuggested) {
+  const fieldReference = summary.calibrationMode === "field-stake";
   return [
     "Sen VOTEX saha asistanısın. Aşağıdaki JSON, Legacy manyetik DERİNLİK PROXY kalibrasyon özetidir (invert değil).",
-    "Görev: Saha etiketine yaklaşmak için Parametre öner.",
+    fieldReference
+      ? "Kalibrasyon türü: 1,00 m derinliğe çakılmış metal uçlu referans kazık; amaç cihazın 1 m derinlik ölçeğini ankrajlamaktır."
+      : "Kalibrasyon türü: bilinen derinlikte tek obje; amaç seçili objeye göre derinlik proxy'sini düzeltmektir.",
+    "Görev: Saha referansına yaklaşmak için Parametre öner.",
     "Kurallar:",
-    "- Yalnızca sensorHeightM (0..2), bipolarSepFactor (0.5..4), dipoleBlend (0..1) öner.",
+    "- sensorHeightM yalnızca 0..0.20 m olabilir; normal başlangıç değeri 0.10 m'dir.",
+    "- bipolarSepFactor (0.5..4) ve dipoleBlend (0..1) öner.",
     "- Küçük sabit kaymada önce sensorHeightM; büyük oranda bipolarSepFactor; ince ayarda dipoleBlend.",
     "- Aşırı uydurma yapma; tek çekim belirsizliğini not et.",
+    fieldReference
+      ? "- Referans kazığı normal obje/metal listesine eklenmez; yalnızca derinlik ölçeği mihenk noktasıdır."
+      : "- Seçili objeyi yeni bir obje türü olarak uydurma.",
     "- Yanıtın SADECE şu JSON olsun (başka metin yok):",
-    '{"sensorHeightM":0.4,"bipolarSepFactor":1.85,"dipoleBlend":0.3,"rationaleTr":["madde1","madde2"]}',
+    '{"sensorHeightM":0.1,"bipolarSepFactor":1.85,"dipoleBlend":0.3,"rationaleTr":["madde1","madde2"]}',
     "",
     "Yerel ön-öneri (istersen iyileştir):",
     JSON.stringify(localSuggested, null, 2),
@@ -261,10 +293,16 @@ function buildPrompt(summary, localSuggested) {
 /**
  * @param {number} labelDepthM
  * @param {{ sensorHeightM: number, bipolarSepFactor: number, dipoleBlend: number }} params
- * @param {{ forceLocal?: boolean }} [options]
+ * @param {{ forceLocal?: boolean, baselineParams?: object, calibrationMode?: string }} [options]
  */
 export async function suggestDepthParamsWithAi(labelDepthM, params, options = {}) {
-  const summary = buildDepthCalibSummary(labelDepthM, params);
+  // UI yeni öneriyi alana yazsa bile aynı hedef/ölçüm için ilk parametrelerden
+  // yeniden hesaplar; böylece öneri üstüne öneri çarpanları katlamaz.
+  const sourceParams = options.baselineParams || params;
+  const summary = buildDepthCalibSummary(labelDepthM, {
+    ...sourceParams,
+    calibrationMode: options.calibrationMode || sourceParams?.calibrationMode || "single-object",
+  });
   const local = proposeDepthParamsLocal(summary);
   if (!local.ok || !summary) {
     return { ...local, summary: null };

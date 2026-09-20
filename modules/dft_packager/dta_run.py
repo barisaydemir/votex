@@ -6,15 +6,18 @@ import sys
 import traceback
 from pathlib import Path
 
+from dta_paths import user_data_dir
+
 os.environ["PYTHONNOUSERSITE"] = "1"
 
 BASE = Path(__file__).resolve().parent
+USER_DATA_DIR = user_data_dir()
 EMBED = BASE / "runtime" / "python312-amd64"
 EMBED_SP = EMBED / "Lib" / "site-packages"
 VENV_SP = BASE / ".venv_jarvis" / "Lib" / "site-packages"
 VENDOR = BASE / "vendor"
 CRYPTO_BINDINGS = EMBED_SP / "cryptography" / "hazmat" / "bindings"
-BOOT_LOG = BASE / "logs" / "boot.log"
+BOOT_LOG = USER_DATA_DIR / "logs" / "boot.log"
 
 
 def _log(msg: str) -> None:

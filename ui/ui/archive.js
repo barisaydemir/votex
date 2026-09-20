@@ -5,8 +5,12 @@ import { logLine } from "./telemetry.js";
 import { restoreSoilFromArchive } from "./soilProfile.js";
 import { updateShotHint } from "./shotType.js";
 import { clearStructures, ensureViewer } from "../viewer/scene.js";
-import { addLegacyDikShapesToScene } from "../viewer/legacyDikOverlay.js";
-import { renderLegacyDikPanel } from "./legacyDikPanel.js";
+import {
+  addLegacyDikShapesToScene,
+  clearLegacySelection,
+  setLegacySelectedStep,
+} from "../viewer/legacyDikOverlay.js";
+import { renderLegacyDikPanel, restoreLegacyFieldSession } from "./legacyDikPanel.js";
 import { normalizeLegacyResult } from "../viewer/legacyDikModel.js";
 
 /** @type {((surface: any, minConf?: number) => any) | null} */
@@ -105,10 +109,12 @@ async function openLegacyEntry(id) {
     const fileName = loaded.meta?.fileName || loaded.meta?.file_name || "legacy_dik.json";
     const normalized = normalizeLegacyResult(loaded.result, state.legacyMatrixHint || null);
     state.legacyDikRawContent = loaded.content || null;
-    state.legacySelectedDetectionId = null;
+    clearLegacySelection();
     const steps = Array.isArray(normalized.scanSteps) ? normalized.scanSteps : [];
-    state.legacySelectedStepIndex = steps.length ? Number(steps[0].index) || 1 : null;
     addLegacyDikShapesToScene(normalized);
+    // Fingerprint anahtarıyla önceki inceleme oturumunu geri yükle.
+    await restoreLegacyFieldSession(normalized, fileName);
+    if (steps.length) setLegacySelectedStep(Number(steps[0].index) || 1);
     renderLegacyDikPanel(normalized, {
       fileName,
       statusSuffix: `${normalized.message || "arşivden yüklendi"}`,

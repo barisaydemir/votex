@@ -40,3 +40,8 @@ __pycache__/
 
 # Freebuff masaüstü durum dosyaları
 .freebuff/
+
+# Geçici analiz/yama dosyaları
+tmp/
+temp/
+yama/

@@ -113,6 +113,9 @@ pub struct AppSettings {
     /// Saha kalibrasyon defteri (etiket + parametre anlık görüntüleri)
     #[serde(default)]
     pub legacy_depth_calib_notes: Vec<crate::legacy_mag_json::LegacyDepthCalibNote>,
+    /// Saha inceleme oturumları (JSON fingerprint → incelenen hedefler / rapor seçimi)
+    #[serde(default)]
+    pub legacy_field_sessions: std::collections::HashMap<String, crate::legacy_mag_json::LegacyFieldSession>,
 }
 
 fn default_soil_profile() -> String {
@@ -213,6 +216,7 @@ impl Default for AppSettings {
             csv_underground_only: true,
             legacy_depth_params: crate::legacy_mag_json::LegacyDepthParams::default(),
             legacy_depth_calib_notes: Vec::new(),
+            legacy_field_sessions: std::collections::HashMap::new(),
         }
     }
 }

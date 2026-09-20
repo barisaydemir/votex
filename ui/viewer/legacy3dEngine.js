@@ -318,6 +318,9 @@ export function uncertaintyScaleOf(confidence) {
 }
 
 function makeUncertaintyShell(shape, model, color, basePoints) {
+  // Metal bulguları yalnızca ölçülen ayak iziyle gösterilir; belirsizlik
+  // kabuğu kırmızı objeyi olduğundan büyük göstermemelidir.
+  if (shape.kind === "metal") return null;
   const scale = uncertaintyScaleOf(shape.confidence);
   if (scale <= 1.08 && shape.confidence >= 0.75) return null;
   const points = (basePoints || templateFootprintPoints(shape)).map(([x, z]) => [x * scale, z * scale]);
@@ -618,17 +621,18 @@ function addSignalLayer(group, shape, model, fieldDetection, color) {
   const x = shape.cx - (model.originXM + model.widthM * 0.5);
   const z = shape.cz - (model.originZM + model.depthM * 0.5);
   const center = new THREE.Vector3(x, -(shape.topDepthM + shape.bottomDepthM) * 0.5, z);
-  const intensity = clamp(0.6 + shape.strength * 0.08, 0.75, 1.8);
-  const confidenceScale = 0.75 + shape.confidence * 0.45;
+  const exactMetal = shape.kind === "metal";
+  const intensity = exactMetal ? 1 : clamp(0.6 + shape.strength * 0.08, 0.75, 1.8);
+  const confidenceScale = exactMetal ? 1 : 0.75 + shape.confidence * 0.45;
   const base = {
-    x: Math.max(shape.width * 0.5, 0.18) * intensity * confidenceScale,
-    y: Math.max(shape.heightM * 0.55, 0.22) * intensity,
-    z: Math.max(shape.length * 0.5, 0.18) * intensity * confidenceScale,
+    x: Math.max(shape.width * 0.5, 0.06) * intensity * confidenceScale,
+    y: Math.max(shape.heightM * 0.5, 0.08) * intensity,
+    z: Math.max(shape.length * 0.5, 0.06) * intensity * confidenceScale,
   };
   const objects = [
-    makeShell(shape, center, { x: base.x * 1.55, y: base.y * 1.35, z: base.z * 1.55 }, color, 0.08 + shape.confidence * 0.08, 1060),
-    makeShell(shape, center, { x: base.x * 1.16, y: base.y * 1.08, z: base.z * 1.16 }, color, 0.13 + shape.confidence * 0.1, 1065),
-    makeCore(shape, center, color, { x: base.x * 0.68, y: base.y * 0.72, z: base.z * 0.68 }),
+    makeShell(shape, center, { x: exactMetal ? base.x : base.x * 1.55, y: exactMetal ? base.y : base.y * 1.35, z: exactMetal ? base.z : base.z * 1.55 }, color, 0.08 + shape.confidence * 0.08, 1060),
+    makeShell(shape, center, { x: exactMetal ? base.x : base.x * 1.16, y: exactMetal ? base.y : base.y * 1.08, z: exactMetal ? base.z : base.z * 1.16 }, color, 0.13 + shape.confidence * 0.1, 1065),
+    makeCore(shape, center, color, { x: exactMetal ? base.x : base.x * 0.68, y: exactMetal ? base.y : base.y * 0.72, z: exactMetal ? base.z : base.z * 0.68 }),
     makeTopEnergyRing(shape, x, z, shape.topDepthM, color),
     ...(shape.kind === "metal" ? [makePlumePoints(shape, center, color)] : []),
   ];

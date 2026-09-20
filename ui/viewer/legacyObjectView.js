@@ -5,6 +5,7 @@
  */
 import * as THREE from "three";
 import { state } from "../app/state.js";
+import { selectedDetectionOf, selectedStepOf } from "./legacyTargetSession.js";
 import { invalidate } from "./scene.js";
 
 const SIGNAL_TYPES = new Set(["signal-shell", "magnetic-plume"]);
@@ -160,11 +161,8 @@ export function applyLegacyObjectViewMode(group = state.legacyDikGroup) {
   if (!group) return getLegacyObjectViewMode();
   const mode = getLegacyObjectViewMode();
   const blend = getLegacyObjectViewBlend();
-  const selectedId = state.legacySelectedDetectionId || null;
-  const selectedStep = state.legacySelectedStepIndex != null
-    && Number.isFinite(Number(state.legacySelectedStepIndex))
-    ? Number(state.legacySelectedStepIndex)
-    : null;
+  const selectedId = selectedDetectionOf(state.legacyTargetSession);
+  const selectedStep = selectedStepOf(state.legacyTargetSession);
   const layer = group.getObjectByName("legacyRealisticLayer") || group;
   const sliceDepth = Number(state.legacyTomographyDepthM);
   const sliceHalf = (() => {

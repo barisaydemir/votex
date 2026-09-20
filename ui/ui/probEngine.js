@@ -5,6 +5,7 @@ import {
   setAutoLaunchProb,
   setProbFallback,
   setProbProfile,
+  isTauriRuntime,
 } from "../api/tauri.js";
 import { $ } from "../app/state.js";
 import { setStatus } from "../app/status.js";
@@ -102,6 +103,7 @@ export function logProbFromSurface(surface) {
 }
 
 async function bindProbEngineEvent() {
+  if (!isTauriRuntime()) return;
   try {
     const { listen } = await import("@tauri-apps/api/event");
     await listen("prob-engine", (event) => {

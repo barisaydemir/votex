@@ -32,7 +32,7 @@ describe("legacyGridTemplate", () => {
 
   it("alt satırdan başlar ve satırlarda gidiş-dönüş yönünü korur", () => {
     const steps = Array.from({ length: 6 }, (_, index) => ({ index: index + 1 }));
-    const template = buildLegacyGridTemplate({ rows: 2, cols: 3, widthM: 3, depthM: 2, scanSteps: steps });
+    const template = buildLegacyGridTemplate({ rows: 2, cols: 3, widthM: 3, depthM: 2, scanSteps: steps, numberingDirection: "ltr" });
     const byPosition = (row, col) => template.cells.find((cell) => cell.row === row && cell.col === col);
     expect(byPosition(0, 0).stepIndex).toBe(1);
     expect(byPosition(1, 0).stepIndex).toBe(2);
@@ -42,6 +42,13 @@ describe("legacyGridTemplate", () => {
     expect(byPosition(1, 2).stepIndex).toBe(6);
     expect(byPosition(0, 0).direction).toBe("forward");
     expect(byPosition(0, 1).direction).toBe("return");
+  });
+
+  it("varsayılan numaralandırma sağdan sola başlar", () => {
+    const template = buildLegacyGridTemplate({ rows: 2, cols: 2, widthM: 2, depthM: 2 });
+    const byPosition = (row, col) => template.cells.find((cell) => cell.row === row && cell.col === col);
+    expect(byPosition(0, 1).stepIndex).toBe(1);
+    expect(byPosition(0, 0).stepIndex).toBe(3);
   });
 
   it("sağdan sola seçeneğinde sütunları ters yönde numaralandırır", () => {
@@ -94,7 +101,7 @@ describe("legacyGridTemplate", () => {
       ...[0, 1, 2].map((y, index) => ({ index: index + 1, xCenterM: 0.5, yCenterM: y + 0.5 })),
       ...[2, 1, 0].map((y, index) => ({ index: index + 4, xCenterM: 1.5, yCenterM: y + 0.5 })),
     ];
-    const template = buildLegacyGridTemplate({ rows: 3, cols: 2, widthM: 2, depthM: 3, scanSteps: steps });
+    const template = buildLegacyGridTemplate({ rows: 3, cols: 2, widthM: 2, depthM: 3, scanSteps: steps, numberingDirection: "ltr" });
     const cell = findLegacyGridCell(template, 1.5, 1.5);
     expect(cell.stepIndex).toBe(5);
     expect(cell.col).toBe(1);

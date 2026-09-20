@@ -14,6 +14,15 @@ import { buildLegacyRealisticLayer } from "./legacy3dEngine.js";
 import { applyLegacyObjectViewMode } from "./legacyObjectView.js";
 import { dimensionsOf, volumeM3Of, formatVolumeM3 } from "./volume.js";
 import { buildLegacyGridTemplate, findLegacyGridCell, applyLegacyNumberingToNormalized } from "./legacyGridTemplate.js";
+import {
+  clearLegacyTargetSession,
+  targetSessionForDetection,
+  targetSessionForStep,
+  selectedDetectionOf,
+  selectedStepOf,
+} from "./legacyTargetSession.js";
+import { selectionTransition } from "./legacyVisibilityController.js";
+import { getLegacyUnifiedObjectMapLayer } from "./legacyUnifiedObjectMap.js";
 
 const GROUP_NAME = "legacyDikShapes";
 /** Sabit dikey harita aralığı (metre) */
@@ -612,8 +621,8 @@ export function applyLegacySceneViewMode(mode = state.legacySceneViewMode, optio
 
   if (!options.skipStepRefresh) {
     applyLegacyStepVisibility(
-      state.legacySelectedStepIndex,
-      state.legacySelectedDetectionId,
+      selectedStepOf(state.legacyTargetSession),
+      selectedDetectionOf(state.legacyTargetSession),
       { skipScene: true },
     );
   }
@@ -665,23 +674,23 @@ export function setLegacySceneViewMode(mode) {
 
 export function applyFocusSafeStepVisibility(detectionId) {
   if (detectionId == null) return;
-  applyLegacyStepVisibility(state.legacySelectedStepIndex, detectionId);
+  applyLegacyStepVisibility(selectedStepOf(state.legacyTargetSession), detectionId);
 }
 
 export function setLegacyStepNumberingDirection(direction) {
-  const next = String(direction || "ltr").toLowerCase() === "rtl" ? "rtl" : "ltr";
+  const next = String(direction || "rtl").toLowerCase() === "rtl" ? "rtl" : "ltr";
   state.legacyStepNumberingDirection = next;
   return next;
 }
 
 export function getLegacyStepNumberingDirection() {
-  return String(state.legacyStepNumberingDirection || "ltr").toLowerCase() === "rtl" ? "rtl" : "ltr";
+  return String(state.legacyStepNumberingDirection || "rtl").toLowerCase() === "rtl" ? "rtl" : "ltr";
 }
 
 export function setLegacyLabelMode(mode) {
   const next = String(mode || "badge").toLowerCase();
   state.legacyLabelMode = next === "off" || next === "full" ? next : "badge";
-  applyLegacyStepVisibility(state.legacySelectedStepIndex, state.legacySelectedDetectionId);
+  applyLegacyStepVisibility(selectedStepOf(state.legacyTargetSession), selectedDetectionOf(state.legacyTargetSession));
   invalidate();
   return state.legacyLabelMode;
 }
@@ -694,6 +703,21 @@ export function applyLegacyStepVisibility(stepIndex = null, detectionId = null, 
   const group = state.legacyDikGroup;
   if (!group) return;
   const selected = Number.isFinite(Number(stepIndex)) && Number(stepIndex) > 0 ? Number(stepIndex) : null;
+  const canonicalDetectionId = detectionId == null ? null : String(detectionId);
+  const session = state.legacyTargetSession || {};
+  if (selectedStepOf(session) !== selected || selectedDetectionOf(session) !== canonicalDetectionId) {
+    state.legacyTargetSession = canonicalDetectionId
+      ? targetSessionForDetection(canonicalDetectionId, selected, {
+        ...session,
+        source: session.source || "visibility-sync",
+      })
+      : selected == null
+        ? clearLegacyTargetSession({ ...session, source: session.source || "visibility-sync" })
+        : targetSessionForStep(selected, {
+          ...session,
+          source: session.source || "visibility-sync",
+        });
+  }
   group.userData.selectedStepIndex = selected;
   group.userData.selectedDetectionId = detectionId || null;
 
@@ -701,11 +725,27 @@ export function applyLegacyStepVisibility(stepIndex = null, detectionId = null, 
   // obje ebeveyn container'ının kapanmasını önler ve "ekran boş" görünümünü
   // engeller. Sadece gerçek tespit secimi veya adim secimi durumunda calisir.
   const focusObjectId = detectionId ? String(detectionId) : null;
+  const mergedTargetId = state.legacySelectedMergedTargetId ? String(state.legacySelectedMergedTargetId) : null;
+  const mergedTarget = mergedTargetId
+    ? state.legacyFieldModel?.mergedTargets?.find((item) => String(item.targetId) === mergedTargetId)
+    : null;
+  const mergedDetectionIds = new Set((mergedTarget?.detectionIds || []).map(String));
+  const mergedViewMode = String(state.legacyMergedTargetViewMode || "simple");
+  const focusedMergedTarget = !!mergedTarget && mergedViewMode !== "full";
 
   group.traverse((object) => {
     if (isLegacyObjectLabel(object) || object.userData?.isDetailLabel) {
       object.visible = resolveLabelVisibility(object, selected, detectionId || null);
       return;
+    }
+    if (focusedMergedTarget && !object.userData?.legacyUnifiedObject && !object.userData?.legacyUnifiedObjectMap) {
+      const objectDetection = legacySelectionMetadataOf(object).detectionId;
+      if (objectDetection != null) {
+        // Sade görünümde ham kaynak gövdeleri gizlenir; kanıt görünümünde
+        // yalnızca seçili birleşik hedefin kaynak anomalileri kalır.
+        object.visible = mergedViewMode === "evidence" && mergedDetectionIds.has(String(objectDetection));
+        return;
+      }
     }
     if (object.userData?.legacyFallbackVisual) {
       // Bu nesne daha once adimsiz olarak isaretlenmis; sadece belirli
@@ -774,7 +814,7 @@ export function applyLegacyStepVisibility(stepIndex = null, detectionId = null, 
   // Son güvenlik katmanı: profil/sahne modu tekrar görünürlük yazsa bile
   // seçilen tespitin gerçek gövde zinciri açık kalır. Aksi halde yalnızca
   // selection guide halkası görünür ve obje ekranda boş sanılır.
-  if (detectionId) {
+  if (detectionId && !focusedMergedTarget) {
     const selectedId = String(detectionId);
     group.traverse((object) => {
       const metadata = legacySelectionMetadataOf(object);
@@ -789,14 +829,46 @@ export function applyLegacyStepVisibility(stepIndex = null, detectionId = null, 
       }
     });
   }
+
+  // Birleşik 3D görünümün tek sahibi legacyUnifiedObjectMap'tir. Eski kutu
+  // katmanı artık üretilmez; burada yalnız canonical katmanın görünürlüğü ve
+  // adım/tespit filtresi uygulanır.
+  const unifiedLayer = getLegacyUnifiedObjectMapLayer();
+  if (unifiedLayer) {
+    unifiedLayer.visible = !!state.legacyUnifiedObjectMapVisible;
+    unifiedLayer.traverse((object) => {
+      if (!object.userData?.legacyMergedTarget) return;
+      const ids = object.userData.legacyDetectionIds || [];
+      const steps = object.userData.legacyStepIndices || [];
+      const stepMatches = selected == null || steps.includes(Number(selected));
+      const targetMatches = !mergedTargetId || object.userData.legacyMergedTargetId === mergedTargetId;
+      const detectionMatches = !detectionId || ids.includes(String(detectionId));
+      object.visible = stepMatches && targetMatches && (focusedMergedTarget ? true : detectionMatches);
+    });
+  }
   invalidate();
 }
 
 export function setLegacySelectedStep(stepIndex) {
   const numeric = Number(stepIndex);
   const selected = Number.isFinite(numeric) && numeric > 0 ? numeric : null;
-  state.legacySelectedStepIndex = selected;
-  state.legacySelectedDetectionId = null;
+  const transition = selectionTransition(state.legacyTargetSession, {
+    type: selected == null ? "CLEAR_SELECTION" : "SELECT_STEP",
+    stepIndex: selected,
+    source: "step-selection",
+  });
+  state.legacyTargetSession = selected == null
+    ? (state.legacyCaseStore?.clearSelection({ source: "selection-reset", view: state.legacyTargetMode ? "target" : "scene" })
+      || clearLegacyTargetSession({ ...transition, source: "selection-reset", view: state.legacyTargetMode ? "target" : "scene" }))
+    : (state.legacyCaseStore?.selectStep(transition.stepIndex, {
+      ...transition,
+      source: "step-selection",
+      view: state.legacyTargetMode ? "target" : "scene",
+    }) || targetSessionForStep(transition.stepIndex, {
+      ...transition,
+      source: "step-selection",
+      view: state.legacyTargetMode ? "target" : "scene",
+    }));
   applyLegacyStepVisibility(selected, null);
   applyInvertProxySelection(null);
   return selected;
@@ -809,10 +881,19 @@ export function setLegacySelectedDetection(detectionId) {
   const step = target?.object?.userData?.legacyStepIndex
     ?? target?.badge?.userData?.legacyStepIndex
     ?? null;
-  state.legacySelectedDetectionId = id;
   state.selectedStructureId = id;
-  state.legacySelectedStepIndex = step != null && Number.isFinite(Number(step)) ? Number(step) : null;
-  applyLegacyStepVisibility(state.legacySelectedStepIndex, id);
+  const transition = selectionTransition(state.legacyTargetSession, {
+    type: id ? "SELECT_DETECTION" : "CLEAR_SELECTION",
+    detectionId: id,
+    stepIndex: step,
+    source: "detection-selection",
+  });
+  state.legacyTargetSession = id
+    ? (state.legacyCaseStore?.selectDetection(id, transition.stepIndex, { ...transition, source: "detection-selection", view: state.legacyTargetMode ? "target" : "scene" })
+      || targetSessionForDetection(id, transition.stepIndex, { ...transition, source: "detection-selection", view: state.legacyTargetMode ? "target" : "scene" }))
+    : (state.legacyCaseStore?.clearSelection({ ...transition, source: "selection-reset", view: state.legacyTargetMode ? "target" : "scene" })
+      || clearLegacyTargetSession({ ...transition, source: "selection-reset", view: state.legacyTargetMode ? "target" : "scene" }));
+  applyLegacyStepVisibility(selectedStepOf(state.legacyTargetSession), id);
   applyInvertProxySelection(id);
   if (id && state.legacyTomographyVisible) {
     const detection = state.legacyFieldModel?.detections?.find((item) => item.detectionId === id)
@@ -830,9 +911,9 @@ export function setLegacySelectedDetection(detectionId) {
 }
 
 export function clearLegacySelection() {
-  state.legacySelectedStepIndex = null;
-  state.legacySelectedDetectionId = null;
   state.selectedStructureId = null;
+  state.legacyTargetSession = state.legacyCaseStore?.clearSelection({ source: "clear-button", view: state.legacyTargetMode ? "target" : "scene" })
+    || clearLegacyTargetSession({ source: "clear-button", view: state.legacyTargetMode ? "target" : "scene" });
   applyLegacyStepVisibility(null, null);
   applyInvertProxySelection(null);
   return null;
@@ -855,14 +936,15 @@ export function focusLegacyDetection(detectionId) {
     ?? target.badge?.userData?.legacyStepIndex
     ?? null;
   state.selectedStructureId = id;
-  state.legacySelectedDetectionId = id;
-  if (step != null && Number.isFinite(Number(step))) {
-    state.legacySelectedStepIndex = Number(step);
-    applyLegacyStepVisibility(Number(step), id);
-  } else {
-    state.legacySelectedStepIndex = null;
-    applyLegacyStepVisibility(null, id);
-  }
+  const transition = selectionTransition(state.legacyTargetSession, {
+    type: "SELECT_DETECTION",
+    detectionId: id,
+    stepIndex: step,
+    source: "camera-focus",
+  });
+  state.legacyTargetSession = state.legacyCaseStore?.selectDetection(id, transition.stepIndex, { ...transition, source: "camera-focus", view: state.legacyTargetMode ? "target" : "scene" })
+    || targetSessionForDetection(id, transition.stepIndex, { ...transition, source: "camera-focus", view: state.legacyTargetMode ? "target" : "scene" });
+  applyLegacyStepVisibility(selectedStepOf(state.legacyTargetSession), selectedDetectionOf(state.legacyTargetSession));
   applyInvertProxySelection(id);
 
   // Seçili gövde + ebeveyn zinciri kesin açık kalsın.
@@ -2015,11 +2097,11 @@ function addInvertProxyLayer(group, normalized, mapWidth, mapDepth, originX, ori
   group.add(layer);
   group.userData.hasInvertProxy = linked.length > 0;
   group.userData.invertProxies = linked;
-  applyInvertProxySelection(state.legacySelectedDetectionId);
+  applyInvertProxySelection(selectedDetectionOf(state.legacyTargetSession));
   return layer;
 }
 
-export function applyInvertProxySelection(detectionId = state.legacySelectedDetectionId) {
+export function applyInvertProxySelection(detectionId = selectedDetectionOf(state.legacyTargetSession)) {
   const group = state.legacyDikGroup;
   const layer = group?.getObjectByName("legacyInvertProxy");
   if (!layer) return;
@@ -2046,7 +2128,7 @@ export function setLegacyInvertProxyVisible(visible) {
     const layer = group.getObjectByName("legacyInvertProxy");
     if (layer) layer.visible = on;
   }
-  applyInvertProxySelection(state.legacySelectedDetectionId);
+  applyInvertProxySelection(selectedDetectionOf(state.legacyTargetSession));
   invalidate();
   return on;
 }
@@ -2055,6 +2137,7 @@ export function toggleLegacyInvertProxy() {
   if (!isLegacyInvertProxyAvailable()) return false;
   return setLegacyInvertProxyVisible(!state.legacyInvertProxyVisible);
 }
+
 
 export function addLegacyDikShapesToScene(result) {
   if (!state.scene || !result) return null;
@@ -2078,11 +2161,17 @@ export function addLegacyDikShapesToScene(result) {
     originYM: originZ,
     numberingDirection: state.legacyStepNumberingDirection,
   });
-  const fieldModel = buildLegacyFieldModel(normalized);
+  const fieldModel = buildLegacyFieldModel(normalized, {
+    splitDetectionIds: state.legacyMergedSplitDetectionIds,
+  });
   const steps = fieldModel.steps.map((entry) => entry.raw);
-  const defaultStep = null;
-  const selectedStep = state.legacySelectedStepIndex ?? defaultStep;
-  state.legacySelectedStepIndex = selectedStep;
+  const selectedStep = selectedStepOf(state.legacyTargetSession);
+  if (selectedStep != null) {
+    state.legacyTargetSession = targetSessionForStep(selectedStep, {
+      ...state.legacyTargetSession,
+      source: "scene-default-step",
+    });
+  }
 
   // Dünya orijini grid dikdörtgeninin merkezidir; ham koordinat kayması korunur.
   const ox = originX + xMeters / 2;
@@ -2158,6 +2247,8 @@ export function addLegacyDikShapesToScene(result) {
     }
   });
   group.add(realisticLayer);
+  // Birleşik hedef geometrisi kullanıcı katmanını açtığında yalnızca
+  // legacyUnifiedObjectMap tarafından üretilir; eski kutu katmanı eklenmez.
 
   addInvertProxyLayer(group, normalized, xMeters, zMeters, originX, originZ, fieldModel);
 
@@ -2198,7 +2289,7 @@ export function addLegacyDikShapesToScene(result) {
   } catch {
     /* ignore */
   }
-  applyLegacyStepVisibility(selectedStep, state.legacySelectedDetectionId);
+  applyLegacyStepVisibility(selectedStep, selectedDetectionOf(state.legacyTargetSession));
   applyLegacySceneViewMode(state.legacySceneViewMode);
   syncClipRange(-depthMax, 3);
   refreshClipState();
@@ -2236,8 +2327,7 @@ export function removeLegacyDikShapes() {
   state.legacyDepthMapVisible = false;
   state.legacyInvertProxyVisible = false;
   state.legacyFieldModel = null;
-  state.legacySelectedDetectionId = null;
-  state.legacySelectedStepIndex = null;
+  state.legacyTargetSession = clearLegacyTargetSession({ source: "scene-clear" });
   state.legacyDikResult = null;
   if (state.structureTargets) {
     for (const k of Object.keys(state.structureTargets)) {

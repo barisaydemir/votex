@@ -5,6 +5,13 @@ import {
   clearLegacySelection,
   applyLegacyStepVisibility,
 } from "./legacyDikOverlay.js";
+import {
+  createLegacyTargetSession,
+  targetSessionForStep,
+  selectedStepOf,
+  selectedDetectionOf,
+} from "./legacyTargetSession.js";
+import { createLegacyCaseStore } from "./legacyCaseStore.js";
 
 describe("legacy ortak seçim filtresi", () => {
   beforeEach(() => {
@@ -17,8 +24,7 @@ describe("legacy ortak seçim filtresi", () => {
     const untagged = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
     group.add(stepOne, stepTwo, untagged);
     state.legacyDikGroup = group;
-    state.legacySelectedStepIndex = 1;
-    state.legacySelectedDetectionId = null;
+    state.legacyTargetSession = targetSessionForStep(1, { source: "test" });
     state.selectedStructureId = null;
   });
 
@@ -32,10 +38,34 @@ describe("legacy ortak seçim filtresi", () => {
 
   it("Tümü ortak seçim durumunu sıfırlar", () => {
     clearLegacySelection();
-    expect(state.legacySelectedStepIndex).toBeNull();
-    expect(state.legacySelectedDetectionId).toBeNull();
+    expect(state.legacyTargetSession.stepIndex).toBeNull();
+    expect(state.legacyTargetSession.detectionId).toBeNull();
+    expect(selectedStepOf(state.legacyTargetSession)).toBeNull();
+    expect(selectedDetectionOf(state.legacyTargetSession)).toBeNull();
     expect(state.selectedStructureId).toBeNull();
     expect(state.legacyDikGroup.children.every((child) => child.visible)).toBe(true);
+  });
+
+  it("panel ve overlay için ortak case store seçim komutları aynı sözleşmeyi üretir", () => {
+    const localState = { legacyTargetSession: null, selectedStructureId: null };
+    const store = createLegacyCaseStore(localState);
+    const step = store.selectStep(4, { source: "test" });
+    expect(step).toMatchObject({ kind: "step", stepIndex: 4, detectionId: null, visibility: "step" });
+    const detection = store.selectDetection("legacy-dik-shape-7", 4, { source: "test" });
+    expect(detection).toMatchObject({ kind: "detection", stepIndex: 4, detectionId: "legacy-dik-shape-7", visibility: "selected-only" });
+    const cleared = store.clearSelection({ source: "test" });
+    expect(cleared).toMatchObject({ kind: "none", stepIndex: null, detectionId: null });
+  });
+
+  it("panel ve overlay için ortak case store seçim komutları aynı sözleşmeyi üretir", () => {
+    const localState = { legacyTargetSession: null, selectedStructureId: null };
+    const store = createLegacyCaseStore(localState);
+    const step = store.selectStep(4, { source: "test" });
+    expect(step).toMatchObject({ kind: "step", stepIndex: 4, detectionId: null, visibility: "step" });
+    const detection = store.selectDetection("legacy-dik-shape-7", 4, { source: "test" });
+    expect(detection).toMatchObject({ kind: "detection", stepIndex: 4, detectionId: "legacy-dik-shape-7", visibility: "selected-only" });
+    const cleared = store.clearSelection({ source: "test" });
+    expect(cleared).toMatchObject({ kind: "none", stepIndex: null, detectionId: null });
   });
 
   it("tespit seçimi detectionId’siz katman kökünü gizlemez", () => {
@@ -64,7 +94,7 @@ describe("legacy ortak seçim filtresi", () => {
         title: "Test",
       },
     };
-    state.legacySelectedDetectionId = "legacy-dik-shape-1";
+    state.legacyTargetSession = createLegacyTargetSession({ detectionId: "legacy-dik-shape-1", source: "test" });
     applyLegacyStepVisibility(null, "legacy-dik-shape-1");
     expect(layer.visible).toBe(true);
     expect(body.visible).toBe(true);

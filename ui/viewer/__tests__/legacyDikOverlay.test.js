@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import * as THREE from "three";
 import { footprintPoints, createFootprintFill, polygonToWorldPoints, polygonToPlanPoints, formatLegacyObjectLabel, setLegacyLabelMode, getLegacyLabelMode, applyLegacyStepVisibility, setLegacySelectedStep } from "../legacyDikOverlay.js";
 import { state } from "../../app/state.js";
+import { createLegacyTargetSession } from "../legacyTargetSession.js";
 
 vi.stubGlobal("requestAnimationFrame", () => 0);
 
@@ -60,8 +61,7 @@ describe("legacyDikOverlay.labelMode", () => {
   afterEach(() => {
     state.legacyDikGroup = null;
     state.legacyLabelMode = "badge";
-    state.legacySelectedDetectionId = null;
-    state.legacySelectedStepIndex = null;
+    state.legacyTargetSession = createLegacyTargetSession({ source: "test-reset" });
     state.structureTargets = {};
   });
 

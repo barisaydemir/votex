@@ -5,6 +5,7 @@ import { $, state } from "../app/state.js";
 import { initStageHud, updateStageHud } from "../ui/stageHud.js";
 import { updateLabelFade, invalidateLabelCache } from "./labelFade.js";
 import { noteRenderFrame, onTierChange } from "./adaptiveQuality.js";
+import { clearLegacyTargetSession } from "./legacyTargetSession.js";
 
 
 // ── Render-on-demand ─────────────────────────────────────────
@@ -283,8 +284,7 @@ export function clearStructures() {
   state.selectedStructureId = null;
   state.legacyDikResult = null;
   state.legacyFieldModel = null;
-  state.legacySelectedStepIndex = null;
-  state.legacySelectedDetectionId = null;
+  state.legacyTargetSession = clearLegacyTargetSession({ source: "scene-clear" });
   state.legacyDikRawContent = null;
   state.legacyDikFileName = null;
   state.legacyTomographyDepthM = null;

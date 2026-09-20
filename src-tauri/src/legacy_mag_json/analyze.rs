@@ -793,7 +793,7 @@ fn dipole_kernel(rho: f32, z: f32) -> f32 {
 }
 
 fn apply_sensor_height(mut est: DepthEstimate, sensor_height_m: f32) -> DepthEstimate {
-    let h = 0.50;
+    let h = sensor_height_m.clamp(0.0, 0.20);
     est.center_m = (est.center_m + h).min(10.0);
     est.top_m = (est.top_m + h).min(9.8);
     est.bottom_m = (est.bottom_m + h).min(10.0).max(est.top_m + 0.15);
@@ -1939,8 +1939,7 @@ pub fn analyze_legacy_dik_with_options(
     requested_spacing_m: Option<f32>,
     depth_params: LegacyDepthParams,
 ) -> Result<LegacyDikResult, String> {
-    let mut params = depth_params.clamped();
-    params.sensor_height_m = 0.50;
+    let params = depth_params.clamped();
     let (outer, meta, mut table, ix, iy, iz, ixm, iym) = parse_outer_and_table(content)?;
     let spacing = requested_spacing_m
         .filter(|value| value.is_finite() && *value > 0.0);
@@ -2390,10 +2389,10 @@ mod tests {
             "bakır depth drifted: auto {mid_a:.2} vs matrix {mid_b:.2}"
         );
         assert_eq!(a.depth_method, "bipolar");
-        // Yumuşatılmış bipolar + 0.40 m cihaz ofseti (~2.9 m).
+        // Yumuşatılmış bipolar + 0.10 m cihaz-yüzey ofseti (yaklaşık 2.6 m).
         assert!(
-            (2.7..=3.5).contains(&mid_b),
-            "expected softened+offset ~2.9 m bipolar depth, got {mid_b:.2}"
+            (2.3..=3.2).contains(&mid_b),
+            "expected softened+0.10 m offset ~2.6 m bipolar depth, got {mid_b:.2}"
         );
         assert!(
             !auto.invert_proxies.is_empty(),
@@ -2410,7 +2409,7 @@ mod tests {
     #[test]
     fn depth_params_defaults_and_clamp() {
         let d = LegacyDepthParams::default();
-        assert!((d.sensor_height_m - 0.50).abs() < 1e-6);
+        assert!((d.sensor_height_m - 0.10).abs() < 1e-6);
         assert!((d.bipolar_sep_factor - 1.85).abs() < 1e-6);
         assert!((d.dipole_blend - 0.30).abs() < 1e-6);
         let raw = serde_json::json!({});
@@ -2422,13 +2421,13 @@ mod tests {
             dipole_blend: 2.0,
         }
         .clamped();
-        assert!((clamped.sensor_height_m - 0.50).abs() < 1e-6);
+        assert!((clamped.sensor_height_m - 0.20).abs() < 1e-6);
         assert!((clamped.bipolar_sep_factor - 0.5).abs() < 1e-6);
         assert!((clamped.dipole_blend - 1.0).abs() < 1e-6);
     }
 
     #[test]
-    fn bakir_sensor_height_is_fixed_at_half_meter() {
+    fn bakir_sensor_height_respects_small_surface_distance() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("examples")
@@ -2442,30 +2441,30 @@ mod tests {
             None,
             None,
             LegacyDepthParams {
-                sensor_height_m: 0.50,
+                sensor_height_m: 0.10,
                 ..LegacyDepthParams::default()
             },
         )
-        .expect("h=0.50");
+        .expect("h=0.10");
         let without_h = analyze_legacy_dik_with_options(
             &content,
             None,
             None,
             LegacyDepthParams {
-                sensor_height_m: 0.0,
+                sensor_height_m: 0.20,
                 ..LegacyDepthParams::default()
             },
         )
-        .expect("h=0 is clamped to 0.50");
+        .expect("h=0.20 is accepted");
         let (Some(a), Some(b)) = (with_h.metals.first(), without_h.metals.first()) else {
             panic!("expected metal");
         };
         let mid_a = 0.5 * (a.depth_top_m + a.depth_bottom_m);
         let mid_b = 0.5 * (b.depth_top_m + b.depth_bottom_m);
-        let delta = mid_a - mid_b;
+        let delta = mid_b - mid_a;
         assert!(
-            delta.abs() < 0.001,
-            "fixed 0.50 m boundary must ignore zero override: {mid_a:.3} vs {mid_b:.3}"
+            (delta - 0.10).abs() < 0.001,
+            "sensor height must contribute only the configured 0.10 m difference: {mid_a:.3} vs {mid_b:.3}"
         );
     }
 
@@ -2518,6 +2517,21 @@ mod tests {
         assert!(result.ok);
         assert_eq!(result.point_count, 5);
     }
+    #[test]
+    fn rust_result_fixture_matches_js_replay_contract() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("examples")
+            .join("legacy_dik_result_fixture.json");
+        let content = std::fs::read_to_string(&path).expect("result fixture");
+        let result: LegacyDikResult = serde_json::from_str(&content)
+            .expect("canonical LegacyDikResult fixture");
+        assert!(result.ok);
+        assert_eq!(result.anomalies.len(), 1);
+        assert_eq!(result.scan_steps.len(), 1);
+        assert_eq!(result.fingerprint, "legacy-result-fixture-v1");
+    }
+
     #[test]
     fn analyze_example_file_if_present() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

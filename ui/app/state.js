@@ -15,8 +15,6 @@ export const $ = (id) => document.getElementById(id);
   selectionMarker: import("three").Object3D | null,
   structureKotM: Record<string, number>,
   legacyDikGroup: import("three").Group | null,
-  legacySelectedStepIndex: number | null,
-  legacySelectedDetectionId: string | null,
   legacyListFilter: string,
 }} */
 export const state = {
@@ -58,6 +56,10 @@ export const state = {
   legacyTomographyPlaying: false,
   /** |σ| eşiğinin altı şeffaf/gri gösterilir */
   legacyTomographySigmaFloor: 0,
+  /** Bulguları tekil sürekli 3D objelere birleştiren katman (aç/kapa) */
+  legacyUnifiedObjectMapVisible: false,
+  /** Bulguları derinlik hacminde gösteren yardımcı harita (aç/kapa) */
+  legacyUndergroundMapVisible: false,
   /** Yüzey altı 3D renk haritası (aç/kapa; tespitlerden bağımsız) */
   legacySubsurfaceMapVisible: false,
   /** Yüzey altı harita dilim opaklığı 0.08–0.55 */
@@ -72,6 +74,14 @@ export const state = {
   legacyDepthCalibAiText: null,
   /** Son önerilen Parametre (alanlara yazılana kadar) */
   legacyDepthCalibSuggestion: null,
+  /** Kalibrasyon modu: single-object veya field-stake */
+  legacyDepthCalibrationMode: "single-object",
+  /** Öneri zincirinde kullanılan değişmemiş başlangıç parametreleri; öneri üstüne öneri katlanmasını önler */
+  legacyDepthCalibBaseParams: null,
+  /** Saha kazığı tekrar okumaları ve kalibrasyon karşılaştırması */
+  legacyFieldCalibrationReadings: [],
+  legacyFieldCalibrationBeforeM: null,
+  legacyFieldCalibrationAfterM: null,
   /** Tahmini derinlik haritası (aç/kapa bakış; invert değil) */
   legacyDepthMapVisible: false,
   /** Derinlik haritası plan opaklığı 0.2–0.95 */
@@ -81,23 +91,31 @@ export const state = {
   /** 3D etiket modu: off | badge | full */
   legacyLabelMode: "badge",
   /** Adım numaralandırma yönü: ltr = soldan sağa, rtl = sağdan sola */
-  legacyStepNumberingDirection: "ltr",
+  legacyStepNumberingDirection: "rtl",
   /** 3D obje bakışı: shape | signal | both (varsayılan shape — saha kullanıcısı) */
   legacyObjectViewMode: "shape",
   /** Kontür(0) ↔ sinyal(1) karışım; both modunda kullanılır */
   legacyObjectViewBlend: 0.5,
   /** Map detectionId → { n, spreadM, midM } çoklu çekim tutarlılığı */
   legacyArchiveDepthSpread: null,
-  /** Legacy 3D görünümünde seçili tespit; null ise seçili adımın tüm tespitleri */
-  legacySelectedDetectionId: null,
   /** Legacy 3D sahne görünümü: combined, plan veya objects */
   legacySceneViewMode: "combined",
   /** Sol LEGACY3DMAG listesi filtresi: all, detections, strong, attention veya normal */
   legacyListFilter: "all",
-  /** Son yüklenen Legacy dik JSON analiz sonucu */
+  /** Son yüklenen Legacy dik JSON analiz sonucu (AnalysisResult) */
   legacyDikResult: null,
+  /** Analiz sonucu ile saha gözlemlerini ayıran tek vaka modeli */
+  legacyCase: null,
   /** Adım, tespit ve saha metrelerini birleştiren ortak görünüm modeli */
   legacyFieldModel: null,
+  /** Legacy harita: full = tüm kanıtlar, merged = birleşik hedefler, both = ikisi */
+  legacyMapViewMode: "full",
+  /** Birleşik hedef seçimi */
+  legacySelectedMergedTargetId: null,
+  /** Seçili birleşik hedefin 3D sunumu: simple | evidence | full */
+  legacyMergedTargetViewMode: "simple",
+  /** Kullanıcının otomatik gruptan ayırdığı ham kanıt kimlikleri */
+  legacyMergedSplitDetectionIds: [],
   legacyDikRawContent: null,
   legacyDikFileName: null,
   /** CSV verisi (CsvImportResult) */
@@ -133,4 +151,25 @@ export const state = {
   detectionNotes: {},
   /** 3D kullanıcı görünüm profili: simple, technical veya field */
   viewProfile: "simple",
+  /** LEGACY kullanıcı paneli: simple veya expert */
+  legacyUserMode: "simple",
+  /** Hedef modunda yalnızca seçili hedefi büyüt */
+  legacyTargetMode: false,
+  /** Saha raporuna elle eklenen Legacy hedef kimlikleri */
+  legacyReportTargetIds: [],
+  /** Legacy saha operatörü görev akışını göster */
+  legacyFieldWorkflowEnabled: true,
+  /** Adım/obje/kamera görünürlüğünün ortak seçim sözleşmesi */
+  legacyTargetSession: {
+    kind: "none",
+    stepIndex: null,
+    detectionId: null,
+    view: "scene",
+    visibility: "step",
+    source: "initial",
+  },
+  /** Hazır derinlik profili adı */
+  legacyDepthProfile: "normal",
+  /** Birleşme duyarlılığı: cautious | normal | research */
+  legacyMergeProfile: "normal",
 };

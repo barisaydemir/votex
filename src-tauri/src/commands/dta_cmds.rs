@@ -138,6 +138,33 @@ pub fn set_legacy_depth_calib_notes(
     Ok(s)
 }
 
+/// Saha inceleme oturumlarını kaydet (fingerprint anahtarlı; en fazla 40 dosya).
+#[tauri::command]
+pub fn set_legacy_field_sessions(
+    sessions: std::collections::HashMap<String, crate::legacy_mag_json::LegacyFieldSession>,
+) -> Result<AppSettings, String> {
+    let mut s = app_settings::load_settings();
+    let mut cleaned: Vec<(String, crate::legacy_mag_json::LegacyFieldSession)> = Vec::new();
+    for (key, session) in sessions.into_iter() {
+        let key = key.trim().chars().take(120).collect::<String>();
+        if key.is_empty() {
+            continue;
+        }
+        let mut session = session;
+        session.key = key.clone();
+        session.updated_at = session.updated_at.chars().take(40).collect();
+        session.reviewed_targets.truncate(500);
+        session.report_targets.truncate(500);
+        cleaned.push((key, session));
+    }
+    // Settings şişmesin: en güncel 40 oturumu koru.
+    cleaned.sort_by(|a, b| b.1.updated_at.cmp(&a.1.updated_at));
+    cleaned.truncate(40);
+    s.legacy_field_sessions = cleaned.into_iter().collect();
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
 /// CSV filtre tercihlerini toplu olarak kaydet (yeniden başlasa da hatırlanır).
 #[tauri::command]
 pub fn set_csv_filter_prefs(

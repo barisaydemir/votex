@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import * as THREE from "three";
 import { state } from "../../app/state.js";
 import { nearestLegacyDetectionId, pickLegacyDetectionOnSurface } from "../pick.js";
+import { createLegacyTargetSession } from "../legacyTargetSession.js";
 
 describe("legacy surface pick → nearest detection", () => {
   beforeEach(() => {
@@ -9,7 +10,7 @@ describe("legacy surface pick → nearest detection", () => {
     state.legacyDikGroup.userData.gridWidthM = 8;
     state.legacyDikGroup.userData.gridDepthM = 10;
     state.legacyDikGroup.updateMatrixWorld(true);
-    state.legacySelectedStepIndex = null;
+    state.legacyTargetSession = createLegacyTargetSession({ source: "test-reset" });
     state.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
     state.camera.position.set(6, 8, 6);
     state.camera.lookAt(0, 0, 0);
@@ -44,7 +45,7 @@ describe("legacy surface pick → nearest detection", () => {
   });
 
   it("seçili adımda eşleşme yoksa diğer adıma düşer", () => {
-    state.legacySelectedStepIndex = 99;
+    state.legacyTargetSession = createLegacyTargetSession({ stepIndex: 99, source: "test" });
     const hit = new THREE.Vector3(-1.9, 0.02, 1.4);
     expect(nearestLegacyDetectionId(hit)).toBe("legacy-dik-shape-2");
   });

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { dimensionsOf, volumeM3Of, formatVolumeM3 } from "./volume.js";import { state } from "../app/state.js";
+import { selectedStepOf } from "./legacyTargetSession.js";
 import { focusFreeDraw, focusStructure, flyCameraTo } from "./labels.js";
 import { isRulerEnabled } from "../ui/mapRuler.js";
 import { renderFreeDrawPanel } from "../ui/freeDrawPanel.js";
@@ -61,7 +62,7 @@ export function nearestLegacyDetectionId(localOrWorldPoint, maxDistM = 3.5, opts
   const local = opts.local
     ? localOrWorldPoint
     : group.worldToLocal(localOrWorldPoint.clone());
-  const selectedStep = state.legacySelectedStepIndex;
+  const selectedStep = selectedStepOf(state.legacyTargetSession);
   const mapSpan = Math.max(
     Number(group.userData?.gridWidthM) || 0,
     Number(group.userData?.gridDepthM) || 0,

@@ -6,6 +6,7 @@
 
 import { dimensionsOf, volumeM3Of } from "./volume.js";
 import { mergeLegacyShapes, normalizeLegacyResult } from "./legacyNormalize.js";
+import { buildLegacyMergePresentation } from "./legacyMergedTargetModel.js";
 
 export { mergeLegacyShapes, normalizeLegacyResult, orderScanStepsLeftFirst } from "./legacyNormalize.js";
 
@@ -159,7 +160,7 @@ function recommendationOf(shape, detection) {
   return "Komşu adımlardan çapraz ölçüm alın; tek başına kazı kararı vermeyin.";
 }
 
-export function buildLegacyFieldModel(result) {
+export function buildLegacyFieldModel(result, options = {}) {
   const normalized = normalizeLegacyResult(result);
   const steps = legacyStepsOf(normalized);
   const ranges = stationRanges(steps);
@@ -192,16 +193,24 @@ export function buildLegacyFieldModel(result) {
       geometry: shape.shapeType || "irregular",
       evidence: {
         source: shape.shapeSource || "inferred",
-        shapeConfidence: Number(shape.shapeConfidence) || 0,
-        shapeFitError: Number(shape.shapeFitError) || 0,
+        shapeConfidence: Number.isFinite(Number(shape.shapeConfidence)) ? Number(shape.shapeConfidence) : null,
+        shapeFitError: Number.isFinite(Number(shape.shapeFitError)) ? Number(shape.shapeFitError) : null,
       },
       recommendation: "",
       raw: shape,
     };
     detection.magneticResponse = magneticResponseOf(detection);
     detection.recommendation = recommendationOf(shape, detection);
+    detection.analysisEvidence = buildLegacyAnalysisEvidence(detection, {
+      mergeProfile: options.mergeProfile || "normal",
+    });
     return detection;
   });
+  const mergePresentation = buildLegacyMergePresentation(detections, {
+    mergeProfile: options.mergeProfile || "normal",
+    splitDetectionIds: options.splitDetectionIds || [],
+  });
+  const mergedTargets = mergePresentation.targets;
   const modelSteps = steps.map((step, index) => {
     const range = ranges[index] || { centerM: 0, startM: 0, endM: 0 };
     const stepDetections = detections.filter((detection) => detection.stepIndex === step.index);
@@ -220,7 +229,15 @@ export function buildLegacyFieldModel(result) {
     };
   });
   const scale = residualScaleOf(normalized);
-  return { steps: modelSteps, detections, stepByIndex, result: normalized, residualScale: scale };
+  return {
+    steps: modelSteps,
+    detections,
+    mergedTargets,
+    mergePresentation,
+    stepByIndex,
+    result: normalized,
+    residualScale: scale,
+  };
 }
 
 export function matchesLegacyListFilter(filter, item = {}) {
@@ -315,6 +332,137 @@ export function formatLegacyFieldLine(detection) {
  * Seçili bulgu için sade saha özeti (ekran / PDF / kopyala).
  * Hesap sonucunu değiştirmez.
  */
+function percentScore(value) {
+  if (!Number.isFinite(Number(value))) return null;
+  return Math.max(0, Math.min(100, Math.round(Number(value))));
+}
+
+function evidenceMetric(value, source, rawValue, kind = "proxy", reason = "") {
+  return {
+    value: value == null ? null : percentScore(value),
+    source,
+    rawValue: Number.isFinite(Number(rawValue)) ? Number(rawValue) : null,
+    unit: "percent",
+    kind,
+    ...(reason ? { reason } : {}),
+  };
+}
+
+/**
+ * Seçili anomalinin yüzde analizini ve bu yüzdelerin dayanaklarını tek DTO'da
+ * üretir. Bu değerler malzeme teşhisi değil, ölçümden türetilen proxy'lerdir.
+ */
+export function buildLegacyAnalysisEvidence(detection, options = {}) {
+  if (!detection) return null;
+  const raw = detection.raw && typeof detection.raw === "object" ? detection.raw : {};
+  const evidence = detection.evidence && typeof detection.evidence === "object" ? detection.evidence : {};
+  const strength = Number(detection.strength ?? detection.peakSigma ?? raw.peakSigma ?? raw.strength);
+  const confidence = Number(detection.confidence);
+  const shapeErrorRaw = detection.shapeFitError ?? evidence.shapeFitError ?? raw.shapeFitError ?? raw.shape_fit_error;
+  const shapeError = Number(shapeErrorRaw);
+  const repeat = options.repeatability && typeof options.repeatability === "object"
+    ? options.repeatability
+    : null;
+  const spreadM = Number(repeat?.spreadM);
+  const repeatability = repeat?.n >= 2 && Number.isFinite(spreadM)
+    ? 100 - spreadM * 40
+    : null;
+  const signal = Number.isFinite(strength) && strength > 0 ? (strength / 5) * 100 : null;
+  const compactness = Number.isFinite(shapeError) ? 100 - shapeError * 100 : null;
+  const metrics = {
+    signalStrength: evidenceMetric(signal, "peakSigma", strength),
+    anomalyConfidence: evidenceMetric(Number.isFinite(confidence) ? confidence * 100 : null, "confidence", confidence, "measurement-proxy"),
+    compactness: evidenceMetric(compactness, "shapeFitError", shapeError),
+    repeatability: evidenceMetric(repeatability, "archiveDepthSpread", spreadM, "archive-proxy", repeat?.n >= 2 ? "" : "insufficient-repeated-scans"),
+  };
+  const signalValue = metrics.signalStrength.value;
+  return {
+    schemaVersion: 1,
+    detectionId: String(detection.detectionId || ""),
+    metrics,
+    inputs: {
+      stepIndex: detection.stepIndex ?? null,
+      depthTopM: Number(detection.depthTopM),
+      depthBottomM: Number(detection.depthBottomM),
+      stationM: Number(detection.stationM),
+      offsetM: Number(detection.offsetM),
+      widthM: Number(detection.dimensions?.width ?? detection.widthM ?? (Number(raw.rx) || 0) * 2),
+      lengthM: Number(detection.dimensions?.length ?? detection.lengthM ?? (Number(raw.ry) || 0) * 2),
+      strengthSigma: Number.isFinite(strength) ? strength : null,
+      mergeProfile: String(options.mergeProfile || "normal"),
+      repeatedScans: Number.isFinite(Number(repeat?.n)) ? Number(repeat.n) : 0,
+      depthSpreadM: Number.isFinite(spreadM) ? spreadM : null,
+    },
+    interpretation: signalValue == null || signalValue < 40
+      ? "weak-or-uncertain-anomaly"
+      : signalValue < 70 ? "investigate-anomaly" : "strong-repeatable-candidate",
+    warning: "material-not-identifiable",
+    disclaimer: "Bu yüzdeler ölçümden türetilen tahminlerdir; altın, gümüş veya başka bir malzemeyi kesin olarak tanımlamaz.",
+  };
+}
+
+/** Analiz panelinin her yüzde için açıklayacağı kaynak satırlarını üretir. */
+export function analysisEvidenceRowsOf(analysis) {
+  const metrics = analysis?.metrics || {};
+  const definitions = [
+    ["signalStrength", "Sinyal gücü", "peakSigma", "σ"],
+    ["anomalyConfidence", "Anomali güveni", "confidence", ""],
+    ["compactness", "Kompaktlık proxy", "shapeFitError", "hata"],
+    ["repeatability", "Tekrarlanabilirlik", "archiveDepthSpread", "m"],
+  ];
+  return definitions.map(([key, label, source, unit]) => {
+    const metric = metrics[key] || {};
+    const value = metric.value == null ? "—" : `%${metric.value}`;
+    const raw = metric.rawValue == null ? "—" : `${metric.rawValue}${unit ? ` ${unit}` : ""}`;
+    return {
+      key,
+      label,
+      value,
+      source,
+      raw,
+      kind: metric.kind || "proxy",
+      reason: metric.reason || "",
+    };
+  });
+}
+
+/**
+ * Analiz hattını kullanıcıya açıklamak için küçük, salt-okunur trace DTO'su.
+ * Bu bir hata günlüğü değil; aynı sonuçtan üretilen aşama ve sayaç sözleşmesidir.
+ */
+export function buildLegacyAnalysisTrace(result, fieldModel = null, options = {}) {
+  const normalized = result?.scanSteps ? result : normalizeLegacyResult(result);
+  const steps = Array.isArray(normalized?.scanSteps) ? normalized.scanSteps : [];
+  const shapes = Array.isArray(normalized?.shapes) ? normalized.shapes : legacyShapesOf(normalized);
+  const detections = Array.isArray(fieldModel?.detections) ? fieldModel.detections : [];
+  const mergedTargets = Array.isArray(fieldModel?.mergedTargets) ? fieldModel.mergedTargets : [];
+  const stage = (key, label, status, count, detail) => ({ key, label, status, count, detail });
+  const inputPresent = options.inputPresent !== false;
+  const ok = normalized?.ok !== false;
+  return {
+    schemaVersion: 1,
+    status: ok ? "complete" : "warning",
+    fingerprint: String(normalized?.fingerprint || ""),
+    stages: [
+      stage("json", "JSON yüklendi", inputPresent ? "complete" : "warning", null,
+        inputPresent ? (options.fileName || "kaynak dosya") : "kaynak dosya yok"),
+      stage("normalized", "Sonuç sözleşmesi hazırlandı", "complete", null,
+        "camelCase LegacyDikResult"),
+      stage("steps", "Tarama adımları bulundu", steps.length ? "complete" : "warning", steps.length,
+        steps.length ? "fiziksel tarama sırası korundu" : "adım verisi yok"),
+      stage("detections", "Anomaliler üretildi", shapes.length ? "complete" : "warning", shapes.length,
+        shapes.length ? "şekiller / metal adayları" : "anomali bulunamadı"),
+      stage("field-model", "Saha modeli oluşturuldu", detections.length || steps.length ? "complete" : "warning",
+        detections.length, `${steps.length} adım · ${detections.length} tespit`),
+      stage("merged", "Birleşik hedefler üretildi", mergedTargets.length ? "complete" : "warning", mergedTargets.length,
+        mergedTargets.length ? "canonical footprint ve bağlantılar hazır" : "birleşecek hedef yok"),
+      stage("evidence", "Analiz yüzdeleri üretildi", detections.some((item) => item.analysisEvidence) ? "complete" : "warning",
+        detections.filter((item) => item.analysisEvidence).length,
+        "sinyal, güven, kompaktlık ve tekrar dayanakları"),
+    ],
+  };
+}
+
 export function buildLegacyFieldBrief(detection) {
   if (!detection) return null;
   const confPct = Math.round((Number(detection.confidence) || 0) * 100);

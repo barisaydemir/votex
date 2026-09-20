@@ -123,6 +123,7 @@ pub fn run() {
             commands::dta_cmds::set_hints_3d_visible,
             commands::dta_cmds::set_legacy_depth_params,
             commands::dta_cmds::set_legacy_depth_calib_notes,
+            commands::dta_cmds::set_legacy_field_sessions,
             commands::dta_cmds::set_csv_filter_prefs,
             commands::dta_cmds::deep_structure_scan,
             commands::dta_cmds::staged_depth_scan,

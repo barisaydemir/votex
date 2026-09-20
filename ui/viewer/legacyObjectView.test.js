@@ -4,6 +4,7 @@ import * as THREE from "three";
 vi.stubGlobal("requestAnimationFrame", () => 0);
 
 import { state } from "../app/state.js";
+import { createLegacyTargetSession } from "./legacyTargetSession.js";
 import {
   applyLegacyObjectViewMode,
   getLegacyObjectViewMode,
@@ -19,7 +20,7 @@ afterEach(() => {
   state.legacyDikGroup = null;
   state.legacyObjectViewMode = "shape";
   state.legacyObjectViewBlend = 0.5;
-  state.legacySelectedDetectionId = null;
+  state.legacyTargetSession = createLegacyTargetSession({ source: "test-reset" });
   state.legacyTomographyVisible = false;
   state.legacyTomographyDepthM = null;
 });
@@ -104,11 +105,11 @@ describe("legacyObjectView", () => {
     layer.add(selected, other);
     group.add(layer);
     state.legacyDikGroup = group;
-    state.legacySelectedStepIndex = 2;
+    state.legacyTargetSession = createLegacyTargetSession({ stepIndex: 2, source: "test" });
     applyLegacyObjectViewMode(group);
     expect(selected.visible).toBe(true);
     expect(other.visible).toBe(false);
-    state.legacySelectedStepIndex = null;
+    state.legacyTargetSession = createLegacyTargetSession({ source: "test" });
     applyLegacyObjectViewMode(group);
     expect(selected.visible).toBe(true);
     expect(other.visible).toBe(true);
@@ -135,8 +136,7 @@ describe("legacyObjectView", () => {
     layer.add(selected, selectedLabel, other);
     group.add(layer);
     state.legacyDikGroup = group;
-    state.legacySelectedStepIndex = 2;
-    state.legacySelectedDetectionId = "legacy-dik-shape-1";
+    state.legacyTargetSession = createLegacyTargetSession({ stepIndex: 2, detectionId: "legacy-dik-shape-1", source: "test" });
 
     applyLegacyObjectViewMode(group);
 

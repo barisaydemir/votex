@@ -16,6 +16,7 @@
  */
 
 import { state } from "../app/state.js";
+import { setObservation } from "../viewer/legacyCaseModel.js";
 
 const STORAGE_KEY = "votex-detection-notes";
 
@@ -52,6 +53,13 @@ export function getDetectionNotes(focusId) {
  */
 export function setDetectionNotes(focusId, data) {
   state.detectionNotes[focusId] = data;
+  if (state.legacyCase) {
+    state.legacyCase = setObservation(state.legacyCase, focusId, {
+      note: data?.notes || "",
+      photos: Array.isArray(data?.photos) ? data.photos : [],
+      reviewed: true,
+    });
+  }
   saveDetectionNotes();
 }
 
@@ -94,7 +102,7 @@ export function attachNoteButtons(panelEl) {
     });
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      openNoteModal(focusId);
+      openDetectionNoteModal(focusId);
     });
 
     // Kartın position'unu relative yap
@@ -142,7 +150,7 @@ export function attachNoteButtons(panelEl) {
 /**
  * Not/Fotoğraf modalını aç
  */
-function openNoteModal(focusId) {
+export function openDetectionNoteModal(focusId) {
   const existing = getDetectionNotes(focusId);
 
   // Modal overlay
@@ -286,6 +294,7 @@ function openNoteModal(focusId) {
       photos,
     });
     overlay.remove();
+    window.dispatchEvent(new CustomEvent("votex:detection-notes-change", { detail: { focusId } }));
     // Panoyu yenile (not butonlarını güncelle)
     refreshPanel();
   });

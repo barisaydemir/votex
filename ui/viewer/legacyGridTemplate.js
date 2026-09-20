@@ -35,7 +35,7 @@ export function findLegacyGridCell(template, xM, yM) {
 /**
  * Sütun-major görünen adım no: LTR’de sol sütun 1’den, RTL’de sağ sütun 1’den.
  */
-export function displayStepIndexForCell(row, col, rowCount, colCount, numberingDirection = "ltr") {
+export function displayStepIndexForCell(row, col, rowCount, colCount, numberingDirection = "rtl") {
   const leftToRight = String(numberingDirection).toLowerCase() !== "rtl";
   const orderedCol = leftToRight ? col : (colCount - 1 - col);
   return orderedCol * rowCount + row + 1;
@@ -53,7 +53,7 @@ export function buildLegacyGridTemplate({
   originXM = 0,
   originYM = 0,
   scanSteps = [],
-  numberingDirection = "ltr",
+  numberingDirection = "rtl",
 } = {}) {
   const rowCount = positiveInt(rows);
   const colCount = positiveInt(cols);
@@ -64,7 +64,7 @@ export function buildLegacyGridTemplate({
   const cellHeightM = depth / rowCount;
   if (!(cellWidthM > 0) || !(cellHeightM > 0)) return null;
   const orderedSteps = Array.isArray(scanSteps) ? scanSteps : [];
-  const direction = String(numberingDirection || "ltr").toLowerCase() === "rtl" ? "rtl" : "ltr";
+  const direction = String(numberingDirection || "rtl").toLowerCase() === "rtl" ? "rtl" : "ltr";
   const cells = [];
 
   for (let col = 0; col < colCount; col += 1) {
@@ -141,7 +141,7 @@ export function applyDisplayStepNumbering(steps, {
   depthM,
   originXM = 0,
   originYM = 0,
-  numberingDirection = "ltr",
+  numberingDirection = "rtl",
 } = {}) {
   const list = Array.isArray(steps) ? steps.map((step) => ({ ...step })) : [];
   if (!list.length) return list;
@@ -179,7 +179,7 @@ export function applyLegacyNumberingToNormalized(normalized, {
   depthM,
   originXM = 0,
   originYM = 0,
-  numberingDirection = "ltr",
+  numberingDirection = "rtl",
 } = {}) {
   if (!normalized || typeof normalized !== "object") return normalized;
   const rows = Number(normalized.matrixRows);

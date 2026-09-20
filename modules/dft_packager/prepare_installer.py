@@ -104,6 +104,7 @@ def copy_portable_dta_files(dest: Path) -> None:
     mapping = {
         "dta_launcher.py": "launcher.py",
         "dta_run.py": "run_dta.py",
+        "dta_paths.py": "dta_paths.py",
         "dta_baslat.vbs": "baslat.vbs",
         "dta_baslat.bat": "baslat.bat",
         "dta_onar.bat": "DTA_ONAR.bat",
@@ -336,6 +337,50 @@ def inject_tkinter(rt_dst: Path) -> None:
         log(f"UYARI: embed test: {e}")
 
 
+def relocate_dta_user_data(dest: Path) -> None:
+    """Move mutable DTA data out of Program Files while keeping resources portable."""
+    (dest / "dta_user_data.py").write_text(
+        '''from __future__ import annotations
+import os
+from pathlib import Path
+
+
+def user_data_dir() -> Path:
+    root = os.environ.get("DTA_USER_DATA_DIR")
+    if root:
+        return Path(root)
+    appdata = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA")
+    if appdata:
+        return Path(appdata) / "DFT" / "DerinTaramaAsistan"
+    return Path.home() / ".dft" / "DerinTaramaAsistan"
+
+
+USER_DATA_DIR = user_data_dir()
+''',
+        encoding="utf-8",
+    )
+    mutable_names = ("config", "memory", "logs", "reports", "recordings", "cache")
+    for path in dest.rglob("*.py"):
+        if "runtime" in path.parts or path.name == "dta_user_data.py":
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        updated = text
+        for name in mutable_names:
+            updated = updated.replace(f'BASE_DIR / "{name}"', f'USER_DATA_DIR / "{name}"')
+            updated = updated.replace(f'BASE / "{name}"', f'USER_DATA_DIR / "{name}"')
+        if updated == text:
+            continue
+        if "from dta_user_data import USER_DATA_DIR" not in updated:
+            marker = "from pathlib import Path"
+            if marker in updated:
+                updated = updated.replace(marker, marker + "\nfrom dta_user_data import USER_DATA_DIR", 1)
+        path.write_text(updated, encoding="utf-8")
+    log(r"DTA kullanıcı verileri %APPDATA%\DFT\DerinTaramaAsistan konumuna yönlendirildi")
+
+
 def stage_dta(dest: Path) -> None:
     """DTA + gömülü Python + wheels — ileri özellikler (Live/yorum) için zorunlu."""
     dest.mkdir(parents=True, exist_ok=True)
@@ -487,6 +532,7 @@ def stage_dta(dest: Path) -> None:
 
     prebake_embed_packages(dest)
     copy_portable_dta_files(dest)
+    relocate_dta_user_data(dest)
 
     # VC++ — cryptography/_rust icin saha PC'de sart
     for vc in (
@@ -523,10 +569,9 @@ def stage_dta(dest: Path) -> None:
         src = DTA_SRC / "config" / name
         if src.is_file():
             shutil.copy2(src, cfg_dst / name)
-    example = cfg_dst / "api_keys.example.json"
-    keys = cfg_dst / "api_keys.json"
-    if example.is_file() and not keys.is_file():
-        shutil.copy2(example, keys)
+    # Gerçek API anahtarı dosyası setup'a kopyalanmaz. Kullanıcı ayarları
+    # launcher tarafından %APPDATA% altındaki veri dizininden okunur.
+    (cfg_dst / "api_keys.json").unlink(missing_ok=True)
     pol = cfg_dst / "license_policy.json"
     if not pol.is_file():
         pol.write_text(
@@ -538,8 +583,8 @@ def stage_dta(dest: Path) -> None:
     (dest / "KUR_DTA.bat").write_text(
         """@echo off
 cd /d "%~dp0"
-echo DTA hedefe kuruluyor (VoteX degismez)...
-set DEST=%LOCALAPPDATA%\\Programs\\DerinTaramaAsistan
+echo DTA makine-basi hedefe kuruluyor (VoteX degismez)...
+set DEST=%ProgramFiles%\\DerinTaramaAsistan
 if not exist "%DEST%" mkdir "%DEST%"
 xcopy /E /I /Y /Q "%~dp0*" "%DEST%\\"
 echo.

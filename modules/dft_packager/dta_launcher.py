@@ -10,6 +10,7 @@ Tkinter yoksa bile kurulum + açılış dener; hata MessageBox ile gösterilir.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -17,7 +18,10 @@ import time
 import traceback
 from pathlib import Path
 
+from dta_paths import user_data_dir
+
 BASE_DIR = Path(__file__).resolve().parent
+USER_DATA_DIR = user_data_dir()
 VENV_DIR = BASE_DIR / ".venv_jarvis"
 VENV_PY = VENV_DIR / "Scripts" / "python.exe"
 VENV_PYW = VENV_DIR / "Scripts" / "pythonw.exe"
@@ -28,7 +32,7 @@ GET_PIP = EMBED_DIR / "get-pip.py"
 WHEELS = BASE_DIR / "wheels"
 REQ = BASE_DIR / "requirements.txt"
 MAIN = BASE_DIR / "main.py"
-BOOT_LOG = BASE_DIR / "logs" / "boot.log"
+BOOT_LOG = USER_DATA_DIR / "logs" / "boot.log"
 
 C_BG = "#020617"
 C_PRI = "#3b82f6"
@@ -44,6 +48,23 @@ SPLASH_TITLE = "Derin Tarama Asistan · Açılış"
 
 UI_IMPORT = "import tkinter, PIL, psutil"
 FULL_IMPORT = "import google.genai, PIL, flask, requests, psutil"
+
+
+def _prepare_user_data() -> None:
+    """Keep the installed Program Files tree read-only for normal users."""
+    try:
+        USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        for name in ("config", "memory", "logs", "reports", "recordings", "cache"):
+            source = BASE_DIR / name
+            target = USER_DATA_DIR / name
+            if source.is_dir() and not target.exists():
+                shutil.copytree(source, target)
+            target.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        try:
+            print(f"DTA user-data migration skipped: {exc}", flush=True)
+        except Exception:
+            pass
 
 
 def _boot_log(msg: str) -> None:
@@ -273,6 +294,7 @@ def spawn_main() -> subprocess.Popen:
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONNOUSERSITE"] = "1"
+    env["DTA_USER_DATA_DIR"] = str(USER_DATA_DIR)
     vendor = str((BASE_DIR / "vendor").resolve())
     base = str(BASE_DIR.resolve())
     run_py = BASE_DIR / "run_dta.py"
@@ -566,6 +588,7 @@ def silent_setup() -> int:
 
 def main() -> int:
     _dpi_aware()
+    _prepare_user_data()
     _boot_log(f"start cwd={BASE_DIR} exe={sys.executable} argv={sys.argv}")
     if "--silent-setup" in sys.argv:
         return silent_setup()

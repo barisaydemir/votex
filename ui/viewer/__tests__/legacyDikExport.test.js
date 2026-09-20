@@ -62,6 +62,14 @@ describe("legacyDikExport", () => {
     expect(rows[1].cx).toBe(2.0);
   });
 
+  it("seçili hedefleri saha özetine ekler", () => {
+    const html = buildLegacyFieldSummaryHtml({
+      selectedTargetsHtml: "<div>Adım 2 · Metal adayı</div>",
+    });
+    expect(html).toContain("RAPORA EKLENEN HEDEFLER");
+    expect(html).toContain("Adım 2 · Metal adayı");
+  });
+
   it("saha özeti HTML yazdırılabilir içerik üretir", () => {
     const html = buildLegacyFieldSummaryHtml({
       fileName: "demo.json",

@@ -1,3 +1,229 @@
+## 0.4.110 — 20 Eylül 2026
+
+### Birleşik hedef sade görünüm ve ortak seçim akışı
+
+- Seçili birleşik hedef için Sade, Kanıt ve Tam görünüm seçenekleri eklendi.
+- Sade görünüm yalnızca seçili birleşik hedef ile yatay bağlantılarını gösterir.
+- Kanıt görünümü hedefi oluşturan ham anomalileri de gösterir.
+- Tam görünüm tüm saha katmanını gösterir.
+- Panel, 3D overlay ve kamera seçimleri ortak case-store sözleşmesini kullanır.
+- Üst durum satırında çalışan sürüm, adım yönü, görünüm, profil ve seçim gösterilir.
+
+## 0.4.109 — 20 Eylül 2026
+
+### Varsayılan adım numaralandırma yönü
+
+- Legacy tarama adımlarının varsayılan numaralandırması artık sağdan sola başlar.
+- 3D grid, sol panel ve JSON yeniden analiz akışı aynı RTL varsayılanını kullanır.
+- Soldan sağa seçeneği korunur ve kullanıcı tarafından ayrıca seçilebilir.
+- RTL varsayılanı için regresyon testi eklendi.
+- VOTEX 0.4.109 Windows setup üretildi.
+
+## 0.4.108 — 20 Eylül 2026
+
+### Birleşik hedef güven trend grafiği
+
+- Birleşik hedef seçildiğinde kaynak adımların güven yüzdeleri SVG trend grafiğinde gösterilir.
+- İlk ve son adım arasındaki güven değişimi puan olarak görünür.
+- Grafik, mevcut adım-güven-derinlik zaman çizelgesini tamamlar; ölçüm veya birleşme hesabını değiştirmez.
+- Zaman çizelgesi grafik hesaplaması için regresyon testleri eklendi.
+
+## 0.4.107 — 19 Eylül 2026
+
+### JSON replay sözleşmesi ve runtime sürüm guard’ı
+
+- Rust `LegacyDikResult` ile JS saha modelini aynı canonical fixture üzerinden doğrulayan replay sözleşmesi eklendi.
+- Çalışan runtime sürümü uygulama başlığı ve sürüm rozetine yazılır; UI sözleşmesi de görünür hale getirildi.
+- Anomali analiz yüzdeleri ve kaynak dayanakları korunur.
+
+## 0.4.106 — 19 Eylül 2026
+
+### Açıklanabilir anomali yüzdeleri
+
+- Anomali analiz panelinde her yüzde için kaynak alan ve ham değer gösterilir.
+- Sinyal, güven, kompaktlık ve tekrarlanabilirlik metrikleri canonical analiz DTO’sundan beslenir.
+- Tekrarlı ölçüm yoksa tekrarlanabilirlik zorla üretilmez; eksik veri nedeni gösterilir.
+- Yeni JSON akışı ve üretim build’i doğrulandı.
+- VOTEX 0.4.106 Windows setup üretildi.
+
+---
+
+## 0.4.105 — 19 Eylül 2026
+
+### Sağ dock analiz penceresi
+
+- Anomali analiz penceresi artık ekranı karartmayan sağ dock panel olarak açılır.
+- Ana 3D sahne, sol menü ve sağ rapor etkileşimleri kilitlenmez.
+- Panel yalnızca seçilen anomalinin yanında görünür; adım/temizleme seçimlerinde kapanır.
+- VOTEX 0.4.105 Windows setup üretildi.
+
+---
+
+## 0.4.104 — 19 Eylül 2026
+
+### Anomali sinyal analiz penceresi
+
+- Anomali seçildiğinde ayrı analiz penceresinde sinyal gücü, güven, kompaktlık ve tekrarlanabilirlik yüzdeleri gösterilir.
+- Yüzdelerin dayanakları (adım, derinlik, merkez, boyut, sinyal σ, profil ve tekrar ölçümleri) görünür hale getirildi.
+- Yorumların malzeme kimliği veya değerli metal kesinliği olmadığı açıkça belirtilir.
+- VOTEX 0.4.104 Windows setup üretildi.
+
+---
+
+## 0.4.103 — 18 Eylül 2026
+
+### Canonical birleşik geometri ve saha kararı kalıcılığı
+
+- Birleşik hedefler canonical footprint ve connector geometri çıktısı taşır.
+- 3D renderer connector/boşluk kararını tekrar hesaplamaz.
+- Connector koridorları ölçülen kanıtlardan ayrı görsel katman olarak gösterilir.
+- Eski büyük kutu birleşik layer builder'ı kaldırıldı; tek unified 3D layer kullanılır.
+- Ayırma kararları ve birleşme politikası fingerprint'li saha oturumunda korunur.
+- Zincirleme hedeflerde maksimum yatay boşluk bilgisi açıklanabilir hale getirildi.
+- VOTEX 0.4.103 Windows setup üretildi.
+
+---
+
+## 0.4.102 — 18 Eylül 2026
+
+### Birleşik hedef inceleme çalışma alanı
+
+- Birleşik hedef kartı artık seçilen fiziksel hedefi tek çalışma alanında gösterir.
+- Birleşik derinlik, kaynak kanıt sayısı, yatay bağlantı sayısı ve birleşme güveni ayrı metrikler olarak görünür.
+- Birleşme nedenleri ve kaynak adımlar listelenir; kanıt düğmesine tıklayınca ilgili 3D bulguya odaklanılır.
+- Birleşik hedef ile ham kanıt görünümü arasında geçiş korunur.
+- VOTEX 0.4.102 Windows setup üretildi.
+
+---
+
+## 0.4.101 — 18 Eylül 2026
+
+### Seçim/görünürlük geçiş sözleşmesi ve birleşik 3D hedefler
+
+- Birleşme politikası, kanıt kalitesi, yatay bağlantılar ve birleşme nedenleri canonical modelde tek çıktı olarak toplandı.
+- Birleşik 3D katmanı aynı canonical bağlantıları kullanır; küçük yatay boşluklarda koridor, büyük boşluklarda gerçek boşluk korunur.
+- Kanıt ayak izleri kaynak kimliği/adım metadata’sıyla korunur; kırmızı metal bulgularının ölçülen boyutu genişletilmez.
+- Birleşik hedef ve bağlantı regresyon testleri eklendi.
+- Legacy seçim ve harita katmanı görünürlük bayrakları tek sözleşmede birleştirildi.
+- Birleşik obje görünürlüğü ile eski yeraltı dilimi görünürlüğünün karışması düzeltildi.
+- VOTEX 0.4.101 Windows setup üretildi.
+
+---
+
+## 0.4.99 — 17 Eylül 2026
+
+### Legacy panel controller ayrıştırması
+
+- JSON, analiz, kalibrasyon, görünüm, rapor ve AI event akışları controller katmanlarına ayrıldı.
+- Legacy saha görünümü, içerik tabanlı vaka oturumu ve hedef/workflow state yapısı korunarak panel koordinatör hale getirildi.
+- Yeni sürüm için JavaScript testleri ve production build doğrulandı.
+
+---
+
+## 0.4.98 — 17 Eylül 2026
+
+### DTA kullanıcı verisi ve kurulum güvenliği
+
+- DTA config, memory, logs, reports ve recordings verileri artık Program Files yerine `%APPDATA%\\DFT\\DerinTaramaAsistan` altında tutulur.
+- Kurulumun Program Files klasörlerine standart kullanıcı yazma izni verme ihtiyacı kaldırıldı.
+- İlk çalıştırmada eski paket içindeki kullanıcı verileri yeni kullanıcı veri dizinine taşınır.
+- DTA launcher ve yardımcı süreçler kullanıcı veri dizinini ortam değişkeniyle ortak kullanır.
+- VOTEX 0.4.98 Windows setup üretildi.
+
+---
+
+## 0.4.97 — 16 Eylül 2026
+
+### Kurulum ayrıcalık modeli düzeltmesi
+
+- Kurulum hedefi `{localappdata}\Programs` yerine `{autopf}` (makine-başı Program Files) olarak değiştirildi; yönetici modunda kurulan uygulama artık tüm kullanıcıların görebileceği ortak konuma kurulur.
+- `UsePreviousAppDir=no` eklendi: eski per-user kurulumun kayıtlı hedefi yeni kurulumu eski konuma çekemez.
+- DTA çalışma klasörlerine (config, logs, memory) `users-modify` izni verildi; standart kullanıcı altında Python config/log yazımı çalışır.
+- VOTEX ayarlarındaki `dtaLaunchPath` artık yeni makine-başı DTA konumunu gösterir.
+- Eski per-user kurulumlar `{localappdata}\Programs` altından sessizce kaldırılmaya devam eder; kaldırıcı başarısız olsa bile kurulum durmaz.
+- VOTEX 0.4.97 Windows setup üretildi.
+
+---
+
+## 0.4.96 — 16 Eylül 2026
+
+### Tek VOTEX kurulum yolu
+
+- Nested Tauri NSIS kurulumu kaldırıldı; VOTEX artık birleşik setup içinde yalnızca doğrudan staging dosyalarından kurulur.
+- Eski kaldırıcı çalışmazsa kurulum devam eder; kurulum metadata’sına SHA-256 ve paketleme modu eklenir.
+- VOTEX 0.4.96 Windows setup üretildi.
+
+---
+
+## 0.4.95 — 16 Eylül 2026
+
+### Kurulum dayanıklılığı
+
+- Eski VOTEX/DFT Suite kaldırıcıları eksik veya kilitli olsa bile yeni setup kurulumu artık durmaz; uyarıyla devam eder.
+- VOTEX 0.4.95 Windows setup üretildi.
+
+---
+
+## 0.4.94 — 16 Eylül 2026
+
+### Saha görev akışı ve hedef çalışma alanı
+
+- Legacy paneline `JSON → Adım → Hedef → 3D doğrula → Not / rapor` sıralı saha görev akışı eklendi.
+- Sıradaki işlem tek düğmeyle başlatılır; tamamlanan adımlar görünür şekilde işaretlenir.
+- Hedef kartı not/fotoğraf ve rapora ekleme işlemleriyle birleştirildi.
+- Saha raporuna eklenen hedefler derinlik, güven, not ve fotoğraf bilgileriyle ayrı bölümde gösterilir.
+- Üretim doğrulaması: 394 JavaScript testi geçti.
+- VOTEX 0.4.94 Windows setup üretildi.
+
+---
+
+## 0.4.93 — 16 Eylül 2026
+
+### Basit kullanım ve hedef odaklı saha akışı
+
+- Legacy3DMAG paneline Basit kullanım / Uzman ayarları görünümü eklendi.
+- Seçili adım veya obje için hedef kartı; derinlik aralığı, proxy orta değer, güven ve güç bilgilerini gösterir.
+- Hedef modu, yalnız seçili hedefi gösterme ve önceki/sonraki hedef navigasyonu eklendi.
+- Normal, Derin hedef ve Saha kazığı hazır parametre profilleri eklendi.
+- Saha kalibrasyonunda önce/sonra karşılaştırması hedef kartına taşındı.
+- VOTEX 0.4.93 Windows setup üretildi.
+
+---
+
+## 0.4.92 — 16 Eylül 2026
+
+### Saha kazığı tekrar okumaları
+
+- 1 m referans kazığı saha kalibrasyonunda en fazla 3 tekrar okuması kaydedilebilir.
+- Okumaların ortalaması ve 1,00 m referansa göre önceki hata gösterilir.
+- Parametre uygulandıktan sonra yeni okuma ile sonraki hata karşılaştırılır.
+- VOTEX 0.4.92 Windows setup üretildi.
+
+---
+
+## 0.4.91 — 16 Eylül 2026
+
+### İki kalibrasyon modu
+
+- Mevcut tek obje / bilinen derinlik kalibrasyonu korunarak devam eder.
+- İsteğe bağlı saha cihaz kalibrasyonu eklendi: 1 m referans kazığı cihazın derinlik ölçeği için mihenk noktası olarak kullanılabilir.
+- Saha modunda hedef derinlik otomatik olarak 1,00 m olur ve tek obje derinliği mod değişiminde korunur.
+- VOTEX 0.4.91 Windows setup üretildi.
+
+---
+
+## 0.4.90 — 16 Eylül 2026
+
+### Cihaz–yüzey mesafesi kalibrasyonu düzeltmesi
+
+- Legacy parametrelerinde varsayılan cihaz–yüzey mesafesi **0,10 m** olarak güncellendi.
+- Mutlak üst sınır **0,20 m** yapıldı; eski 0,50 m kayıtları güvenli aralığa kısılır.
+- Yerel ve AI kalibrasyon önerileri aynı 0–0,20 m sınırını kullanır.
+- Rust analiz motoru artık mesafe değerini sabit 0,50 m yerine doğrulanmış parametreden alır.
+- VOTEX 0.4.90 Windows NSIS setup üretildi.
+
+---
+
 ## 0.4.89 — 15 Eylül 2026
 
 ### Adım ızgarası haritaya tam oturur

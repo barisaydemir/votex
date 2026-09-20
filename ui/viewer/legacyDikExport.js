@@ -163,6 +163,7 @@ export function buildLegacyFieldSummaryHtml(options = {}) {
     residualNote = "residual σ · kalibre nT değil",
     params = {},
     fingerprint = "",
+    selectedTargetsHtml = "",
   } = options;
   const p = depthParamsSnapshot(params);
   return `<!DOCTYPE html>
@@ -179,6 +180,7 @@ h1{font-size:1.25rem;margin:0 0 .4rem} .muted{color:#567;font-size:.85rem}
 <h1>VOTEX · Saha özeti</h1>
 <p class="muted">${escapeHtml(fileName)}${fingerprint ? ` · ${escapeHtml(fingerprint)}` : ""}</p>
 <div class="box"><div class="k">SEÇİLİ BULGU</div>${briefHtml || `<pre>${escapeHtml(briefText || "Tespit seçilmedi")}</pre>`}</div>
+${selectedTargetsHtml ? `<div class="box"><div class="k">RAPORA EKLENEN HEDEFLER</div>${selectedTargetsHtml}</div>` : ""}
 <div class="box"><div class="k">LEJANT</div><p>${escapeHtml(residualNote)}</p>
 <p class="muted">Manyetik ayak izi · gerçek duvar/obje CAD’i değil · χ ölçülmedi</p></div>
 <div class="box"><div class="k">PARAMETRE</div>

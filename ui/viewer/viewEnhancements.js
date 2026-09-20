@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { $, state } from "../app/state.js";
+import { selectedDetectionOf } from "./legacyTargetSession.js";
 import { invalidate } from "./scene.js";
 import { flyCameraTo } from "./labels.js";
 
@@ -61,7 +62,7 @@ export function fitAllObjects() {
 }
 
 export function focusSelectedObject() {
-  const id = state.selectedStructureId || state.legacySelectedDetectionId;
+  const id = state.selectedStructureId || selectedDetectionOf(state.legacyTargetSession);
   const target = id && state.structureTargets?.[id];
   if (target) {
     flyCameraTo(target.position, target.radius || 3, target.title || id, { distScale: 2.8, heightScale: 0.7 });
@@ -114,7 +115,7 @@ function showDetectionGuides(target) {
 }
 
 export function refreshSelectedGuides() {
-  const id = state.selectedStructureId || state.legacySelectedDetectionId;
+  const id = state.selectedStructureId || selectedDetectionOf(state.legacyTargetSession);
   const target = id && state.structureTargets?.[id];
   if (target) showDetectionGuides(target);
   else clearGuides();
@@ -138,7 +139,7 @@ export function setViewProfile(profile) {
       || name === "magneticGradientArrows"
       || /^magneticIsoContour-/.test(name);
     const isLabel = object.userData?.isBadge || object.userData?.isDetailLabel || object.userData?.legacyRankLabel || object.userData?.legacyScanStepLabel;
-    const selectedDetectionId = state.legacySelectedDetectionId || null;
+    const selectedDetectionId = selectedDetectionOf(state.legacyTargetSession);
     const objectDetectionId = legacyDetectionIdOf(object);
     const belongsToSelectedLegacyDetection = selectedDetectionId != null
       && objectDetectionId != null

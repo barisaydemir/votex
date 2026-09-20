@@ -4,7 +4,7 @@ Tek Setup.exe üretici — kullanıcıya sadece DFT_Suite_Setup.exe verilir.
 
 Akış (BUILD PC):
   1) fetch_votex_runtimes.py  → Node/Rust/WebView2/VC++
-  2) tauri build (NSIS)       → Votex.exe (+ opsiyonel *-setup.exe)
+  2) tauri build               → Votex.exe
   3) DTA stage                → runtime + wheels/venv
   4) Inno Setup ISCC          → dist/DFT_Suite_Setup.exe
 
@@ -16,6 +16,7 @@ Kullanım:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -47,7 +48,7 @@ def _resolve_release_dir() -> Path:
 RELEASE = _resolve_release_dir()
 BUNDLE_NSIS = RELEASE / "bundle" / "nsis"
 ISS = HERE / "DFT_Suite.iss"
-PACKAGE_VERSION = "0.4.85"
+PACKAGE_VERSION = "0.4.110"
 
 ISCC_CANDIDATES = [
     Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
@@ -112,7 +113,7 @@ def ensure_runtimes() -> Path:
         r"""
 $votexSettings = Join-Path $env:APPDATA "Votex"
 New-Item -ItemType Directory -Force -Path $votexSettings | Out-Null
-$dta = Join-Path $env:LOCALAPPDATA "Programs\DerinTaramaAsistan\launcher.py"
+$dta = Join-Path $env:ProgramFiles "DerinTaramaAsistan\launcher.py"
 @{
   dtaLaunchPath = $dta
   autoLaunchDta = $true
@@ -135,7 +136,6 @@ def build_tauri() -> None:
 def stage_votex(staging_votex: Path) -> Path | None:
     staging_votex.mkdir(parents=True, exist_ok=True)
     release = _resolve_release_dir()
-    bundle_nsis = release / "bundle" / "nsis"
     log(f"Release: {release}")
     exe = None
     for name in ("votex.exe", "Votex.exe"):
@@ -154,18 +154,10 @@ def stage_votex(staging_votex: Path) -> Path | None:
             if dst.exists():
                 shutil.rmtree(dst)
             shutil.copytree(src, dst)
-    setup = None
-    if bundle_nsis.is_dir():
-        setups = sorted(
-            bundle_nsis.glob("*setup.exe"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        if setups:
-            setup = setups[0]
-            shutil.copy2(setup, STAGING / "votex-setup.exe")
-            log(f"NSIS eklendi: {setup.name}")
-    return setup
+    # VOTEX tek kez, doğrudan Inno Setup içindeki staging\VOTEX yolundan kurulur.
+    # Tauri'nin nested NSIS paketini eklemek aynı klasöre iki installer'ın
+    # müdahale etmesine ve eski kaldırıcı hatalarının kurulumu durdurmasına yol açabilir.
+    return None
 
 
 def stage_dta(dest: Path) -> None:
@@ -254,11 +246,20 @@ def main() -> int:
             raise SystemExit(f"Setup üretilemedi: {DIST}")
         out = cands[0]
 
+    sha256 = hashlib.sha256()
+    with out.open("rb") as setup_file:
+        for chunk in iter(lambda: setup_file.read(1024 * 1024), b""):
+            sha256.update(chunk)
+
     meta = {
         "created": datetime.now().isoformat(timespec="seconds"),
         "version": PACKAGE_VERSION,
         "output": str(out),
+        "size_bytes": out.stat().st_size,
         "size_mb": round(out.stat().st_size / (1024 * 1024), 1),
+        "sha256": sha256.hexdigest(),
+        "votex_install_mode": "direct-staging",
+        "nested_tauri_setup": False,
         "user_action": f"Sadece DFT_Suite_Setup_{PACKAGE_VERSION}.exe çalıştır",
         "notes": [
             "Legacy3DMag dik çekim → anomali / olası yapı şekilleri",

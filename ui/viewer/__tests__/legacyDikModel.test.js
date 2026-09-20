@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import rustResultFixture from "../../../examples/legacy_dik_result_fixture.json";
 import {
+  buildLegacyAnalysisEvidence,
+  analysisEvidenceRowsOf,
   buildLegacyFieldBrief,
   buildLegacyFieldModel,
+  buildLegacyAnalysisTrace,
   formatLegacyFieldBriefHtml,
   formatLegacyFieldLine,
   legacyStepsOf,
@@ -21,6 +25,39 @@ const result = {
 };
 
 describe("legacyDikModel", () => {
+  it("replays the canonical Rust result into a detection and analysis evidence", () => {
+    const model = buildLegacyFieldModel(rustResultFixture);
+    expect(model.result.fingerprint).toBe("legacy-result-fixture-v1");
+    expect(model.steps).toHaveLength(1);
+    expect(model.detections).toHaveLength(1);
+    expect(model.detections[0].stepIndex).toBe(1);
+    expect(model.detections[0].analysisEvidence.metrics.signalStrength.value).toBe(64);
+    expect(model.mergedTargets.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("görünür analiz akışını aynı saha modelinden üretir", () => {
+    const model = buildLegacyFieldModel(rustResultFixture);
+    const trace = buildLegacyAnalysisTrace(model.result, model, {
+      inputPresent: true,
+      fileName: "fixture.json",
+    });
+    expect(trace.schemaVersion).toBe(1);
+    expect(trace.status).toBe("complete");
+    expect(trace.fingerprint).toBe("legacy-result-fixture-v1");
+    expect(trace.stages.map((stage) => stage.key)).toEqual([
+      "json", "normalized", "steps", "detections", "field-model", "merged", "evidence",
+    ]);
+    expect(trace.stages.find((stage) => stage.key === "steps")).toMatchObject({ count: 1, status: "complete" });
+    expect(trace.stages.find((stage) => stage.key === "evidence")).toMatchObject({ count: 1, status: "complete" });
+  });
+
+  it("eksik saha verisini akışta uyarı olarak gösterir", () => {
+    const trace = buildLegacyAnalysisTrace({ ok: true, scanSteps: [], shapes: [], fingerprint: "empty" }, { steps: [], detections: [], mergedTargets: [] }, { inputPresent: false });
+    expect(trace.status).toBe("complete");
+    expect(trace.stages.find((stage) => stage.key === "json").status).toBe("warning");
+    expect(trace.stages.find((stage) => stage.key === "steps").status).toBe("warning");
+  });
+
   it("normalizes camelCase and snake_case scan step fields", () => {
     const steps = legacyStepsOf({ scan_steps: [{ index: 3, x_center_m: 2, y_center_m: 4, width_m: 1.5 }] });
     expect(steps[0].index).toBe(1); // sol-önce yeniden numaralandırma
@@ -89,6 +126,34 @@ describe("legacyDikModel", () => {
     expect(matchesLegacyListFilter("detections", { isDetection: false, anomalyCount: 0 })).toBe(false);
     expect(matchesLegacyListFilter("strong", { status: "strong" })).toBe(true);
     expect(matchesLegacyListFilter("normal", { status: "attention" })).toBe(false);
+  });
+
+  it("canonical analiz kanıt DTO'su yüzdeleri ve dayanakları birlikte taşır", () => {
+    const model = buildLegacyFieldModel(result, { mergeProfile: "cautious" });
+    const detection = model.detections[0];
+    const analysis = buildLegacyAnalysisEvidence(detection, {
+      mergeProfile: "cautious",
+      repeatability: { n: 3, spreadM: 0.25 },
+    });
+    expect(analysis.schemaVersion).toBe(1);
+    expect(analysis.detectionId).toBe(detection.detectionId);
+    expect(analysis.metrics.signalStrength).toMatchObject({ value: 68, source: "peakSigma", rawValue: 3.4 });
+    expect(analysis.metrics.anomalyConfidence).toMatchObject({ value: 96, source: "confidence" });
+    expect(analysis.metrics.compactness.value).toBe(0);
+    expect(analysis.metrics.repeatability).toMatchObject({ value: 90, source: "archiveDepthSpread" });
+    expect(analysis.inputs).toMatchObject({ mergeProfile: "cautious", repeatedScans: 3, depthSpreadM: 0.25 });
+    expect(analysis.warning).toBe("material-not-identifiable");
+    expect(analysisEvidenceRowsOf(analysis)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "signalStrength", source: "peakSigma", raw: "3.4 σ" }),
+      expect.objectContaining({ key: "repeatability", source: "archiveDepthSpread", raw: "0.25 m" }),
+    ]));
+  });
+
+  it("tekrar verisi yoksa repeatability metriğini hesaplamaz", () => {
+    const model = buildLegacyFieldModel(result);
+    const analysis = model.detections[0].analysisEvidence;
+    expect(analysis.metrics.repeatability.value).toBeNull();
+    expect(analysis.metrics.repeatability.reason).toBe("insufficient-repeated-scans");
   });
 
   it("seçili tespit için sade saha özeti üretir", () => {

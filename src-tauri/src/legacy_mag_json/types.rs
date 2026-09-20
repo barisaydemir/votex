@@ -292,11 +292,39 @@ pub struct LegacyDepthCalibNote {
     pub saved_at: String,
 }
 
+/// Saha inceleme oturumu — JSON fingerprint anahtarıyla kalıcı hedef kaydı.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyTargetCheck {
+    pub status: String,
+    #[serde(default)]
+    pub at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyFieldSession {
+    /// JSON fingerprint (yoksa dosya adı)
+    pub key: String,
+    #[serde(default)]
+    pub reviewed_targets: Vec<String>,
+    #[serde(default)]
+    pub report_targets: Vec<String>,
+    #[serde(default)]
+    pub last_target_id: Option<String>,
+    #[serde(default)]
+    pub last_step_index: Option<u32>,
+    #[serde(default)]
+    pub target_checks: std::collections::HashMap<String, LegacyTargetCheck>,
+    #[serde(default)]
+    pub updated_at: String,
+}
+
 /// Legacy metal derinlik proxy çarpanları (Parametre çekmecesi).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LegacyDepthParams {
-    /// Cihaz–yüzey sınırı sabittir: 0,50 m; derinlik diğer proxy parametreleriyle ayarlanır.
+    /// Cihaz–yüzey mesafesi normalde 0,10 m; mutlak üst sınır 0,20 m'dir.
     #[serde(default = "default_sensor_height_m")]
     pub sensor_height_m: f32,
     /// Bipolar tepe–çukur çarpanı (z ≈ factor · Δ).
@@ -308,7 +336,7 @@ pub struct LegacyDepthParams {
 }
 
 fn default_sensor_height_m() -> f32 {
-    0.50
+    0.10
 }
 fn default_bipolar_sep_factor() -> f32 {
     1.85
@@ -330,7 +358,7 @@ impl Default for LegacyDepthParams {
 impl LegacyDepthParams {
     pub fn clamped(self) -> Self {
         Self {
-            sensor_height_m: 0.50,
+            sensor_height_m: self.sensor_height_m.clamp(0.0, 0.20),
             bipolar_sep_factor: self.bipolar_sep_factor.clamp(0.5, 4.0),
             dipole_blend: self.dipole_blend.clamp(0.0, 1.0),
         }

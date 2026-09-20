@@ -1,4 +1,4 @@
-import { buildSurface3d, deepStructureScan, stagedDepthScan, waterBlueScan, getAppSettings, setHints3dVisible } from "./api/tauri.js";
+import { buildSurface3d, deepStructureScan, stagedDepthScan, waterBlueScan, getAppSettings, setHints3dVisible, isTauriRuntime } from "./api/tauri.js";
 import { enableDualAnalysis, setModuleEnabled, getPackStatus } from "./hybrid/dualAnalysisPack.js";
 import { setClipEnabled, setClipHeight } from "./viewer/scene.js";
 import { setXray } from "./viewer/xray.js";
@@ -681,6 +681,7 @@ function refreshMeshSettings() {
 }
 
 async function bindDtaGuide() {
+  if (!isTauriRuntime()) return;
   try {
     const { listen } = await import("@tauri-apps/api/event");
     await listen("dta-guide", (event) => {
