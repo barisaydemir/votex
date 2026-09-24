@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectedFootprintsForTarget } from "./legacyUnifiedObjectMap.js";
+import { connectedFootprintsForTarget, verificationStatusOf } from "./legacyUnifiedObjectMap.js";
 
 const group = {
   userData: {
@@ -18,6 +18,20 @@ const evidence = (id, x, z, rx = 0.25, rz = 0.25) => ({
 });
 
 describe("legacyUnifiedObjectMap", () => {
+  it("birleşik hedef durumunu kanıt kararlarından türetir", () => {
+    const target = { detectionIds: ["a", "b"] };
+    expect(verificationStatusOf(target, {
+      legacyFieldSessionController: { session: { targetChecks: { a: { status: "confirmed" }, b: { status: "confirmed" } } } },
+    })).toBe("confirmed");
+    expect(verificationStatusOf(target, {
+      legacyFieldSessionController: { session: { targetChecks: { a: { status: "confirmed" }, b: { status: "rejected" } } } },
+    })).toBe("rejected");
+    expect(verificationStatusOf(target, {
+      legacyFieldSessionController: { session: { targetChecks: { a: { status: "confirmed" } } } },
+    })).toBe("reviewed");
+    expect(verificationStatusOf(target, { legacyFieldSessionController: { session: { targetChecks: {} } } })).toBe("unverified");
+  });
+
   it("koridoru yalnız küçük yatay boşluk için üretir", () => {
     const result = connectedFootprintsForTarget({
       evidence: [evidence("a", 2, 2), evidence("b", 2.7, 2)],

@@ -1,3 +1,110 @@
+## 0.4.121 — 24 Eylül 2026
+
+### Arayüz düzeni düzeltmesi
+
+- index.html'deki kapanmamış etiketler düzeltildi: TOPRAK katlaması (details) CFG/LOG/MAP panellerini ve orta/sağ panelleri yutup ekrandan taşıyordu; arayüz 3 panelli düzene geri döndü.
+- Fazladan kapanan div ve erken kapanan label etiketi de temizlendi.
+- VOTEX 0.4.121 Windows setup üretildi.
+
+## 0.4.120 — 24 Eylül 2026
+
+### Paketleme düzeltmesi
+
+- 0.4.119 kurulum paketi, eşzamanlı derleme yarışı yüzünden eski (0.4.118) Votex.exe'yi paketlemişti; temiz 0.4.120 derlemesi + paket içi hash doğrulaması.
+
+## 0.4.119 — 24 Eylül 2026
+
+### Release otomasyonu
+
+- Sürüm artırma + doğrulama + NSIS + birleşik setup akışı tek komuta indirildi: npm run release (scripts/release.mjs).
+- Sürüm senkronizasyonu birim testleri eklendi (scripts/release.test.js).
+- VOTEX 0.4.119 Windows setup üretildi.
+
+## 0.4.118 — 24 Eylül 2026
+
+### Hassasiyet hattı tamamlandı: 3D bağ, canlı sayaç, kalıcılık, tek kaynak
+
+- Hassasiyet ayarı 3D analiz hattına (`build_surface_3d`) da bağlandı: min güven skoru %0→0.80 ↔ %100→0.15 eşlemesiyle Rust'a iletilir; JS/Rust eşik formülleri `ui/hybrid/sensitivity.js` ve `src-tauri/src/sensitivity.rs` ile ortak tanımlandı (Rust birim testleri dahil).
+- Çift `min-confidence` id çakışması giderildi: hassasiyet slider'ı `main-sensitivity-slider` oldu, eski 25-70 "Min. güven" slider'ı kaldırıldı; arşiv geri yükleme ve AUTO artık kayıtlı min güveni ters eşlemeyle hassasiyet slider'ına yazar.
+- Birleşik Analiz panelinde hassasiyet gerçek tespit filtresine bağlandı: renk eşleşme toleransı + min piksel alanı görüntü çözümlemeye, güven eşiği yapı tespitine uygulanır; 3D yapı kutuları süzgeçten geçer ve slider yanında canlı tespit sayacı gösterilir.
+- Hassasiyet artık kalıcı: analiz oturumu (`AnalyzeSession`) ve arşiv meta/index girdileri `sensitivity` alanını saklar (eski kayıtlar uyumlu); arşiv açılışında slider doğrudan geri gelir ve saha raporu altbilgisine "Hassasiyet: %X (etiket) · min güven · eşik · min alan" satırı yazılır.
+- Hassasiyet→eşik katsayıları tek kaynakta birleştirildi: `shared/sensitivity.json` hem JS hem Rust tarafından okunur; ortak `golden` vektörleri iki dildeki birim testlerle pariteyi kilitler.
+- VOTEX 0.4.118 Windows setup üretildi.
+
+## 0.4.117 — 23 Eylül 2026
+
+### Yapı tespit hassasiyeti ayar çubuğu ve dinamik analiz
+
+- Görünen Yapılar Hassasiyeti Ayar Çubuğu (Structure Detection Sensitivity Slider) eklendi: Birleşik Analiz panelinde %0-%100 hassasiyet ayarı ile renk/sinyal toleransı (`match_threshold`), min piksel alanı (`min_area`) ve min güven skoru (`min_confidence`) canlı olarak dinamik ayarlanabilir.
+- Debounced (150ms) slider event handler'ı entegre edildi; slider sürüklendiğinde ekrandaki 2D harita ve 3D anomali tespitleri canlı olarak güncellenir.
+- Rust `AnalyzeImageRequest` DTO'su ve `analyze_uploaded_image` komutu dinamik `sensitivity` parametrelerini alacak şekilde güncellendi.
+- VOTEX 0.4.117 Windows setup üretildi.
+
+## 0.4.116 — 23 Eylül 2026
+
+### Canlı saha akışı, otomatik saha raporu ve kontrol listesi
+
+- Bluetooth (BLE) cihaz bağlantı modülü eklendi: tarama, bağlanma, canlı veri akışı ve "⏹ Bitir ve Kaydet" ile tek dokunuşta Case Package + arşiv kaydı; bağlantı kopmasında otomatik arşivleme.
+- Canlı 2D ısı haritası eklendi: tarama sürerken harita, yürüyüş izi ve ziyaret edilmemiş kare uyarısı (6×3 "kenar boş kaldı" tespiti).
+- Cihaz görünümü: gökkuşağı paleti ve eşik üstü net kontur ile cihazın kendi programının görünümüne uyarlama; karşılaştırma için "Votex" görünümü seçilebilir.
+- Otomatik tek sayfalık saha raporu: kapsama yüzdesi, atlanan kareler, hedef listesi ve seçilen hedeflerin 3D sahne görüntüsü eki; yazdırma/PDF ve HTML kayıt.
+- Saha raporu arşive `field_report.html` olarak SHA-256 bütünlük metadata'sıyla iliştirilir; arşivden "📄 Rapor" ile yeniden görüntülenir, kurcalanma/silme bütünlükte raporlanır.
+- Saha kontrol listesi modu: ✓/⚠/✗ denetim maddeleri, hüküm rozeti (TARAMA TAM / KONTROL GEREKLİ / TARAMA EKSİK) ve kapsama + yürüyüş izi SVG diyagramı.
+- Birleşik objelerin operatör doğrulama durumuna göre renklenmesi (yeşil/kırmızı/turuncu) ve seçili obje için renkli 3D bilgi rozeti eklendi.
+- VOTEX 0.4.116 Windows setup üretildi.
+
+## 0.4.115 — 22 Eylül 2026
+
+### 3D Kesit Bıçağı, Dipol Güven Motoru, Çoklu Çekim ve Saha İhracı
+
+- Canlı 3D kesit bıçağı (clipping plane) ile anomali ve katman kesit analizi eklendi.
+- Dipol manyetik karakteri ve anomali simetrisi üzerinden olasılıksal güven oranı (%) sınıflandırması geliştirildi.
+- Çoklu çekim tarama birleştirici (multi-grid scan stitcher) desteği sağlandı.
+- Yapılandırılmış saha ekspertiz raporu ve AR/GeoJSON export araçları entegre edildi.
+- VOTEX 0.4.115 Windows setup üretildi.
+
+## 0.4.114 — 21 Eylül 2026
+
+### Arşiv bütünlüğü ve Case Package round-trip
+
+- Legacy arşivlerinde `source.json`, `legacy_result.json` ve `case_package.json` için SHA-256 bütünlük metadata’sı eklendi.
+- Arşiv açılışında doğrulandı, uyuşmazlık, eksik, doğrulanmadı ve eski format durumları ayrıştırılır.
+- Case Package restore akışı arşiv ve taşınabilir JSON import’unda ortaklaştırıldı; doğrulanmış derived field model doğrudan korunur.
+- Tauri arşiv round-trip ve kurcalanmış içerik regresyon testi eklendi.
+- VOTEX 0.4.114 Windows setup üretildi.
+
+## 0.4.113 — 21 Eylül 2026
+
+### Öğrenme ve kalibrasyon tutarlılığı
+
+- Öğrenilmiş tip bazlı derinlik bantlarının doğrulanmış tespit türüyle üretilmesi düzeltildi.
+- 3D model, panel ve arşiv açılışında öğrenilmiş eşiklerin aynı şekilde kullanılması sağlandı.
+- Kalibrasyon snapshot’ındaki gözlenen derinlik ve ölçek değerleri yeniden yüklemede korunur.
+- VOTEX 0.4.113 Windows setup üretildi.
+
+## 0.4.112 — 21 Eylül 2026
+
+### Yerel öğrenilmiş eşik kalibrasyonu
+
+- Sahada doğrulanan ve elenen hedef kararlarından tip, derinlik ve σ eşikleri için sınırlı yerel öğrenme katmanı eklendi.
+- Az örnekle eşiklerin değişmesi engellendi; güven ve σ değerleri güvenli sınırlar içinde, derinlik bantları ise yumuşak geçişle güncellenir.
+- Öğrenilmiş eşikler JSON/arşiv açılışında geri yüklenir ve hedef durum etiketlerinde kullanılır.
+- Hedef kartlarına saha doğrulama/eleme kararları eklendi; kararlar fingerprint tabanlı oturumda saklanır.
+- Öğrenilmiş eşikler uygulama ayarlarında kalıcı tutulur.
+- VOTEX 0.4.112 Windows setup üretildi.
+
+## 0.4.111 — 20 Eylül 2026
+
+### Lateral yanıt adayları ve saha kalibrasyonu kalıcılığı
+
+- Komşu tarama adımlarındaki olası aynı kaynak / lateral yanıt ilişkileri ayrı bir proxy skoru ile hesaplanır; mevcut birleşme kararını ve ölçülen footprint boyutlarını değiştirmez.
+- 1 m referans kazığı okumalarına göre lateral skorlar sınırlı (0,75×–1,33×) ve medyan tabanlı otomatik ayarlanır.
+- Lateral adaylar 3D'de Kanıt görünümünde kesikli mavi açıklayıcı çizgi olarak gösterilir; fiziksel bağlantı değildir.
+- Kalibrasyon snapshot'ı (okumalar, önce/sonra, derinlik ölçeği, kalite) fingerprint anahtarlı saha oturumuna kaydedilir ve aynı JSON yeniden açıldığında otomatik geri yüklenir.
+- Arayüzde "✓ Kalibrasyon geri yüklendi" rozeti; üst runtime durumunda kalibrasyon geri yükleme bilgisi gösterilir.
+- Gerçek JSON fixture ile fingerprint oturumu + kalibrasyon geri yükleme smoke testi eklendi.
+- VOTEX 0.4.111 Windows setup üretildi.
+
 ## 0.4.110 — 20 Eylül 2026
 
 ### Birleşik hedef sade görünüm ve ortak seçim akışı

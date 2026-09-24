@@ -25,7 +25,7 @@ const PARAM_GUIDE = {
   "csv-grid-res":      { min: 8,    max: 64,   step: 1 },
   "csv-sigma":         { min: 1,    max: 4,    step: 0.5 },
   "unified-csv-weight":{ min: 0,    max: 100,  step: 5 },
-  "min-confidence":    { min: 25,   max: 70,   step: 5 }, // UI % cinsinden (25-70 → 0.25-0.70)
+  "main-sensitivity-slider": { min: 0, max: 100, step: 5 }, // Yapı hassasiyeti % (min güven 0.80 ↔ 0.15)
 };
 
 const FEEDBACK_KEY = "votex.autotune.feedback.v1";
@@ -148,15 +148,14 @@ const RULES = {
     return { value: clamp(val, PARAM_GUIDE["unified-csv-weight"]), reason };
   },
 
-  /* Min güven: kaliteye göre — gürültülüde yüksek eşik yanlış pozitifi önler */
-  "min-confidence": (p) => {
+  /* Yapı hassasiyeti: gürültülü veride daha katı (yanlış pozitif önlenir), temiz veride detaycı */
+  "main-sensitivity-slider": (p) => {
     if (!p.image && !p.csv) return null; // veri yokken önerme
     const q = qualityClass(p);
-    // UI yüzde: 25-70
-    const val = q === "clean" ? 40 : q === "normal" ? 40 : 45;
-    const reason = q === "noisy" ? "Gürültülü veri — yüksek güven eşiği" : "Standart güven eşiği";
-    // Yüzde olarak dönsün (25-70 aralığı UI'da yüzde)
-    const pct = clamp(val, PARAM_GUIDE["min-confidence"]);
+    // %0-100 hassasiyet: gürültülü → 50 (min güven ~0.48), temiz/normal → 60 (~0.41)
+    const val = q === "noisy" ? 50 : 60;
+    const reason = q === "noisy" ? "Gürültülü veri — hassasiyet düşürüldü" : "Standart hassasiyet";
+    const pct = clamp(val, PARAM_GUIDE["main-sensitivity-slider"]);
     return pct == null ? null : { value: pct, reason };
   },
 };

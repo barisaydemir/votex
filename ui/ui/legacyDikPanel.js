@@ -13,6 +13,7 @@ import {
   setLegacyDepthParams,
   setLegacyDepthCalibNotes,
   setLegacyFieldSessions,
+  setLegacyLearnedThresholds,
   listArchive,
   loadLegacyArchive,
 } from "../api/tauri.js";
@@ -61,7 +62,8 @@ import {
 import {
   removeLegacyUndergroundMap,
 } from "../viewer/legacyUndergroundMap.js";
-import { isLegacyUnifiedObjectMapAvailable } from "../viewer/legacyUnifiedObjectMap.js";
+import { isLegacyUnifiedObjectMapAvailable, refreshLegacyUnifiedObjectMapStyles } from "../viewer/legacyUnifiedObjectMap.js";
+import { refreshLegacyLateralEvidenceLayer } from "../viewer/legacyLateralEvidenceLayer.js";
 import {
   removeLegacyGeothermalMap,
   isLegacyGeothermalMapAvailable,
@@ -78,6 +80,12 @@ import {
   getLegacyObjectViewBlend,
 } from "../viewer/legacyObjectView.js";
 import { buildDepthCalibSummary, summarizeFieldStakeReadings, suggestDepthParamsWithAi } from "../viewer/legacyDepthCalibAi.js";
+import { buildLegacyDtaCaseBrief, formatLegacyDtaCaseBriefText } from "../viewer/legacyDtaBridge.js";
+import {
+  buildLearnedThresholds,
+  collectVerifiedSamples,
+  serializeLearnedThresholds,
+} from "../viewer/legacyThresholdLearning.js";
 import {
   createLegacyTargetSession,
   selectedDetectionOf,
@@ -121,6 +129,7 @@ import { dimensionsOf, volumeM3Of, formatVolumeM3 } from "../viewer/volume.js";
 import { unifiedObjectMapVisibleOf } from "../viewer/legacyVisibilityController.js";
 import { createLegacyCase } from "../viewer/legacyCaseModel.js";
 import { createLegacyCaseStore } from "../viewer/legacyCaseStore.js";
+import { legacyCasePackageMatches, refreshLegacyCasePackage } from "../viewer/legacyCasePackage.js";
 import {
   DEFAULT_DEPTH_PARAMS,
   clampNum,
@@ -157,8 +166,11 @@ function syncLegacyRuntimeContext() {
   const view = state.legacySceneViewMode === "plan" ? "Saha planı" : state.legacySceneViewMode === "objects" ? "Objeler" : "Birleşik 3D";
   const profile = state.legacyMergeProfile === "cautious" ? "Temkinli" : state.legacyMergeProfile === "research" ? "Araştırma" : "Normal";
   const selection = session.detectionId ? `Obje ${session.detectionId.replace(/^legacy-dik-shape-/, "#")}` : session.stepIndex ? `Adım ${session.stepIndex}` : "Seçim yok";
-  el.textContent = `v${document.documentElement.dataset.votexVersion || "—"} · ${direction} · ${view} · ${profile} · ${selection}`;
-  el.title = `UI sözleşmesi: legacy-result-v1 · seçim: ${session.kind || "none"} · görünürlük: ${session.visibility || "step"}`;
+  const calibration = state.legacyFieldCalibrationRestored && state.legacyFieldModel?.lateralCalibration?.applied
+    ? " · ✓ kalibrasyon geri yüklendi"
+    : "";
+  el.textContent = `v${document.documentElement.dataset.votexVersion || "—"} · ${direction} · ${view} · ${profile} · ${selection}${calibration}`;
+  el.title = `UI sözleşmesi: legacy-result-v1 · seçim: ${session.kind || "none"} · görünürlük: ${session.visibility || "step"}${calibration ? " · fingerprint oturumundan lateral kalibrasyon" : ""}`;
 }
 
 const activeFieldSession = () => fieldSessionController.session;
@@ -166,12 +178,81 @@ const persistActiveFieldSession = () => fieldSessionController.persist();
 const loadFieldSessionForCurrentJson = () => fieldSessionController.loadCurrent();
 const sessionProgressStatusText = () => fieldSessionController.progressText();
 
+/**
+ * Öğrenilmiş eşik modelini state'e yükler (uygulama açılışı / JSON açılışı).
+ * Model yoksa öğrenme katmanı etkisiz kalır — davranış varsayılan eşiklerde.
+ */
+async function loadLearnedThresholdsFromSettings() {
+  try {
+    const s = await getAppSettings();
+    const learned = s?.legacyLearnedThresholds || s?.legacy_learned_thresholds || null;
+    state.legacyLearnedThresholds = learned && typeof learned === "object" ? learned : null;
+  } catch {
+    state.legacyLearnedThresholds = null;
+  }
+  return state.legacyLearnedThresholds;
+}
+
+/**
+ * Güncel saha oturumu kararlarından eşik modelini güncelleyip kaydeder.
+ * Sadece karar sayısı değiştiğinde anlamlı değişim olur; model sınırları
+ * legacyThresholdLearning tarafından korunur.
+ */
+async function updateLearnedThresholdsFromSession() {
+  try {
+    const fieldModel = state.legacyFieldModel;
+    const session = activeFieldSession();
+    if (!fieldModel || !session) return null;
+    const samples = collectVerifiedSamples({ fieldModel, session });
+    if (!samples.length) return null;
+    const learned = buildLearnedThresholds(samples, state.legacyLearnedThresholds);
+    state.legacyLearnedThresholds = serializeLearnedThresholds(learned);
+    await setLegacyLearnedThresholds(state.legacyLearnedThresholds);
+    return state.legacyLearnedThresholds;
+  } catch (error) {
+    console.warn("[legacy-dik] threshold learning:", error);
+    return null;
+  }
+}
+
 /** Arşiv açılışında saha oturumunu yeni vaka sözleşmesiyle geri yükler. */
 export async function restoreLegacyFieldSession(normalized, fileName) {
   if (normalized) state.legacyDikResult = normalized;
   state.legacyDikFileName = fileName || state.legacyDikFileName || null;
+  await loadLearnedThresholdsFromSettings();
   await fieldSessionController.loadCurrent();
   return fieldSessionController.restoreCase(normalized, fileName);
+}
+
+function lateralCalibrationSnapshot() {
+  const model = state.legacyFieldModel?.lateralCalibration;
+  const readings = Array.isArray(state.legacyFieldCalibrationReadings)
+    ? state.legacyFieldCalibrationReadings.map(Number).filter((value) => Number.isFinite(value) && value > 0).slice(0, 3)
+    : [];
+  if (!model?.applied && !readings.length
+    && state.legacyFieldCalibrationBeforeM == null
+    && state.legacyFieldCalibrationAfterM == null
+    && state.legacyFieldCalibrationObservedM == null
+    && state.legacyFieldCalibrationDepthScale == null) return null;
+  return {
+    schemaVersion: 1,
+    mode: state.legacyDepthCalibrationMode === "field-stake" ? "field-stake" : "single-object",
+    referenceDepthM: 1,
+    readings,
+    beforeM: state.legacyFieldCalibrationBeforeM == null ? null : Number(state.legacyFieldCalibrationBeforeM),
+    afterM: state.legacyFieldCalibrationAfterM == null ? null : Number(state.legacyFieldCalibrationAfterM),
+    observedM: model?.observedM ?? null,
+    depthScale: model?.depthScale ?? null,
+    quality: model?.quality || "",
+    updatedAt: new Date().toISOString().slice(0, 19),
+  };
+}
+
+async function persistLateralCalibrationSnapshot() {
+  const session = activeFieldSession();
+  if (!session) return null;
+  fieldSessionController.setLateralCalibration(lateralCalibrationSnapshot());
+  return fieldSessionController.persist();
 }
 
 function readDepthParamsFromUi() {
@@ -244,6 +325,7 @@ async function reanalyzeCurrentLegacyJson(depthParams) {
     setLegacySelectedStep(Number(resultSteps[0].index) || 1);
   }
   renderLegacyDikPanel(normalized, { fileName });
+  refreshLegacyLateralEvidenceLayer();
   syncFieldStakeCalibrationUi();
   return normalized;
 }
@@ -286,6 +368,43 @@ async function copyLegacySahaBrief() {
     /* fallback below */
   }
   setStatus(lastSahaBriefText.split("\n")[0]);
+}
+
+/**
+ * Legacy3DMAG vaka özetini DTA/Gemini bağlamına kopyalar.
+ * Ölçüm ve karar verilerini okur; hiçbir hesabı değiştirmez.
+ */
+async function copyLegacyDtaCaseBrief() {
+  const casePackage = state.legacyCasePackage;
+  const fieldModel = casePackage?.derived?.fieldModel;
+  if (!casePackage || !fieldModel || (!fieldModel.detections?.length && !fieldModel.steps?.length)) {
+    setStatus("DTA özeti için önce Legacy JSON analiz edin");
+    return;
+  }
+  const brief = buildLegacyDtaCaseBrief({
+    casePackage,
+    scan: {
+      matrixRows: Number(state.legacyDikResult?.matrixRows) || 0,
+      matrixCols: Number(state.legacyDikResult?.matrixCols) || 0,
+    },
+    depthParams: readDepthParamsFromUi(),
+    mergeProfile: state.legacyMergeProfile || "normal",
+  });
+  if (!brief) {
+    setStatus("DTA özeti üretilemedi — vaka verisi eksik");
+    return;
+  }
+  const text = formatLegacyDtaCaseBriefText(brief);
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      setStatus("DTA/Gemini vaka özeti panoya kopyalandı — DTA'ya yapıştırın");
+      return;
+    }
+  } catch {
+    /* fallback below */
+  }
+  setStatus("DTA özeti üretildi ama panoya kopyalanamadı");
 }
 
 async function refreshArchives() {
@@ -909,7 +1028,7 @@ function updateLegacyTargetCard(detectionId = selectedDetectionOf(state.legacyTa
     if (confidence) confidence.innerHTML = "";
     const notes = $("legacy-target-notes");
     if (notes) { notes.hidden = true; notes.textContent = ""; }
-    ["btn-legacy-target-notes", "btn-legacy-target-report", "btn-legacy-target-prev", "btn-legacy-target-focus", "btn-legacy-target-next", "btn-legacy-target-only", "btn-legacy-target-calibrate"].forEach((id) => { const button = $(id); if (button) button.disabled = true; });
+    ["btn-legacy-target-notes", "btn-legacy-target-report", "btn-legacy-target-prev", "btn-legacy-target-focus", "btn-legacy-target-next", "btn-legacy-target-only", "btn-legacy-target-calibrate", "btn-legacy-target-confirm", "btn-legacy-target-reject"].forEach((id) => { const button = $(id); if (button) button.disabled = true; });
     return;
   }
   if (!detection && selectedStep) {
@@ -925,7 +1044,7 @@ function updateLegacyTargetCard(detectionId = selectedDetectionOf(state.legacyTa
     if (notes) { notes.hidden = true; notes.textContent = ""; }
     const focus = $("btn-legacy-target-focus");
     if (focus) focus.disabled = false;
-    ["btn-legacy-target-notes", "btn-legacy-target-report", "btn-legacy-target-prev", "btn-legacy-target-next", "btn-legacy-target-only", "btn-legacy-target-calibrate"].forEach((buttonId) => { const button = $(buttonId); if (button) button.disabled = true; });
+    ["btn-legacy-target-notes", "btn-legacy-target-report", "btn-legacy-target-prev", "btn-legacy-target-next", "btn-legacy-target-only", "btn-legacy-target-calibrate", "btn-legacy-target-confirm", "btn-legacy-target-reject"].forEach((buttonId) => { const button = $(buttonId); if (button) button.disabled = true; });
     return;
   }
   card.hidden = false;
@@ -984,6 +1103,49 @@ function updateLegacyTargetCard(detectionId = selectedDetectionOf(state.legacyTa
   const next = $("btn-legacy-target-next");
   if (prev) prev.disabled = index <= 0;
   if (next) next.disabled = index < 0 || index >= targetDetectionList().length - 1;
+  syncVerifyButtons(id);
+}
+
+/** Doğrulama butonlarının durumunu ve öğrenme özetini senkronlar. */
+function syncVerifyButtons(id) {
+  const confirmBtn = $("btn-legacy-target-confirm");
+  const rejectBtn = $("btn-legacy-target-reject");
+  const learnEl = $("legacy-learn-summary");
+  const session = activeFieldSession();
+  const status = session?.targetChecks?.[String(id || "")]?.status || "";
+  if (confirmBtn) {
+    confirmBtn.disabled = !id;
+    confirmBtn.classList.toggle("is-active", status === "confirmed");
+  }
+  if (rejectBtn) {
+    rejectBtn.disabled = !id;
+    rejectBtn.classList.toggle("is-active", status === "rejected");
+  }
+  if (learnEl) {
+    const learned = state.legacyLearnedThresholds;
+    learnEl.textContent = learned && Number(learned.decisionSampleCount) > 0
+      ? `🎯 ${learned.decisionSampleCount} karar öğrendim · eşik %${Math.round(Number(learned.confidenceStrong) * 100)}`
+      : "🎯 öğrenme: doğrulama bekleniyor";
+  }
+}
+
+async function setTargetCheckStatusFromUi(status) {
+  const id = selectedTargetId();
+  if (!id) return;
+  legacyCaseStore.setCheckStatus(id, status);
+  refreshLegacyUnifiedObjectMapStyles(state);
+  syncVerifyButtons(id);
+  import("../viewer/viewEnhancements.js").then(({ refreshSelectedGuides }) => {
+    refreshSelectedGuides();
+  }).catch(() => {});
+  const labels = { confirmed: "Sahada doğrulandı", rejected: "Sahada reddedildi" };
+  setStatus(`${labels[status] || status} · hedef kararları eşik öğrenmesine eklendi`);
+  const learned = await updateLearnedThresholdsFromSession();
+  if (learned) {
+    // Yeni eşiklerle mevcut modeli tazele (durum etiketleri yeniden hesaplanır).
+    renderLegacyDikPanel(state.legacyDikResult, { fileName: state.legacyDikFileName });
+    setStatus(`${labels[status] || status} · öğrenilmiş eşik güncellendi (güven ≥ %${Math.round(Number(learned.confidenceStrong) * 100)})`);
+  }
 }
 
 function selectTargetByOffset(offset) {
@@ -1081,6 +1243,18 @@ function syncLegacyMapViewUi() {
   select.value = mode;
 }
 
+function lateralRelationBadgeHtml(detectionId) {
+  const relations = Array.isArray(state.legacyFieldModel?.evidenceRelations)
+    ? state.legacyFieldModel.evidenceRelations.filter((item) => item.fromDetectionId === detectionId || item.toDetectionId === detectionId)
+    : [];
+  if (!relations.length) return "";
+  const best = relations[0];
+  const calibration = best.calibration?.applied ? ` · saha kalibrasyonu ${best.calibration.quality}` : "";
+  const delta = Number(best.calibrationScoreDeltaPct) || 0;
+  const deltaText = delta ? ` · kalibrasyon ${delta > 0 ? "+" : ""}${delta} puan` : "";
+  return `<div class="legacy-lateral-relation-badge" title="${escapeLegacyHtml(best.reasons.join(" · "))}">↔ ${relations.length} lateral yanıt adayı · en yüksek %${best.scorePct}${calibration}${deltaText}</div>`;
+}
+
 function mergedTargetRows(targets = []) {
   return targets.map((target) => {
     const confidence = Math.round((Number(target.confidence) || 0) * 100);
@@ -1096,6 +1270,7 @@ function mergedTargetRows(targets = []) {
       <div class="legacy-merged-target-meta">Derinlik ${Number(target.depthTopM).toFixed(2)}–${Number(target.depthBottomM).toFixed(2)} m · güven %${confidence}</div>
       <div class="legacy-merged-target-meta">${target.detectionIds.length} kanıt · adımlar: ${escapeLegacyHtml(steps)} · tutarlılık: ${consistency}</div>
       <div class="legacy-merged-target-meta legacy-merged-target-connection">↔ ${escapeLegacyHtml(connectorText)}</div>
+      <div class="legacy-merged-target-meta">${target.detectionIds.length > 1 ? "Birleşik hedef" : "Tek kanıt"} · lateral yanıtlar kesin birleşme değildir</div>
       <button type="button" class="mil" data-legacy-merged-expand="${escapeLegacyHtml(target.targetId)}">İncelemeyi aç</button>
       <button type="button" class="mil" data-legacy-merged-report="${escapeLegacyHtml(target.targetId)}">Rapora ekle</button>
       ${target.detectionIds.length > 1 ? `<button type="button" class="mil" data-legacy-merged-split="${escapeLegacyHtml(target.targetId)}">Ayır</button>` : ""}
@@ -1113,6 +1288,10 @@ function renderMergedTargetWorkspace(target) {
     : "simple";
   const connectors = Array.isArray(target.connectors) ? target.connectors : [];
   const evidence = Array.isArray(target.evidence) ? target.evidence : [];
+  const lateralRelations = Array.isArray(state.legacyFieldModel?.evidenceRelations)
+    ? state.legacyFieldModel.evidenceRelations.filter((relation) => target.detectionIds.includes(relation.fromDetectionId) || target.detectionIds.includes(relation.toDetectionId))
+    : [];
+  const lateralCalibration = state.legacyFieldModel?.lateralCalibration;
   const reasons = Array.isArray(target.mergeReasons) ? target.mergeReasons : [];
   const timeline = Array.isArray(target.timeline) ? target.timeline : buildLegacyTargetTimeline(target);
   const confidenceChart = buildLegacyTargetConfidenceChart(timeline);
@@ -1130,7 +1309,7 @@ function renderMergedTargetWorkspace(target) {
   const metrics = $("legacy-target-metrics");
   if (metrics) metrics.innerHTML = `<div class="legacy-target-metric"><b>${Number(target.depthTopM || 0).toFixed(2)}–${Number(target.depthBottomM || 0).toFixed(2)} m</b><span>birleşik derinlik</span></div><div class="legacy-target-metric"><b>${evidence.length}</b><span>kaynak kanıt</span></div><div class="legacy-target-metric"><b>%${confidence}</b><span>birleşme güveni</span></div><div class="legacy-target-metric"><b>${connectors.length}</b><span>yatay bağlantı</span></div>`;
   const confidenceHost = $("legacy-target-confidence");
-  if (confidenceHost) confidenceHost.innerHTML = `<b>İnceleme özeti:</b> adımlar ${escapeLegacyHtml(steps)} · ${escapeLegacyHtml(target.evidenceQuality || "single")} kanıt kalitesi${reasons.length ? `<div class="legacy-merged-reasons">${reasons.map((reason) => `<span>• ${escapeLegacyHtml(reason)}</span>`).join("")}</div>` : ""}`;
+  if (confidenceHost) confidenceHost.innerHTML = `<b>İnceleme özeti:</b> adımlar ${escapeLegacyHtml(steps)} · ${escapeLegacyHtml(target.evidenceQuality || "single")} kanıt kalitesi${reasons.length ? `<div class="legacy-merged-reasons">${reasons.map((reason) => `<span>• ${escapeLegacyHtml(reason)}</span>`).join("")}</div>` : ""}${lateralRelations.length ? `<div class="legacy-lateral-evidence-note">↔ ${lateralRelations.length} lateral yanıt adayı. <b>Kanıt</b> görünümünde kesikli mavi çizgi, sensör yanıtı olasılığını gösterir; fiziksel bağlantı veya büyütülmüş obje değildir.${lateralCalibration?.applied ? ` Saha kalibrasyonu: 1 m referans / ${Number(lateralCalibration.observedM).toFixed(2)} m okuma · skor etkisi sınırlı ve yalnız lateral proxy içindir.` : ""}</div>` : ""}`;
   const notes = $("legacy-target-notes");
   if (notes) {
     notes.hidden = false;
@@ -1154,10 +1333,30 @@ export function renderLegacyDikPanel(result, options = {}) {
     numberingDirection: state.legacyStepNumberingDirection,
   });
   const fileName = options.fileName || state.legacyDikFileName || "legacy_dik.json";
-  const fieldModel = buildLegacyFieldModel(normalized, {
+  const modelOptions = {
     mergeProfile: state.legacyMergeProfile,
     splitDetectionIds: state.legacyMergedSplitDetectionIds,
-  });
+    fieldCalibrationReadings: state.legacyFieldCalibrationReadings,
+    fieldCalibrationReferenceM: 1,
+    fieldCalibrationAfterM: state.legacyFieldCalibrationAfterM,
+    fieldCalibrationObservedM: state.legacyFieldCalibrationObservedM,
+    fieldCalibrationDepthScale: state.legacyFieldCalibrationDepthScale,
+    learnedThresholds: state.legacyLearnedThresholds || null,
+    depthParams: readDepthParamsFromUi(),
+    scan: {
+      matrixRows: Number(normalized.matrixRows) || 0,
+      matrixCols: Number(normalized.matrixCols) || 0,
+    },
+  };
+  const packageFieldModel = options.casePackage?.derived?.fieldModel;
+  const fieldModel = packageFieldModel && typeof packageFieldModel === "object"
+    ? packageFieldModel
+    : legacyCasePackageMatches(state.legacyCasePackage, normalized, modelOptions)
+      ? state.legacyCasePackage.derived.fieldModel
+      : buildLegacyFieldModel(normalized, modelOptions);
+  modelOptions.notesByDetection = Object.fromEntries(
+    (fieldModel.detections || []).map((detection) => [detection.detectionId, getDetectionNotes(detection.detectionId)]),
+  );
   state.legacyDikResult = normalized;
   state.legacyFieldModel = fieldModel;
   state.legacyDikFileName = fileName;
@@ -1166,6 +1365,11 @@ export function renderLegacyDikPanel(result, options = {}) {
     content: state.legacyDikRawContent || "",
     analysisParams: readDepthParamsFromUi(),
   });
+  if (options.casePackage) {
+    state.legacyCasePackage = options.casePackage;
+  } else {
+    refreshLegacyCasePackage(state, fieldModel, modelOptions);
+  }
 
   const tomographyButton = $("btn-legacy-tomography");
   if (tomographyButton) {
@@ -1191,6 +1395,8 @@ export function renderLegacyDikPanel(result, options = {}) {
   syncStepNumberInput();
   syncObjectViewUi(fieldModel);
   syncLegacyExportUi(fieldModel);
+  syncLegacyCalibrationMode(state.legacyDepthCalibrationMode);
+  syncFieldStakeCalibrationUi();
   void refreshLegacyArchiveConsistency(fileName, fieldModel);
 
   const st = $("legacy-dik-status");
@@ -1288,9 +1494,13 @@ export function renderLegacyDikPanel(result, options = {}) {
       const mag = detection?.magneticResponse || magneticResponseOf(detection || c);
       const magBadge = `<div class="legacy-mag-response" title="${escapeLegacyHtml(mag.disclaimer)}">${escapeLegacyHtml(mag.label)}</div>`;
       const consistBadge = consistencyBadgeHtml(detectionId);
+      const lateralBadge = lateralRelationBadgeHtml(detectionId);
       const volumeText = `<span class="legacy-volume-line"><b>Yaklaşık hacim</b> ${formatVolumeM3(volume)} · ${dims.width.toFixed(2)} × ${dims.length.toFixed(2)} × ${dims.height.toFixed(2)} m</span>`;
-      return `<div class="legacy-anomaly-card" data-legacy-focus="${detectionId}" data-legacy-status="${detectionStatus}" style="display:block;width:100%;text-align:left;color:var(--text);${strong}"><button type="button" class="legacy-detection-main" data-legacy-focus="${detectionId}" style="display:block;width:100%;text-align:left;color:inherit;background:none;border:0;padding:0;cursor:pointer;"><span style="color:${kind === "metal" ? "#e85858" : "#f4c875"};">${i === 0 ? "★" : "◆"} #${i + 1}</span> <b>${kind === "metal" ? "Metal" : "Anomali"}</b> · ${shapeName} · ${source}<br/><span>Adım ${detection?.stepIndex ?? "—"} · hat ${detection?.stationM?.toFixed(2) ?? "—"} m · aralık ${stepRangeText} · derinlik ${top.toFixed(2)}–${bot.toFixed(2)} m · güven %${Math.round((detection?.confidence ?? Number(c.confidence) ?? 0) * 100)} · ${sig.toFixed(1)}σ</span><br/><span>şekil güveni %${shapeConfidence} · RMS ${Number.isFinite(shapeError) ? shapeError.toFixed(2) : "—"} · boyut ${width.toFixed(2)} × ${length.toFixed(2)} m · ${volumeText}</span></button>${magBadge}${consistBadge}<div style="display:flex;gap:0.25rem;margin-top:0.25rem;"><button type="button" class="mil" data-legacy-show="${detectionId}">3D’de göster</button><button type="button" class="mil" data-legacy-only="${detectionId}">Sadece bunu göster</button></div>${recommendation}</div>`;
+      return `<div class="legacy-anomaly-card" data-legacy-focus="${detectionId}" data-legacy-status="${detectionStatus}" style="display:block;width:100%;text-align:left;color:var(--text);${strong}"><button type="button" class="legacy-detection-main" data-legacy-focus="${detectionId}" style="display:block;width:100%;text-align:left;color:inherit;background:none;border:0;padding:0;cursor:pointer;"><span style="color:${kind === "metal" ? "#e85858" : "#f4c875"};">${i === 0 ? "★" : "◆"} #${i + 1}</span> <b>${kind === "metal" ? "Metal" : "Anomali"}</b> · ${shapeName} · ${source}<br/><span>Adım ${detection?.stepIndex ?? "—"} · hat ${detection?.stationM?.toFixed(2) ?? "—"} m · aralık ${stepRangeText} · derinlik ${top.toFixed(2)}–${bot.toFixed(2)} m · güven %${Math.round((detection?.confidence ?? Number(c.confidence) ?? 0) * 100)} · ${sig.toFixed(1)}σ</span><br/><span>şekil güveni %${shapeConfidence} · RMS ${Number.isFinite(shapeError) ? shapeError.toFixed(2) : "—"} · boyut ${width.toFixed(2)} × ${length.toFixed(2)} m · ${volumeText}</span></button>${magBadge}${consistBadge}${lateralBadge}<div style="display:flex;gap:0.25rem;margin-top:0.25rem;"><button type="button" class="mil" data-legacy-show="${detectionId}">3D’de göster</button><button type="button" class="mil" data-legacy-only="${detectionId}">Sadece bunu göster</button></div>${recommendation}</div>`;
     });
+      const relationSummary = fieldModel.evidenceRelations?.length
+      ? `<div class="legacy-detection-heading"><span class="legacy-section-kicker">LATERAL YANIT ADAYLARI</span><span>${fieldModel.evidenceRelations.length} ilişki · proxy, kesin birleşme değil${fieldModel.lateralCalibration?.applied ? ` · saha kalibrasyonu ${fieldModel.lateralCalibration.quality}` : ""}</span></div>`
+      : "";
     const mergedRows = fieldModel.mergedTargets?.length
       ? `<div class="legacy-detection-heading"><span class="legacy-section-kicker">BİRLEŞİK HEDEFLER</span><span>${fieldModel.mergedTargets.length} fiziksel hedef · ${fieldModel.detections.length} ham kanıt</span></div>${mergedTargetRows(fieldModel.mergedTargets)}`
       : "";
@@ -1298,7 +1508,7 @@ export function renderLegacyDikPanel(result, options = {}) {
     const evidenceRows = rows.length
       ? `<div class="legacy-detection-heading"><span class="legacy-section-kicker">HAM KANITLAR</span><span>${rows.length} ayrı sonuç · güçlüden zayıfa</span></div>${rows.join("")}`
       : `<div class="legacy-empty-state">Analiz anomalisi bulunamadı · ${escapeLegacyHtml(fileName)} · ${escapeLegacyHtml(normalized.fingerprint || "")}</div>`;
-    list.innerHTML = `${filterBar}${mapMode === "full" ? stepSummary : ""}${mapMode === "merged" ? mergedRows : mapMode === "both" ? `${mergedRows}${stepSummary}${evidenceRows}` : evidenceRows}`;
+    list.innerHTML = `${filterBar}${mapMode === "full" ? stepSummary : ""}${mapMode === "merged" ? `${relationSummary}${mergedRows}` : mapMode === "both" ? `${relationSummary}${mergedRows}${stepSummary}${evidenceRows}` : `${relationSummary}${evidenceRows}`}`;
     if (listFilter !== "all" && state.legacyMapViewMode !== "merged") applyListFilter(list, listFilter);
   }
 
@@ -1388,43 +1598,63 @@ async function runLegacyDik() {
   try {
     const picked = await pickLegacyDikJson();
     if (!picked?.content) return;
+    await analyzeLegacyContent(picked.content, picked.fileName || picked.file_name || "scan.json");
+  } catch (e) {
+    console.warn("[legacy-dik]", e);
+    const message = e instanceof Error ? e.message : String(e);
+    setStatus(`Dik çekim: ${message}`);
+  }
+}
+
+/**
+ * Legacy JSON içeriğini mevcut analiz hattından geçirir (dosya seçimi olmadan).
+ * Bluetooth canlı akışı gibi dış kaynaklar bu giriş noktasını kullanır.
+ */
+export async function analyzeLegacyContent(content, fileName = "scan.json") {
+  try {
     setStatus("Dik çekim analiz ediliyor…");
     await ensureViewer();
     try { removeCsvOverlay(); } catch (_) {}
     try { removeLegacyDikShapes(); } catch (_) {}
-    const fileName = picked.fileName || picked.file_name || "scan.json";
     const { matrix, effectiveStepSpacingM } = readLegacyAnalyzeInputs();
     const depthParams = readDepthParamsFromUi();
     const result = await analyzeLegacyDikJson(
-      picked.content,
+      content,
       fileName,
       matrix.scanStepCount,
       effectiveStepSpacingM,
       depthParams
     );
     const normalized = normalizeLegacyResult(result, matrix.hint);
-    state.legacyDikRawContent = picked.content;
+    state.legacyDikRawContent = content;
     state.legacyCase = createLegacyCase({
       result: normalized,
       fileName,
-      content: picked.content,
+      content,
       observations: {},
     });
     state.legacyDepthCalibSuggestion = null;
     state.legacyDepthCalibBaseParams = null;
+    state.legacyFieldCalibrationRestored = false;
+    state.legacyFieldCalibrationObservedM = null;
+    state.legacyFieldCalibrationDepthScale = null;
     state.legacyReportTargetIds = [];
     clearLegacySelection();
     state.legacyMatrixHint = matrix.hint;
-    addLegacyDikShapesToScene(normalized);
-    // Fingerprint anahtarıyla önceki inceleme oturumunu geri yükle.
+    // Önce fingerprint oturumunu ve öğrenilmiş eşikleri yükle; kalibrasyon ve
+    // eşik geri geldikten sonra 3D katmanı aynı snapshot ile üretilecek.
+    await loadLearnedThresholdsFromSettings();
     await loadFieldSessionForCurrentJson();
+    fieldSessionController.restoreCase(normalized, fileName);
+    addLegacyDikShapesToScene(normalized);
     const session = activeFieldSession();
     if (session) {
       state.legacyReportTargetIds = [...session.reportTargets];
     }
     renderLegacyDikPanel(normalized, { fileName });
     try {
-      await saveLegacyArchive(fileName, picked.content, normalized);
+      const savedEntry = await saveLegacyArchive(fileName, content, normalized, state.legacyCasePackage);
+      state.legacyArchiveEntryId = savedEntry?.id || null;
       await refreshArchives();
     } catch (archiveError) {
       console.warn("[legacy-dik] arşiv kaydı yapılamadı:", archiveError);
@@ -1499,6 +1729,8 @@ async function applyLegacyDepthParams() {
       if (state.legacyDepthCalibrationMode === "field-stake") {
         const after = buildDepthCalibSummary(1.0, params, normalized);
         state.legacyFieldCalibrationAfterM = after?.votexMidM == null ? null : Number(after.votexMidM);
+        refreshLegacyLateralEvidenceLayer();
+        void persistLateralCalibrationSnapshot();
         syncFieldStakeCalibrationUi();
       }
       setStatus(normalized?.message || "Parametre uygulandı");
@@ -1551,8 +1783,28 @@ function sameDepthParams(a, b) {
     && Math.abs(Number(a.dipoleBlend) - Number(b.dipoleBlend)) < 0.0001;
 }
 
+function syncLegacyCalibrationRestoreUi() {
+  const el = $("legacy-calibration-restore-status");
+  if (!el) return;
+  const calibration = state.legacyFieldModel?.lateralCalibration;
+  const restored = !!state.legacyFieldCalibrationRestored && !!calibration?.applied;
+  if (!restored) {
+    el.hidden = true;
+    el.textContent = "";
+    el.title = "";
+    return;
+  }
+  const count = Number(calibration.readingCount) || 0;
+  const observed = Number(calibration.observedM);
+  const mode = calibration.quality === "after-reanalysis" ? "yeniden analiz" : "oturum";
+  el.hidden = false;
+  el.textContent = `✓ Kalibrasyon geri yüklendi · ${count ? `${count} okuma` : "snapshot"} · 1 m referans${Number.isFinite(observed) ? ` / ${observed.toFixed(2)} m` : ""}`;
+  el.title = `Fingerprint oturumundan ${mode} geri yüklendi; lateral yanıt proxy’si bu snapshot ile hesaplandı.`;
+}
+
 function syncFieldStakeCalibrationUi() {
   const host = $("legacy-field-stake-controls");
+  syncLegacyCalibrationRestoreUi();
   const mode = state.legacyDepthCalibrationMode === "field-stake";
   if (host) host.hidden = !mode;
   if (!mode) return;
@@ -1596,14 +1848,21 @@ function recordFieldStakeReading() {
     return;
   }
   state.legacyFieldCalibrationReadings = [...readings, measured];
+  state.legacyFieldCalibrationBeforeM = state.legacyFieldCalibrationReadings.reduce((sum, value) => sum + Number(value), 0) / state.legacyFieldCalibrationReadings.length;
   state.legacyFieldCalibrationAfterM = null;
+  void persistLateralCalibrationSnapshot();
   syncFieldStakeCalibrationUi();
   setStatus(`Saha kazığı okuması ${readings.length + 1}/3 kaydedildi · ${measured.toFixed(2)} m`);
 }
 
-function syncLegacyCalibrationMode() {
-  const mode = $("legacy-calibration-mode")?.value === "field-stake" ? "field-stake" : "single-object";
+function syncLegacyCalibrationMode(modeOverride = null) {
+  const selectedMode = modeOverride === "field-stake" || modeOverride === "single-object"
+    ? modeOverride
+    : $("legacy-calibration-mode")?.value;
+  const mode = selectedMode === "field-stake" ? "field-stake" : "single-object";
   state.legacyDepthCalibrationMode = mode;
+  const modeSelect = $("legacy-calibration-mode");
+  if (modeSelect) modeSelect.value = mode;
   const label = $("legacy-param-label-depth");
   const labelText = $("legacy-label-depth-text");
   const labelHelp = $("legacy-label-depth-help");
@@ -1630,6 +1889,7 @@ function syncLegacyCalibrationMode() {
   }
   const ai = $("btn-legacy-params-ai");
   syncFieldStakeCalibrationUi();
+  syncLegacyCalibrationRestoreUi();
   if (ai) {
     ai.textContent = mode === "field-stake" ? "🤖 Saha kalibrasyonu öner" : "🤖 AI öner";
     ai.title = mode === "field-stake"
@@ -1914,6 +2174,8 @@ export function bindLegacyDikPanel() {
     if (selectedDetectionId) focusLegacyDetection(selectedDetectionId);
   });
   $("btn-legacy-target-calibrate")?.addEventListener("click", calibrateSelectedTarget);
+  $("btn-legacy-target-confirm")?.addEventListener("click", () => { void setTargetCheckStatusFromUi("confirmed"); });
+  $("btn-legacy-target-reject")?.addEventListener("click", () => { void setTargetCheckStatusFromUi("rejected"); });
   $("legacy-target-card")?.addEventListener("click", (event) => {
     const evidence = event.target.closest("[data-legacy-merged-evidence]");
     if (!evidence) return;
@@ -1944,6 +2206,9 @@ export function bindLegacyDikPanel() {
 
   $("btn-legacy-saha-copy")?.addEventListener("click", () => {
     copyLegacySahaBrief();
+  });
+  $("btn-legacy-dta-brief-copy")?.addEventListener("click", () => {
+    void copyLegacyDtaCaseBrief();
   });
 
   bindLegacyReportExports({
@@ -2111,4 +2376,5 @@ export function bindLegacyDikPanel() {
   syncLegacyRuntimeContext();
   void loadDepthParamsFromSettings();
   void loadCalibNotesFromSettings();
+  void loadLearnedThresholdsFromSettings();
 }

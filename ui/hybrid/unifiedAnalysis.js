@@ -16,6 +16,7 @@
 
 import * as THREE from 'three';
 import { extractMagneticGrid, renderGridToCanvas, summarizeImageEdges } from './imageProcessor.js';
+import { calculateSensitivityParameters, filterDetectionsBySensitivity } from './sensitivity.js';
 import { CoordinateAligner } from './coordinateAlignment.js';
 import { fuseDataSources } from './dataFusion.js';
 import { analyzeDepth } from './depthAnalysis.js';
@@ -65,7 +66,11 @@ export async function runUnifiedAnalysis(params) {
     showHints = true,      // İpuçlarını göster
     cvThresholds = {},     // Çapraz doğrulama eşikleri
     manualAligner = null,  // Manuel hizalama (varsa)
+    sensitivityPercent = 50, // Yapı hassasiyeti %0-100
+    sensitivityParams = null, // Ön hesaplı eşikler (verilirse yeniden hesaplanmaz)
   } = options;
+
+  const sensParams = sensitivityParams || calculateSensitivityParameters(sensitivityPercent);
 
   const startTime = performance.now();
   console.log('[Unified] Başlıyor...');
@@ -73,11 +78,13 @@ export async function runUnifiedAnalysis(params) {
   // ══════════════════════════════════════════════
   // ADIM 1: Image'dan manyetik grid çıkar (birincil)
   // ══════════════════════════════════════════════
+  // Hassasiyet → renk eşleşme toleransı + min piksel alanı (bkz. sensitivity.js)
   const { grid: imageGrid, lut, stats: imageStats } = extractMagneticGrid(image, {
     stripWidth: 20,
     gridRes,
     ntRange,
-    matchThreshold: 0.35,
+    matchThreshold: sensParams.matchThreshold,
+    minArea: sensParams.minArea,
   });
   const edgeAnalysis = summarizeImageEdges(imageGrid, gridRes);
 
@@ -218,8 +225,10 @@ export async function runUnifiedAnalysis(params) {
 
   console.log(`[Unified] 3/4 Derinlik: ${depthResult.stats.depthMin.toFixed(1)}..${depthResult.stats.depthMax.toFixed(1)}m`);
 
-  // Yapıları tespit et (bileşik modelden)
-  const structures = detectStructures(fusionGrid, depthResult, gridRes, poolSizeM);
+  // Yapıları tespit et (bileşik modelden) — hassasiyet güven eşiğiyle
+  const allStructures = detectStructures(fusionGrid, depthResult, gridRes, poolSizeM, sensParams.minConfidence);
+  // Gerçek tespit filtresi: min güven / min alan süzgeci (bkz. sensitivity.js)
+  const structures = filterDetectionsBySensitivity(allStructures, sensParams.percent);
 
   // ══════════════════════════════════════════════
   // ADIM 4: Tek 3D sahne oluştur
@@ -272,6 +281,8 @@ export async function runUnifiedAnalysis(params) {
     fusionGrid,
     depthResult,
     structures,
+    allStructures,
+    sensitivityParams: sensParams,
     hints,
     crossValResult,
     elapsed: Number(elapsed),
@@ -282,14 +293,15 @@ export async function runUnifiedAnalysis(params) {
 
 /**
  * Fusion grid + derinlik verisinden yapıları tespit et.
+ * `minConfidence` — hassasiyetten türetilen güven eşiği (0.80 katı ↔ 0.15 hassas).
  */
-function detectStructures(fusionGrid, depthResult, gridRes, poolSizeM) {
+function detectStructures(fusionGrid, depthResult, gridRes, poolSizeM, minConfidence = 0.45) {
   const structures = [];
   const halfPool = poolSizeM / 2;
 
   // Güçlü manyetik sinyaller → metal
   for (const cell of fusionGrid) {
-    if (Math.abs(cell.magnetic || 0) > 300 && (cell.confidence || 0) > 0.5) {
+    if (Math.abs(cell.magnetic || 0) > 300 && (cell.confidence || 0) > minConfidence) {
       const worldX = (cell.x - 0.5) * poolSizeM;
       const worldZ = (cell.y - 0.5) * poolSizeM;
       const depthCell = depthResult.depthGrid.find(d => d.gx === cell.gx && d.gy === cell.gy);
@@ -310,7 +322,7 @@ function detectStructures(fusionGrid, depthResult, gridRes, poolSizeM) {
 
   // Geniş düşük sinyal bölgeleri → boşluk/oda
   for (const cell of fusionGrid) {
-    if ((cell.magnetic || 0) < -200 && (cell.confidence || 0) > 0.4) {
+    if ((cell.magnetic || 0) < -200 && (cell.confidence || 0) > Math.max(0.1, minConfidence - 0.1)) {
       // Komşu hücreleri kontrol et — geniş bir boşluk mu?
       const neighbors = fusionGrid.filter(c =>
         Math.abs(c.x - cell.x) < 0.1 &&

@@ -8,6 +8,52 @@ const GROUP_NAME = "legacyUnifiedObjectMapLayer";
 
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 
+const STATUS_COLORS = Object.freeze({
+  confirmed: 0x3edc8c,
+  rejected: 0xe23a3a,
+  reviewed: 0xe8a020,
+  unverified: null,
+});
+
+export function verificationStatusOf(target, appState = state) {
+  const checks = appState?.legacyFieldSessionController?.session?.targetChecks
+    || appState?.legacyCasePackage?.operator?.targetChecks
+    || {};
+  const statuses = (target?.detectionIds || [])
+    .map((id) => String(checks[String(id)]?.status || "").toLowerCase())
+    .filter(Boolean);
+  if (!statuses.length) return "unverified";
+  if (statuses.some((status) => status === "rejected")) return "rejected";
+  if (statuses.length === (target?.detectionIds || []).length && statuses.every((status) => status === "confirmed")) return "confirmed";
+  return "reviewed";
+}
+
+function statusColorOf(status, fallback) {
+  return STATUS_COLORS[status] || fallback;
+}
+
+function setMaterialColor(material, color) {
+  if (!material || color == null || !material.color) return;
+  material.color.setHex(color);
+  material.emissive?.setHex(color);
+}
+
+export function refreshLegacyUnifiedObjectMapStyles(appState = state) {
+  const layer = getLegacyUnifiedObjectMapLayer();
+  if (!layer) return false;
+  layer.traverse((object) => {
+    if (!object.userData?.legacyUnifiedObject || object.userData?.legacyEvidenceConnector) return;
+    const status = verificationStatusOf({ detectionIds: object.userData.legacyDetectionIds || [] }, appState);
+    const color = statusColorOf(status, object.userData.legacyDefaultColor);
+    if (color == null) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => setMaterialColor(material, color));
+    object.userData.legacyVerificationStatus = status;
+  });
+  invalidate();
+  return true;
+}
+
 function pointOf(evidence, group, canonicalFootprint = null) {
   const raw = evidence?.raw || {};
   if (canonicalFootprint) {
@@ -175,7 +221,9 @@ export function addLegacyUnifiedObjectMap() {
     const bottom = Math.max(top + 0.18, finite(target.depthBottomM, top + 0.6));
     const height = Math.min(bottom - top, finite(group.userData.depthMapM, 10) - top);
     if (height <= 0) return;
-    const color = String(target.type || "").toLowerCase().includes("metal") ? 0xff6b5e : 0xffc857;
+    const defaultColor = String(target.type || "").toLowerCase().includes("metal") ? 0xff6b5e : 0xffc857;
+    const verificationStatus = verificationStatusOf(target);
+    const color = statusColorOf(verificationStatus, defaultColor);
     const connectorColor = 0x74c2ff;
     const metadata = {
       legacyUnifiedObject: true,
@@ -185,6 +233,8 @@ export function addLegacyUnifiedObjectMap() {
       legacyStepIndices: target.stepIndices.map(Number),
       legacyEvidenceQuality: target.evidenceQuality || "single",
       legacyMergeReasons: target.mergeReasons || [],
+      legacyVerificationStatus: verificationStatus,
+      legacyDefaultColor: defaultColor,
     };
     const targetLayer = new THREE.Group();
     targetLayer.name = `legacyUnifiedObject-${index + 1}`;

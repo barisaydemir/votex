@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import rustResultFixture from "../../../examples/legacy_dik_result_fixture.json";
 import {
+  contentFingerprint,
+} from "../legacyCaseModel.js";
+import {
+  createEmptyFieldSession,
+  createFieldSessionStore,
+  setLateralCalibration,
+} from "../legacyFieldSession.js";
+import {
   buildLegacyAnalysisEvidence,
   analysisEvidenceRowsOf,
   buildLegacyFieldBrief,
@@ -14,6 +22,7 @@ import {
   residualScaleOf,
   statusLabel,
 } from "../legacyDikModel.js";
+import { buildLearnedThresholds } from "../legacyThresholdLearning.js";
 
 const result = {
   scanSteps: [
@@ -33,6 +42,62 @@ describe("legacyDikModel", () => {
     expect(model.detections[0].stepIndex).toBe(1);
     expect(model.detections[0].analysisEvidence.metrics.signalStrength.value).toBe(64);
     expect(model.mergedTargets.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("gerçek JSON fixture + fingerprint oturumundan lateral kalibrasyonu geri yükler", async () => {
+    const content = JSON.stringify(rustResultFixture);
+    const key = contentFingerprint(content, "legacy_dik_result_fixture.json");
+    const backing = {};
+    const store = createFieldSessionStore({
+      loadAll: async () => backing,
+      saveAll: async (sessions) => Object.assign(backing, sessions),
+    });
+    const saved = await store.save(setLateralCalibration(createEmptyFieldSession(key), {
+      mode: "field-stake",
+      referenceDepthM: 1,
+      readings: [0.49, 0.5, 0.51],
+      beforeM: 0.5,
+      afterM: 1.02,
+      observedM: 0.5,
+      depthScale: 1.33,
+      quality: "repeatable",
+    }));
+    const reopenedStore = createFieldSessionStore({
+      loadAll: async () => backing,
+      saveAll: async () => {},
+    });
+    const restored = await reopenedStore.load(key, "legacy_dik_result_fixture.json");
+    const calibration = restored?.lateralCalibration;
+    const model = buildLegacyFieldModel(rustResultFixture, {
+      fieldCalibrationReadings: calibration?.readings,
+      fieldCalibrationReferenceM: calibration?.referenceDepthM,
+      fieldCalibrationAfterM: calibration?.afterM,
+    });
+    expect(saved.key).toBe(key);
+    expect(restored?.key).toBe(key);
+    expect(calibration).toMatchObject({ mode: "field-stake", readings: [0.49, 0.5, 0.51], afterM: 1.02 });
+    expect(model.result.fingerprint).toBe("legacy-result-fixture-v1");
+    expect(model.lateralCalibration).toMatchObject({ applied: true, readingCount: 3, observedM: 1.02 });
+  });
+
+  it("öğrenilmiş eşik modeli durum etiketlerini günceller ve modele işlenir", () => {
+    // Onaylı örneklerin güveni düşük (0.62–0.66), reddedilenler çok düşük → öğrenilen eşik ~0.6
+    const samples = [
+      { detectionId: "a", status: "confirmed", confidence: 0.66, strength: 3.4, depthTopM: 1.2, depthBottomM: 1.8 },
+      { detectionId: "b", status: "confirmed", confidence: 0.62, strength: 3.2, depthTopM: 1.2, depthBottomM: 1.8 },
+      { detectionId: "c", status: "confirmed", confidence: 0.64, strength: 3.3, depthTopM: 1.2, depthBottomM: 1.8 },
+      { detectionId: "d", status: "rejected", confidence: 0.5, strength: 2.0, depthTopM: 3, depthBottomM: 4 },
+      { detectionId: "e", status: "rejected", confidence: 0.45, strength: 1.8, depthTopM: 3, depthBottomM: 4 },
+    ];
+    const learned = buildLearnedThresholds(samples);
+    const learnedModel = buildLegacyFieldModel(rustResultFixture, { learnedThresholds: learned });
+    const detection = learnedModel.detections[0];
+    // Fixture tespiti: güven 0.82, σ ~3.4 → öğrenilen güven eşiği 0.58 altında kaldığından strong kalır
+    expect(detection.status).toBe("strong");
+    expect(learnedModel.learnedThresholds).toBe(learned);
+    // Kontrol: öğrenme olmadan da aynı sonuç — davranış değişmez kalır
+    const plainModel = buildLegacyFieldModel(rustResultFixture);
+    expect(plainModel.detections[0].status).toBe("strong");
   });
 
   it("görünür analiz akışını aynı saha modelinden üretir", () => {

@@ -16,7 +16,7 @@ export function sessionKeyOf(fingerprint, fileName = "") {
 
 export function createEmptyFieldSession(key, metadata = {}) {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     key: String(key || ""),
     contentHash: String(metadata.contentHash || key || ""),
     hashAlgorithm: String(metadata.hashAlgorithm || ""),
@@ -26,6 +26,7 @@ export function createEmptyFieldSession(key, metadata = {}) {
     reportTargets: [],
     splitDetectionIds: normalizeTargetList(metadata.splitDetectionIds),
     mergePolicy: metadata.mergePolicy || null,
+    lateralCalibration: normalizeLateralCalibration(metadata.lateralCalibration),
     lastTargetId: null,
     lastStepIndex: null,
     targetChecks: {},
@@ -37,6 +38,37 @@ export function normalizeTargetList(value) {
   if (value == null) return [];
   const list = Array.isArray(value) ? value : [value];
   return [...new Set(list.map((item) => String(item)).filter(Boolean))];
+}
+
+export function normalizeLateralCalibration(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const readings = (Array.isArray(raw.readings) ? raw.readings : [])
+    .map(Number)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .slice(0, 3);
+  const positive = (value) => {
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? number : null;
+  };
+  const referenceDepthM = positive(raw.referenceDepthM ?? raw.reference_depth_m) || 1;
+  const beforeM = positive(raw.beforeM ?? raw.before_m);
+  const afterM = positive(raw.afterM ?? raw.after_m);
+  const observedM = positive(raw.observedM ?? raw.observed_m);
+  const depthScale = Number(raw.depthScale ?? raw.depth_scale);
+  const mode = raw.mode === "field-stake" ? "field-stake" : "single-object";
+  if (!readings.length && beforeM == null && afterM == null && observedM == null) return null;
+  return {
+    schemaVersion: Number(raw.schemaVersion) || 1,
+    mode,
+    referenceDepthM,
+    readings,
+    beforeM,
+    afterM,
+    observedM,
+    depthScale: Number.isFinite(depthScale) ? Math.max(0.75, Math.min(1.33, depthScale)) : null,
+    quality: String(raw.quality || ""),
+    updatedAt: String(raw.updatedAt || ""),
+  };
 }
 
 export function normalizeFieldSession(raw) {
@@ -63,6 +95,7 @@ export function normalizeFieldSession(raw) {
     reportTargets: normalizeTargetList(raw?.reportTargets),
     splitDetectionIds: normalizeTargetList(raw?.splitDetectionIds),
     mergePolicy: raw?.mergePolicy && typeof raw.mergePolicy === "object" ? raw.mergePolicy : null,
+    lateralCalibration: normalizeLateralCalibration(raw?.lateralCalibration),
     lastTargetId: raw?.lastTargetId == null ? null : String(raw.lastTargetId),
     lastStepIndex: Number.isFinite(Number(raw?.lastStepIndex)) && Number(raw?.lastStepIndex) > 0
       ? Number(raw.lastStepIndex)
@@ -109,6 +142,14 @@ export function setTargetCheckStatus(session, detectionId, status) {
   }
   checks[id] = { status: next, at: nowIso() };
   return touch({ ...session, targetChecks: checks });
+}
+
+export function setLateralCalibration(session, snapshot = null) {
+  if (!session) return session;
+  return touch({
+    ...session,
+    lateralCalibration: normalizeLateralCalibration(snapshot),
+  });
 }
 
 export function setMergeReview(session, { splitDetectionIds = [], mergePolicy = null } = {}) {

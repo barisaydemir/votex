@@ -72,7 +72,7 @@ export function makeBadgeSprite(num, accentHex = "#7ec8e8") {
   return sprite;
 }
 
-export function makeDetailSprite(title, lines) {
+export function makeDetailSprite(title, lines, options = {}) {
   const lineArr = (Array.isArray(lines) ? lines : [String(lines || "")]).filter(Boolean);
   const canvas = document.createElement("canvas");
   const nLines = Math.min(lineArr.length, 3);
@@ -84,10 +84,15 @@ export function makeDetailSprite(title, lines) {
   const pad = 10;
   const boxW = 520 - pad * 2;
   const boxH = cH - pad * 2;
-  // Çerçevesiz yumuşak balon
-  ctx.fillStyle = "rgba(8, 16, 20, 0.78)";
+  // Yumuşak bilgi balonu; accent yalnız durum/uyarı rengini anlatır.
+  ctx.fillStyle = "rgba(8, 16, 20, 0.86)";
   roundRect(ctx, pad, pad, boxW, boxH, 14);
   ctx.fill();
+  const accentHex = String(options?.accentHex || "#7ec8e8");
+  ctx.strokeStyle = accentHex;
+  ctx.lineWidth = 4;
+  roundRect(ctx, pad + 2, pad + 2, boxW - 4, boxH - 4, 12);
+  ctx.stroke();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#fff6e8";

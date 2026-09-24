@@ -18,6 +18,7 @@ import { buildMesh } from "./viewer/mesh.js";
 import { showHints, clearHints, setHintsVisible } from "./viewer/hintEngine.js";
 import { applyFreeDrawVisibility } from "./viewer/builders/freeDraw.js";
 import { updatePreviewMarks } from "./ui/previewMarks.js";
+import { calculateSensitivityParameters } from "./hybrid/sensitivity.js";
 import { bindMapRuler, redrawRuler } from "./ui/mapRuler.js";
 import { selectedShotType, selectedTargetKind, targetKindLabel, updateShotHint } from "./ui/shotType.js";
 import { formatSoilLine, selectedSoilProfile, startSoilMonitor, updateSoilHint } from "./ui/soilProfile.js";
@@ -475,7 +476,9 @@ async function build3D() {
     $("btn-build-3d").disabled = true;
     const viewMode = selectedShotType();
     const targetKind = selectedTargetKind();
-    const minConfidence = (Number($("min-confidence")?.value) || 45) / 100;
+    // Hassasiyet slider'ı → teknik eşikler (min güven 0.80 ↔ 0.15)
+    const sens = calculateSensitivityParameters(state.sensitivityPercent);
+    const minConfidence = sens.minConfidence;
     const modeLabel = viewMode === "side" ? t("stats.side") : t("stats.top");
     const targetLabel = t("msg.targetBit", { label: targetKindLabel(targetKind) });
     logLine(t("msg.analyzeStart", { mode: modeLabel, target: targetLabel, thr: minConfidence.toFixed(2) }), "info");
@@ -485,7 +488,9 @@ async function build3D() {
       imageBase64: state.pendingFile.base64,
       fileName: state.pendingFile.name,
       lutStripPx: 24,
-      minArea: 80,
+      minArea: sens.minArea,
+      sensitivity: sens.normalized,
+      matchThreshold: sens.matchThreshold,
       viewMode,
       minConfidence,
       targetKind,
@@ -1135,13 +1140,44 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
     heatOpEl.addEventListener('input', syncHeatmapOpacity);
     syncHeatmapOpacity();
   }
-const minConfEl = $("min-confidence");
-const minConfLabel = $("min-confidence-label");
-if (minConfEl && minConfLabel) {
+const minConfEl = $("main-sensitivity-slider");
+const mainSensBadge = $("main-sensitivity-badge");
+const mainSensDesc = $("main-sensitivity-desc");
+let mainSensDebounce = null;
+
+if (minConfEl) {
   const syncConf = () => {
-    minConfLabel.textContent = ((Number(minConfEl.value) || 45) / 100).toFixed(2);
+    const raw = Number(minConfEl.value);
+    const val = Number.isFinite(raw) ? raw : 50;
+    state.sensitivityPercent = val;
+    const params = calculateSensitivityParameters(val);
+    if (mainSensBadge) {
+      const cleanLabel = params.label.replace(/^[^a-zA-ZÇĞİÖŞÜçğıöşü]+/, '').trim();
+      mainSensBadge.textContent = `%${params.percent} (${cleanLabel})`;
+      mainSensBadge.style.color = params.badgeColor;
+      mainSensBadge.style.borderColor = `${params.badgeColor}44`;
+      mainSensBadge.style.background = `${params.badgeColor}18`;
+    }
+    if (mainSensDesc) {
+      mainSensDesc.textContent = params.description;
+    }
+    window.dispatchEvent(new CustomEvent("votex:sensitivity-change", { detail: { percent: val, params } }));
   };
-  minConfEl.addEventListener("input", syncConf);
+
+  // Arşiv geri yükleme / AUTO uygulama gibi render-only senkron:
+  // slider değeri değişmiş olur, yeniden analiz tetiklenmez.
+  minConfEl.addEventListener("votex:sensitivity-sync", () => syncConf());
+
+  minConfEl.addEventListener("input", () => {
+    syncConf();
+    if (mainSensDebounce) clearTimeout(mainSensDebounce);
+    mainSensDebounce = setTimeout(() => {
+      if (state.pendingFile && !$("btn-build-3d")?.disabled) {
+        console.log(`[Main] Hassasiyet canlı yenileniyor (%${minConfEl.value})...`);
+        build3D();
+      }
+    }, 150);
+  });
   syncConf();
 }
 document.querySelectorAll('input[name="shot-type"]').forEach((el) => {

@@ -116,6 +116,9 @@ pub struct AppSettings {
     /// Saha inceleme oturumları (JSON fingerprint → incelenen hedefler / rapor seçimi)
     #[serde(default)]
     pub legacy_field_sessions: std::collections::HashMap<String, crate::legacy_mag_json::LegacyFieldSession>,
+    /// Doğrulanmış hedeflerden öğrenilen eşik modeli (yerel istatistik kalibrasyonu)
+    #[serde(default)]
+    pub legacy_learned_thresholds: Option<serde_json::Value>,
 }
 
 fn default_soil_profile() -> String {
@@ -217,6 +220,7 @@ impl Default for AppSettings {
             legacy_depth_params: crate::legacy_mag_json::LegacyDepthParams::default(),
             legacy_depth_calib_notes: Vec::new(),
             legacy_field_sessions: std::collections::HashMap::new(),
+            legacy_learned_thresholds: None,
         }
     }
 }

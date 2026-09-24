@@ -12,6 +12,7 @@ import { loadImageFromFile } from './imageProcessor.js';
 import { runUnifiedAnalysis, createUnified2DMap } from './unifiedAnalysis.js';
 import { CoordinateAligner, drawControlPoints } from './coordinateAlignment.js';
 import { initClickToAlign, getPoints, getQuality, clearPoints, toggleGrid, destroy as destroyClickAlign } from './clickToAlign.js';
+import { calculateSensitivityParameters, filterDetectionsBySensitivity } from './sensitivity.js';
 
 // ── Durum ──
 
@@ -19,6 +20,9 @@ const panelState = {
   image: null,
   csvLoaded: false,
   analyzing: false,
+  lastResult: null,
+  allStructures: [],
+  debounceTimer: null,
 };
 
 // ── Hizalama Durumu ──
@@ -136,6 +140,9 @@ async function handleStart() {
       magneticDiff: Number(document.getElementById('cv-magnetic-diff')?.value) || 150,
     };
 
+    const sensitivityVal = Number(document.getElementById('unified-sensitivity-slider')?.value || 50);
+    const sensitivityParams = calculateSensitivityParameters(sensitivityVal);
+
     const options = {
       csvWeight: Number(document.getElementById('unified-csv-weight')?.value) || 70,
       soilType: document.querySelector('input[name="soil-profile"]')?.value || 'loam',
@@ -146,6 +153,8 @@ async function handleStart() {
       showHints: true,
       cvThresholds,
       manualAligner: state.manualAligner || null,
+      sensitivityPercent: sensitivityVal,
+      sensitivityParams,
     };
 
     // Tek analiz
@@ -155,6 +164,10 @@ async function handleStart() {
       csvStructures,
       options,
     });
+
+    panelState.lastResult = result;
+    panelState.allStructures = result.allStructures || result.structures || [];
+    updateSensitivityCount(sensitivityVal);
 
     // Sonuçları göster
     showResults(result);
@@ -254,6 +267,22 @@ export function showResults(result) {
   }
 
   resultsEl.style.display = '';
+}
+
+// ── Canlı Tespit Sayacı ──
+
+function updateSensitivityCount(sensitivityVal) {
+  const el = document.getElementById('unified-sensitivity-count');
+  if (!el) return;
+  const all = panelState.allStructures || [];
+  if (all.length === 0) {
+    el.textContent = '🎯 Tespit: —';
+    el.title = 'Analiz henüz yapılmadı';
+    return;
+  }
+  const kept = filterDetectionsBySensitivity(all, sensitivityVal);
+  el.textContent = `🎯 Tespit: ${kept.length} yapı`;
+  el.title = `${all.length} adaydan hassasiyet süzgecinden geçenler`;
 }
 
 // ── Eşik Slider Bağlantıları ──
@@ -376,6 +405,46 @@ function updateAlignQualityUI() {
   `;
 }
 
+function bindSensitivitySlider() {
+  const slider = document.getElementById('unified-sensitivity-slider');
+  const badge = document.getElementById('unified-sensitivity-badge');
+  const desc = document.getElementById('unified-sensitivity-desc');
+  if (!slider) return;
+
+  const updateUI = () => {
+    const raw = Number(slider.value);
+    const val = Number.isFinite(raw) ? raw : 50;
+    const params = calculateSensitivityParameters(val);
+    updateSensitivityCount(val);
+
+    if (badge) {
+      const cleanLabel = params.label.replace(/^[^a-zA-ZÇĞİÖŞÜçğıöşü]+/, '').trim();
+      badge.textContent = `%${params.percent} (${cleanLabel})`;
+      badge.style.color = params.badgeColor;
+      badge.style.borderColor = `${params.badgeColor}44`;
+      badge.style.background = `${params.badgeColor}18`;
+    }
+    if (desc) {
+      desc.textContent = params.description;
+    }
+  };
+
+  slider.addEventListener('input', () => {
+    updateUI();
+
+    // Debounced canlı yenileme
+    if (panelState.debounceTimer) clearTimeout(panelState.debounceTimer);
+    panelState.debounceTimer = setTimeout(() => {
+      if (panelState.image && !panelState.analyzing) {
+        console.log(`[UnifiedPanel] Hassasiyet canlı yenileniyor (%${slider.value})...`);
+        handleStart();
+      }
+    }, 150);
+  });
+
+  updateUI();
+}
+
 // ── Başlatma ──
 
 export function bindUnifiedPanel() {
@@ -385,6 +454,7 @@ export function bindUnifiedPanel() {
 
   console.log('[UnifiedPanel] Bağlandı');
   bindThresholdSliders();
+  bindSensitivitySlider();
   bindClickToAlign();
 
   // Image seç

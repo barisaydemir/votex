@@ -5,6 +5,7 @@ import { selectedShotType, selectedTargetKind } from "./shotType.js";
 import { ensureViewer } from "../viewer/scene.js";
 import { addCsvOverlayToScene, removeCsvOverlay, toggleCsvOverlay, anomalyStatsString, renderCsvHeatmap } from "../viewer/csvOverlay.js";
 import { bindLegacyDikPanel } from "./legacyDikPanel.js";
+import { bindDeviceLink } from "./deviceLink.js";
 import { detectStructuresFromTerrain } from "../viewer/csvAnalysis.js";
 import { filterUnderground, sliceDepths, autoBoxFor } from "../viewer/csvFilter.js";
 import { analyzeDepthSlices } from "../viewer/csvAnalysis.js";
@@ -1328,6 +1329,7 @@ export function bindCsvPanel() {
   buildBtnEl?.addEventListener("click", () => { console.log('[CSV-BTN] buildBtn CLICKED, csvContent=', !!state.csvContent); build3dFromCsv(); });
 
   bindLegacyDikPanel();
+  bindDeviceLink();
 
   // Sigma slider label + 3D overlay otomatik yeniden oluşturma
   const sigmaSlider = $("csv-sigma");

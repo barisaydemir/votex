@@ -143,6 +143,20 @@
       <div class="boot-maker">Barış Aydemir · Digital Future Tech</div>
     </div>
 
+    <div id="field-report-modal" class="field-report-modal" hidden role="dialog" aria-modal="true" aria-labelledby="field-report-title">
+      <div class="field-report-panel">
+        <div class="field-report-bar">
+          <h2 id="field-report-title">Saha Raporu</h2>
+          <div class="btn-row">
+            <button type="button" id="field-report-print" class="mil accent">Yazdır / PDF</button>
+            <button type="button" id="field-report-save" class="mil">HTML Kaydet</button>
+            <button type="button" id="field-report-close" class="mil">Kapat</button>
+          </div>
+        </div>
+        <iframe id="field-report-frame" class="field-report-frame" title="Saha raporu"></iframe>
+      </div>
+    </div>
+
     <div id="license-gate" class="license-gate" hidden aria-modal="true" role="dialog" aria-labelledby="license-gate-title">
       <div class="license-gate-panel">
         <img class="license-gate-logo" src="/votex-logo.png" alt="VOTEX" width="96" height="96" />
@@ -267,6 +281,27 @@
             ardından analizi başlatın.
           </p>
 
+          <!-- 🎯 YAPI TESPİT HASSASİYETİ AYAR KARTI (GÖRSEL / İLK SEKME) -->
+          <div id="main-sensitivity-section" class="main-sensitivity-card">
+            <div class="sens-header">
+              <span class="sens-title">
+                🎯 Yapı Tespit Hassasiyeti
+              </span>
+              <span id="main-sensitivity-badge" class="sens-badge">
+                %50 (Dengeli)
+              </span>
+            </div>
+            <input type="range" id="main-sensitivity-slider" min="0" max="100" step="5" value="50" aria-label="Yapı Tespit Hassasiyeti" />
+            <div class="sens-ticks">
+              <span>🔴 Katı</span>
+              <span>🟡 Dengeli</span>
+              <span>🔵 Maksimum</span>
+            </div>
+            <div id="main-sensitivity-desc" class="sens-desc">
+              Standart anomali ve yapı tespiti (Katı ↔ Detaylı)
+            </div>
+          </div>
+
           <div class="dropzone" id="dropzone">
             <p class="drop-title" data-i18n="ops.dropTitle">HARİTA KAYNAĞI</p>
             <p class="drop-sub" id="file-name">Henüz dosya yok</p>
@@ -279,6 +314,7 @@
                 Analizi Başlat
               </button>
             </div>
+          </div>
 
             <!-- ⚡ AUTO — Akıllı Ayar Öneri Kartı -->
             <div id="auto-tune-card" class="auto-tune-card" style="display:none;"></div>
@@ -438,7 +474,6 @@
               <div id="fd-ct-chips" class="fd-bands"></div>
               <div id="fd-ct-list" class="fd-list fd-jx-list"></div>
             </div>
-          </div>
         </div><!-- /ops-core-a -->
         <div id="panel-fold-zone" class="fold-zone">
 
@@ -520,6 +555,15 @@
                 <button type="button" id="btn-archive-refresh" class="mil compact" data-i18n="archive.refresh">Yenile</button>
               </div>
               <div class="archive-list" id="archive-list" aria-live="polite"></div>
+              <div class="btn-row">
+                <button type="button" id="btn-archive-export-training" class="mil compact" title="Arşivdeki Legacy JSON vakalarını operatör kararlarıyla etiketli JSONL eğitim seti olarak kaydet">🎓 JSONL eğitim seti çıkar</button>
+              </div>
+              <div class="btn-row">
+                <button type="button" id="btn-case-package-export" class="mil compact" title="Açık Legacy vakasını taşınabilir Case Package JSON olarak kaydet">📦 Vaka JSON dışa aktar</button>
+                <button type="button" id="btn-case-package-import" class="mil compact" title="Taşınabilir VOTEX Case Package JSON dosyası aç">📂 Vaka JSON içe aktar</button>
+              </div>
+              <p class="hint compact">Vaka JSON: analiz + 3D model + kalibrasyon + operatör kararlarını tek taşınabilir dosyada saklar.</p>
+              <p class="hint compact">Eğitim seti: girdi ölçüm özeti → operatör kararı (Gemini few-shot / tuning)</p>
             </div>
           </details>
 
@@ -616,6 +660,11 @@
                       <button type="button" id="btn-legacy-target-notes" class="mil" disabled>📝 Not / fotoğraf</button>
                       <button type="button" id="btn-legacy-target-report" class="mil" disabled>📋 Rapora ekle</button>
                     </div>
+                    <div class="legacy-target-workspace-actions legacy-verify-actions">
+                      <button type="button" id="btn-legacy-target-confirm" class="mil" disabled title="Sahada doğrulandı — eşik öğrenmesi bu kararı örnek olarak kullanır">✔ Sahada doğrulandı</button>
+                      <button type="button" id="btn-legacy-target-reject" class="mil" disabled title="Erandı — eşik öğrenmesi bu kararı örnek olarak kullanır">✖ Ele</button>
+                      <span id="legacy-learn-summary" class="legacy-learn-summary" title="Yerel öğrenme: doğrulanmış kararlar GÜÇLÜ/DİKKAT eşiklerini ve tip bazlı derinlik bandını günceller"></span>
+                    </div>
                     <div class="legacy-target-actions">
                       <button type="button" id="btn-legacy-target-prev" class="mil" disabled>‹ Önceki</button>
                       <button type="button" id="btn-legacy-target-focus" class="mil accent" disabled>Hedefe git</button>
@@ -652,6 +701,44 @@
                   <input type="number" id="legacy-dik-step-spacing" min="0" max="1000" step="0.01" value="0" placeholder="Otomatik" />
                   <span class="legacy-input-help">metre · matris boşsa</span>
                 </label>                  <div id="legacy-dik-step-help" class="legacy-step-help">Örn. 6×3 = 6 satır × 3 sütun = 18 kare. Her adım bir kare hücredir; alt satırdan başlanır, hatlar gidiş–dönüş ilerler.</div>
+                <div id="bt-device-box" class="bt-device-box" style="margin:0.4rem 0;padding:0.45rem 0.5rem;border:1px solid rgba(55,148,255,0.25);border-radius:5px;background:rgba(30,80,160,0.08);">
+                  <div class="hint compact" style="margin:0 0 0.3rem;font-weight:600;">📱 Cihaza Bağlan · Bluetooth</div>
+                  <div class="btn-row">
+                    <button id="btn-bt-scan" class="mil">Cihaz Ara</button>
+                    <button id="btn-bt-connect" class="mil" disabled>Bağlan</button>
+                    <button id="btn-bt-disconnect" class="mil" disabled>Kes</button>
+                  </div>
+                  <select id="bt-device-list" class="legacy-select" style="width:100%;margin:0.25rem 0;" disabled>
+                    <option value="">— önce cihaz arayın —</option>
+                  </select>
+                  <div id="bt-link-status" class="hint compact" style="margin:0 0 0.3rem;">Bağlı değil</div>
+                  <label class="legacy-input-row">
+                    <span class="legacy-input-label">Alan genişliği</span>
+                    <input type="number" id="bt-field-width" min="0.5" max="100" step="0.1" value="4" />
+                    <span class="legacy-input-help">m · cihaz göndermiyorsa</span>
+                  </label>
+                  <label class="legacy-input-row">
+                    <span class="legacy-input-label">Alan boyu</span>
+                    <input type="number" id="bt-field-length" min="0.5" max="100" step="0.1" value="5" />
+                    <span class="legacy-input-help">m</span>
+                  </label>
+                  <label class="legacy-input-row">
+                    <span class="legacy-input-label">Harita görünümü</span>
+                    <select id="bt-heat-style" class="legacy-select">
+                      <option value="device" selected>Cihaz · gökkuşağı + eşik konturu</option>
+                      <option value="votex">Votex · simetrik yeşil zemin</option>
+                    </select>
+                    <span class="legacy-input-help">cihaz ekranı yanında karşılaştırma</span>
+                  </label>
+                  <div class="btn-row">
+                    <button id="btn-bt-finish" class="mil accent" disabled>⏹ Bitir ve Kaydet</button>
+                  </div>
+                  <div class="btn-row">
+                    <button id="btn-bt-analyze" class="mil" disabled>Analiz Et</button>
+                    <button id="btn-bt-reset" class="mil" disabled>Akışı Sıfırla</button>
+                  </div>
+                  <div id="bt-stream-status" class="hint compact mono" style="margin:0.25rem 0 0;">0 mesaj · 0 nokta</div>
+                </div>
                 <details class="dta-settings-fold" id="legacy-depth-params-fold" style="margin-top:0.4rem;">
                   <summary>Parametre</summary>
                   <div class="dta-settings">
@@ -678,6 +765,7 @@
                         <option value="field-stake">Saha cihazı · 1 m referans kazığı</option>
                       </select>
                       <span class="legacy-input-help" id="legacy-calibration-mode-help">Seçili objenin bilinen derinliğini girin</span>
+                      <span id="legacy-calibration-restore-status" class="legacy-calibration-restore-status" hidden aria-live="polite"></span>
                     </label>
                     <label class="legacy-input-row">
                       <span class="legacy-input-label" id="legacy-label-depth-text">Bilinen derinlik (m)</span>
@@ -779,7 +867,12 @@
                     <span class="legacy-object-swatch is-neg-sigma"></span><span>−σ negatif</span>
                     <span class="legacy-object-swatch is-metal"></span><span>metal adayı</span>
                   </div>
-                  <div class="legacy-object-legend-note">Manyetik ayak izi · gerçek duvar/obje çizimi değil · residual/σ · χ yok</div>
+                  <div class="legacy-object-legend-row is-status" title="Operatör doğrulama durumu obje rengiyle gösterilir">
+                    <span class="legacy-object-swatch is-verified"></span><span>Doğrulandı</span>
+                    <span class="legacy-object-swatch is-mismatch"></span><span>Reddedildi</span>
+                    <span class="legacy-object-swatch is-reviewed"></span><span>İncelendi</span>
+                  </div>
+                  <div class="legacy-object-legend-note">Manyetik ayak izi · gerçek duvar/obje çizimi değil · renk: obje türü veya operatör doğrulama durumu</div>
                   <div id="legacy-object-legend-scale" class="legacy-object-legend-scale"></div>
                 </div>
                 <div id="legacy-geo-ai-controls" class="legacy-geo-ai-controls" style="display:none;" aria-live="polite">
@@ -831,6 +924,7 @@
                   <button type="button" id="btn-legacy-export-csv" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Tespitleri CSV olarak kaydet">CSV</button>
                   <button type="button" id="btn-legacy-export-geojson" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Tespitleri GeoJSON olarak kaydet">GeoJSON</button>
                   <button type="button" id="btn-legacy-export-summary" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Yazdırılabilir saha özeti (HTML → PDF)">Saha özeti</button>
+                  <button type="button" id="btn-legacy-dta-brief-copy" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Vaka özetini DTA/Gemini bağlamı için panoya kopyala">DTA özeti</button>
                 </div>
                 <div id="legacy-saha-brief" class="legacy-saha-brief" style="display:none;" aria-live="polite">
                   <div class="legacy-saha-brief-kicker">SAHA ÖZETİ</div>
@@ -1054,8 +1148,8 @@
               <div id="csv-slice-report" class="csv-slice-report" style="display:none;"></div>
             </div>
             <div class="slider-row">
-                <label>GRID ÇÖZÜNÜRLÜĞÜ</label>
-                <input type="range" id="csv-grid-res" min="8" max="64" step="1" value="32" />
+                <label>GRID ÇÖZÜNÜRLÜĞÜ
+                  <input type="range" id="csv-grid-res" min="8" max="64" step="1" value="32" />
                 <span id="csv-grid-res-label">20³</span>
               </label>
               <details class="dta-settings-fold" id="csv-anomaly-fold">
@@ -1166,6 +1260,30 @@
                   </div>
                 </div>
               </details>
+
+              <!-- Yapı Tespit Hassasiyeti Slider -->
+              <div id="unified-sensitivity-section" style="margin-top:0.5rem;padding:0.4rem 0.5rem;border:1px solid var(--line);border-radius:var(--r-sharp);background:rgba(255,255,255,0.015);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                  <span style="font-size:0.68rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:0.3rem;">
+                    🎯 Yapı Tespit Hassasiyeti
+                  </span>
+                  <span id="unified-sensitivity-badge" style="font-size:0.6rem;font-weight:600;padding:2px 6px;border-radius:3px;background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3);">
+                    %50 (Dengeli)
+                  </span>
+                </div>
+                <input type="range" id="unified-sensitivity-slider" min="0" max="100" step="5" value="50" style="width:100%;accent-color:#eab308;cursor:pointer;" />
+                <div id="unified-sensitivity-count" style="font-size:0.6rem;font-weight:600;color:var(--text);margin-top:0.25rem;" title="Analiz henüz yapılmadı">
+                  🎯 Tespit: —
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.56rem;color:var(--muted);margin-top:0.15rem;">
+                  <span>🔴 Katı</span>
+                  <span>🟡 Dengeli</span>
+                  <span>🔵 Maksimum</span>
+                </div>
+                <div id="unified-sensitivity-desc" style="font-size:0.58rem;color:var(--muted);margin-top:0.25rem;">
+                  Standart anomali ve yapı tespiti (Katı ↔ Detaylı)
+                </div>
+              </div>
 
               <!-- Tek Başlat Butonu -->
               <button type="button" id="btn-unified-start" class="mil accent" disabled style="width:100%;margin-top:0.5rem;font-size:0.9rem;padding:0.7rem;">🚀 BAŞLAT</button>
@@ -1383,6 +1501,8 @@
           <p class="hint" id="soil-hint">
             Derinlik çarpanı (fizik inversiyonu değil). Sorun olursa Kapalı’ya al — eski derinlik hesabı.
           </p>
+            </div>
+          </details>
 
           <label class="dta-auto-check" style="margin-top: 0.55rem">
             <input type="checkbox" id="structures-through-red" checked />
@@ -1397,11 +1517,6 @@
             <h2 data-i18n="cfg.title">Parametreler</h2>
           </div>
           <div class="grid-form">
-            <label>
-              <span data-i18n="cfg.minConf">Min. güven</span>
-              <input id="min-confidence" type="range" min="25" max="70" value="45" step="5" />
-              <span class="hint" id="min-confidence-label">0.45</span>
-            </label>
             <label>
               <span data-i18n="cfg.vert">Dikey abartı</span>
               <input id="z-scale" type="range" min="10" max="15" value="10" step="1" />

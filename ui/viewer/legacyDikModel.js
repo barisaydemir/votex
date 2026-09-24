@@ -6,7 +6,8 @@
 
 import { dimensionsOf, volumeM3Of } from "./volume.js";
 import { mergeLegacyShapes, normalizeLegacyResult } from "./legacyNormalize.js";
-import { buildLegacyMergePresentation } from "./legacyMergedTargetModel.js";
+import { buildLegacyEvidenceRelations, buildLegacyMergePresentation, lateralCalibrationOf } from "./legacyMergedTargetModel.js";
+import { applyLearnedThresholds } from "./legacyThresholdLearning.js";
 
 export { mergeLegacyShapes, normalizeLegacyResult, orderScanStepsLeftFirst } from "./legacyNormalize.js";
 
@@ -150,6 +151,27 @@ function statusOf(shape) {
   return "normal";
 }
 
+/**
+ * Öğrenilmiş eşikler uygulandığında durum/derinlik yorumunu günceller.
+ * learnedThresholds yoksa davranış birebir aynı kalır.
+ */
+function applyLearnedToDetection(detection, learned) {
+  if (!learned || typeof learned !== "object") return;
+  const result = applyLearnedThresholds(
+    {
+      confidence: detection.confidence,
+      strength: detection.strength,
+      depthTopM: detection.depthTopM,
+      depthBottomM: detection.depthBottomM,
+      type: detection.type,
+    },
+    learned,
+    { status: detection.status },
+  );
+  if (result.status && result.status !== detection.status) detection.status = result.status;
+  if (result.depthNote) detection.depthLearningNote = result.depthNote;
+}
+
 function recommendationOf(shape, detection) {
   const depth = detection.depthTopM;
   const status = detection.status;
@@ -204,7 +226,25 @@ export function buildLegacyFieldModel(result, options = {}) {
     detection.analysisEvidence = buildLegacyAnalysisEvidence(detection, {
       mergeProfile: options.mergeProfile || "normal",
     });
+    applyLearnedToDetection(detection, options.learnedThresholds);
     return detection;
+  });
+  const lateralCalibration = lateralCalibrationOf({
+    fieldCalibrationReadings: options.fieldCalibrationReadings,
+    fieldCalibrationReferenceM: options.fieldCalibrationReferenceM,
+    fieldCalibrationAfterM: options.fieldCalibrationAfterM,
+    fieldCalibrationObservedM: options.fieldCalibrationObservedM,
+    fieldCalibrationDepthScale: options.fieldCalibrationDepthScale,
+  });
+  const evidenceRelations = buildLegacyEvidenceRelations(detections, {
+    sensorHeightM: options.sensorHeightM,
+    baseResponseRadiusM: options.baseResponseRadiusM,
+    lateralSpreadFactor: options.lateralSpreadFactor,
+    maxResponseRadiusM: options.maxResponseRadiusM,
+    maxRelationDistanceM: options.maxRelationDistanceM,
+    maxStepGap: options.maxStepGap,
+    minimumScore: options.minimumRelationScore,
+    lateralCalibration,
   });
   const mergePresentation = buildLegacyMergePresentation(detections, {
     mergeProfile: options.mergeProfile || "normal",
@@ -234,6 +274,9 @@ export function buildLegacyFieldModel(result, options = {}) {
     detections,
     mergedTargets,
     mergePresentation,
+    evidenceRelations,
+    lateralCalibration,
+    learnedThresholds: options.learnedThresholds || null,
     stepByIndex,
     result: normalized,
     residualScale: scale,

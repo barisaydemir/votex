@@ -6,6 +6,7 @@
 mod analysis;
 mod app_settings;
 mod archive;
+mod bt_link;
 mod capture;
 mod commands;
 mod csv_import;
@@ -19,6 +20,7 @@ mod hint_store;
 mod session_persist;
 mod sdc_model;
 mod sdc_reader_mod;
+mod sensitivity;
 mod shape_templates;
 mod soil_profile;
 mod structures;
@@ -113,6 +115,10 @@ pub fn run() {
             commands::csv_cmds::analyze_legacy_dik_json,
             commands::csv_cmds::level_legacy_mag_json,
             commands::csv_cmds::pick_legacy_dik_json,
+            commands::bt_cmds::bt_scan,
+            commands::bt_cmds::bt_connect,
+            commands::bt_cmds::bt_disconnect,
+            commands::bt_cmds::bt_link_status,
             commands::get_dta_link_status,
             commands::dta_cmds::get_app_settings,
             commands::dta_cmds::set_dta_launch_path,
@@ -123,6 +129,7 @@ pub fn run() {
             commands::dta_cmds::set_hints_3d_visible,
             commands::dta_cmds::set_legacy_depth_params,
             commands::dta_cmds::set_legacy_depth_calib_notes,
+            commands::dta_cmds::set_legacy_learned_thresholds,
             commands::dta_cmds::set_legacy_field_sessions,
             commands::dta_cmds::set_csv_filter_prefs,
             commands::dta_cmds::deep_structure_scan,
@@ -149,6 +156,7 @@ pub fn run() {
             commands::archive_cmds::load_archive,
             commands::archive_cmds::save_legacy_archive,
             commands::archive_cmds::load_legacy_archive,
+            commands::archive_cmds::attach_field_report,
             commands::archive_cmds::delete_archive,
             commands::update_cmds::get_app_version,
             commands::update_cmds::get_update_status,

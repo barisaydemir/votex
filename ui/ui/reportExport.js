@@ -20,7 +20,7 @@ import { PALETTES } from "../viewer/colorizer.js";
  * @param {number} quality — JPEG kalitesi (0-1, sadece JPEG için)
  * @returns {string|null} base64 data URL
  */
-function captureSceneImage(format = "image/png", quality = 0.92) {
+export function captureSceneImage(format = "image/png", quality = 0.92) {
   const renderer = state.renderer;
   if (!renderer || !renderer.domElement) return null;
   // Bir render tetikle (tampon taze olsun)

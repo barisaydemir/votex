@@ -18,6 +18,8 @@ export const $ = (id) => document.getElementById(id);
   legacyListFilter: string,
 }} */
 export const state = {
+  /** Yapı Tespit Hassasiyeti yüzdesi (%0 - %100) */
+  sensitivityPercent: 50,
   pendingFile: null,
   surfaceState: null,
   renderer: null,
@@ -82,6 +84,12 @@ export const state = {
   legacyFieldCalibrationReadings: [],
   legacyFieldCalibrationBeforeM: null,
   legacyFieldCalibrationAfterM: null,
+  legacyFieldCalibrationObservedM: null,
+  legacyFieldCalibrationDepthScale: null,
+  /** Aynı JSON fingerprint oturumundan lateral kalibrasyon geri yüklendi mi? */
+  legacyFieldCalibrationRestored: false,
+  /** Doğrulanmış kararlardan öğrenilen eşik modeli (legacyThresholdLearning çıktısı) */
+  legacyLearnedThresholds: null,
   /** Tahmini derinlik haritası (aç/kapa bakış; invert değil) */
   legacyDepthMapVisible: false,
   /** Derinlik haritası plan opaklığı 0.2–0.95 */
@@ -106,6 +114,10 @@ export const state = {
   legacyDikResult: null,
   /** Analiz sonucu ile saha gözlemlerini ayıran tek vaka modeli */
   legacyCase: null,
+  /** Analiz + türetilmiş saha modeli + operatör/öğrenme snapshot'ı */
+  legacyCasePackage: null,
+  /** Son Legacy arşiv kaydının id'si — saha raporu iliştirme için */
+  legacyArchiveEntryId: null,
   /** Adım, tespit ve saha metrelerini birleştiren ortak görünüm modeli */
   legacyFieldModel: null,
   /** Legacy harita: full = tüm kanıtlar, merged = birleşik hedefler, both = ikisi */

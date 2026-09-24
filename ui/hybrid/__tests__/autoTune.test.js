@@ -278,7 +278,7 @@ describe("kural envanteri", () => {
     const ids = getRuleIds();
     expect(ids).toContain("csv-threshold");
     expect(ids).toContain("csv-grid-res");
-    expect(ids).toContain("min-confidence");
+    expect(ids).toContain("main-sensitivity-slider");
     expect(ids).toContain("unified-csv-weight");
     expect(ids.length).toBeGreaterThanOrEqual(10);
   });

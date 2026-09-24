@@ -49,7 +49,7 @@ function paramTitle(id) {
     "csv-grid-res": "Grid Çözünürlüğü",
     "csv-sigma": "Sigma (σ)",
     "unified-csv-weight": "CSV Desteği",
-    "min-confidence": "Min Güven",
+    "main-sensitivity-slider": "Yapı Hassasiyeti",
   };
   return map[id] || id;
 }
@@ -59,7 +59,7 @@ function formatValue(id, v) {
   if (id === "csv-pool-size") return `${v}m`;
   if (id === "csv-fit" || id === "unified-csv-weight") return `%${v}`;
   if (id === "csv-point-size") return Number(v).toFixed(2);
-  if (id === "min-confidence") return (v / 100).toFixed(2);
+  if (id === "main-sensitivity-slider") return `%${v}`;
   return String(v);
 }
 

@@ -22,11 +22,23 @@ pub fn analyze_uploaded_image(
     let height = cleaned.height();
     let original_base64_png = capture::png_data_url(&cleaned)?;
 
+    // Hassasiyet (0–1) → teknik eşikler; bkz. crate::sensitivity
+    // (JS calculateSensitivityParameters ile aynı formül)
+    let sensitivity = req.sensitivity.map(|s| s.clamp(0.0, 1.0));
+    let match_threshold = req
+        .match_threshold
+        .or_else(|| sensitivity.map(crate::sensitivity::match_threshold))
+        .unwrap_or(0.35);
+    let min_area = req
+        .min_area
+        .or_else(|| sensitivity.map(crate::sensitivity::min_area))
+        .unwrap_or(80);
+
     let analysis = vision::analyze_colormap_image(
         &cleaned,
         req.lut_strip_px.unwrap_or(24),
-        req.min_area.unwrap_or(80),
-        0.35,
+        min_area,
+        match_threshold,
     )?;
 
     let response = AnalyzeImageResponse {
@@ -66,7 +78,13 @@ pub fn build_surface_3d(
     let map_id = crate::hint_store::map_fingerprint(&req.image_base64)?;
     let img = decode_image_bytes(&req.image_base64)?;
     let view_mode = req.view_mode.as_deref().unwrap_or("side").to_string();
-    let min_confidence = req.min_confidence.unwrap_or(0.45);
+    // Min güven: açık istek öncelikli; yoksa hassasiyetten (0.80 ↔ 0.15) türetilir.
+    // Hassasiyet faktörü oturuma da yazılır (tekrar üretilebilirlik).
+    let sensitivity_factor = req.sensitivity.map(|s| s.clamp(0.0, 1.0));
+    let min_confidence = req
+        .min_confidence
+        .or_else(|| sensitivity_factor.map(crate::sensitivity::min_confidence))
+        .unwrap_or(0.45);
     let target_kind = req.target_kind.as_deref().unwrap_or("auto").to_string();
     let lut = req.lut_strip_px.unwrap_or(24);
 
@@ -119,6 +137,7 @@ pub fn build_surface_3d(
             lut_strip_px: lut,
             view_mode: view_mode.clone(),
             min_confidence,
+            sensitivity: sensitivity_factor,
             target_kind: target_kind.clone(),
             soil_profile: soil.id.clone(),
         });
@@ -143,6 +162,7 @@ pub fn build_surface_3d(
             lut_strip_px: lut,
             view_mode: view_mode.clone(),
             min_confidence,
+            sensitivity: sensitivity_factor,
             target_kind: target_kind.clone(),
             soil_profile: soil.id.clone(),
         };

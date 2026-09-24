@@ -6,6 +6,7 @@ export const DESKTOP_CAPABILITIES = Object.freeze({
   archive: "list_archive",
   fieldSessions: "set_legacy_field_sessions",
   dta: "launch_dta",
+  bluetooth: "bt_scan",
 });
 
 export function isTauriRuntime() {
@@ -29,6 +30,10 @@ function invokeDesktop(command, args) {
 
 export function pickImageFile() {
   return invokeDesktop("pick_image_file");
+}
+
+export function analyzeUploadedImage(req) {
+  return invokeDesktop("analyze_uploaded_image", { req });
 }
 
 export function buildSurface3d(req) {
@@ -81,6 +86,10 @@ export function setLegacyDepthCalibNotes(notes = []) {
 
 export function setLegacyFieldSessions(sessions = {}) {
   return invokeDesktop("set_legacy_field_sessions", { sessions: sessions && typeof sessions === "object" ? sessions : {} });
+}
+
+export function setLegacyLearnedThresholds(learned = null) {
+  return invokeDesktop("set_legacy_learned_thresholds", { learned });
 }
 
 export function setCsvFilterPrefs(prefs) {
@@ -159,8 +168,13 @@ export function loadArchive(id) {
   return invokeDesktop("load_archive", { id });
 }
 
-export function saveLegacyArchive(fileName, content, result) {
-  return invokeDesktop("save_legacy_archive", { fileName, content, result });
+export function saveLegacyArchive(fileName, content, result, casePackage = null) {
+  return invokeDesktop("save_legacy_archive", { fileName, content, result, casePackage });
+}
+
+/** Arşiv kaydına tek sayfalık saha raporu iliştirir (field_report.html + hash). */
+export function attachFieldReport(id, html) {
+  return invokeDesktop("attach_field_report", { id, html });
 }
 
 export function loadLegacyArchive(id) {
@@ -248,6 +262,26 @@ export function levelLegacyMagJson(content) {
 
 export function pickLegacyDikJson() {
   return invokeDesktop("pick_legacy_dik_json");
+}
+
+/** Yakındaki BLE cihazlarını tarar. */
+export function btScan(timeoutMs = 4000) {
+  return invokeDesktop("bt_scan", { timeoutMs });
+}
+
+/** BLE cihazına bağlanır; veri `bt-data` olayıyla akar. */
+export function btConnect(deviceId) {
+  return invokeDesktop("bt_connect", { deviceId });
+}
+
+/** Aktif BLE oturumunu kapatır. */
+export function btDisconnect() {
+  return invokeDesktop("bt_disconnect");
+}
+
+/** BLE oturum durumu. */
+export function btLinkStatus() {
+  return invokeDesktop("bt_link_status");
 }
 
 export function saveFileDialog(content, suggestedName, filterName, filterExts) {

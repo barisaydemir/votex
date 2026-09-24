@@ -3,6 +3,7 @@ import {
   createFieldSessionStore,
   sessionKeyOf,
   sessionProgressOf,
+  setLateralCalibration,
   setMergeReview,
 } from "../viewer/legacyFieldSession.js";
 import { createLegacyCase } from "../viewer/legacyCaseModel.js";
@@ -48,6 +49,10 @@ export function createLegacyFieldSessionController({ getSettings, saveSessions, 
       active = setMergeReview(active, { splitDetectionIds, mergePolicy });
       return active;
     },
+    setLateralCalibration(snapshot = null) {
+      active = setLateralCalibration(active, snapshot);
+      return active;
+    },
     async persist() {
       if (!active?.key) return active;
       try { active = await getStore().save(active); } catch { /* memory fallback */ }
@@ -67,6 +72,16 @@ export function createLegacyFieldSessionController({ getSettings, saveSessions, 
       current.legacyDikFileName = fileName || current.legacyDikFileName || null;
       current.legacyReportTargetIds = active ? [...active.reportTargets] : [];
       current.legacyMergedSplitDetectionIds = active ? [...(active.splitDetectionIds || [])] : [];
+      const calibration = active?.lateralCalibration;
+      current.legacyFieldCalibrationReadings = calibration?.readings ? [...calibration.readings] : [];
+      current.legacyFieldCalibrationBeforeM = calibration?.beforeM ?? null;
+      current.legacyFieldCalibrationAfterM = calibration?.afterM ?? null;
+      current.legacyFieldCalibrationObservedM = calibration?.observedM ?? null;
+      current.legacyFieldCalibrationDepthScale = calibration?.depthScale ?? null;
+      current.legacyFieldCalibrationRestored = !!calibration;
+      if (calibration?.mode === "field-stake" || calibration?.mode === "single-object") {
+        current.legacyDepthCalibrationMode = calibration.mode;
+      }
       const restoredProfile = active?.mergePolicy?.mergeProfile;
       if (["cautious", "normal", "research"].includes(restoredProfile)) {
         current.legacyMergeProfile = restoredProfile;

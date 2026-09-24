@@ -27,6 +27,7 @@ pub fn load_archive(
             lut_strip_px: loaded.meta.lut_strip_px,
             view_mode: loaded.meta.view_mode.clone(),
             min_confidence: loaded.meta.min_confidence,
+            sensitivity: loaded.meta.sensitivity,
             target_kind: loaded.meta.target_kind.clone(),
             soil_profile: if !loaded.meta.soil_profile.is_empty() {
                 loaded.meta.soil_profile.clone()
@@ -75,14 +76,21 @@ pub fn save_legacy_archive(
     file_name: String,
     content: String,
     result: crate::legacy_mag_json::LegacyDikResult,
+    case_package: Option<serde_json::Value>,
 ) -> Result<ArchiveIndexEntry, String> {
-    archive::save_legacy_entry(&file_name, &content, &result)
+    archive::save_legacy_entry(&file_name, &content, &result, case_package.as_ref())
 }
 
 /// Legacy dik JSON arşiv kaydını yükle; frontend aynı JSON 3D katmanını yeniden kurar.
 #[tauri::command]
 pub fn load_legacy_archive(id: String) -> Result<LegacyArchiveLoadResult, String> {
     archive::load_legacy_entry(&id)
+}
+
+/// Arşiv kaydına tek sayfalık saha raporu iliştir (field_report.html + hash metadata).
+#[tauri::command]
+pub fn attach_field_report(id: String, html: String) -> Result<ArchiveIndexEntry, String> {
+    archive::attach_field_report(&id, &html)
 }
 
 #[tauri::command]

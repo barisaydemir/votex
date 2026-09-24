@@ -23,6 +23,11 @@ import {
 } from "./legacyTargetSession.js";
 import { selectionTransition } from "./legacyVisibilityController.js";
 import { getLegacyUnifiedObjectMapLayer } from "./legacyUnifiedObjectMap.js";
+import { refreshLegacyCasePackage } from "./legacyCasePackage.js";
+import {
+  addLegacyLateralEvidenceLayer,
+  applyLegacyLateralEvidenceVisibility,
+} from "./legacyLateralEvidenceLayer.js";
 
 const GROUP_NAME = "legacyDikShapes";
 /** Sabit dikey harita aralığı (metre) */
@@ -846,6 +851,13 @@ export function applyLegacyStepVisibility(stepIndex = null, detectionId = null, 
       object.visible = stepMatches && targetMatches && (focusedMergedTarget ? true : detectionMatches);
     });
   }
+  // Lateral çizgiler fiziksel bağlantı değildir; yalnızca seçili hedefin
+  // Kanıt görünümünde, açıklayıcı proxy olarak açılır.
+  applyLegacyLateralEvidenceVisibility({
+    detectionId: canonicalDetectionId,
+    targetId: mergedTargetId,
+    viewMode: mergedViewMode,
+  });
   invalidate();
 }
 
@@ -2139,7 +2151,7 @@ export function toggleLegacyInvertProxy() {
 }
 
 
-export function addLegacyDikShapesToScene(result) {
+export function addLegacyDikShapesToScene(result, options = {}) {
   if (!state.scene || !result) return null;
   clearGroup();
 
@@ -2161,9 +2173,19 @@ export function addLegacyDikShapesToScene(result) {
     originYM: originZ,
     numberingDirection: state.legacyStepNumberingDirection,
   });
-  const fieldModel = buildLegacyFieldModel(normalized, {
+  const modelOptions = {
+    mergeProfile: options.mergeProfile ?? state.legacyMergeProfile,
     splitDetectionIds: state.legacyMergedSplitDetectionIds,
-  });
+    fieldCalibrationReadings: options.fieldCalibrationReadings ?? state.legacyFieldCalibrationReadings,
+    fieldCalibrationReferenceM: options.fieldCalibrationReferenceM ?? 1,
+    fieldCalibrationAfterM: options.fieldCalibrationAfterM ?? state.legacyFieldCalibrationAfterM,
+    fieldCalibrationObservedM: options.fieldCalibrationObservedM ?? state.legacyFieldCalibrationObservedM,
+    fieldCalibrationDepthScale: options.fieldCalibrationDepthScale ?? state.legacyFieldCalibrationDepthScale,
+    learnedThresholds: options.learnedThresholds ?? state.legacyLearnedThresholds ?? null,
+  };
+  const fieldModel = options.fieldModel && typeof options.fieldModel === "object"
+    ? options.fieldModel
+    : buildLegacyFieldModel(normalized, modelOptions);
   const steps = fieldModel.steps.map((entry) => entry.raw);
   const selectedStep = selectedStepOf(state.legacyTargetSession);
   if (selectedStep != null) {
@@ -2283,6 +2305,12 @@ export function addLegacyDikShapesToScene(result) {
   state.scene.add(group);
   state.legacyDikGroup = group;
   state.legacyFieldModel = fieldModel;
+  if (options.casePackage) {
+    state.legacyCasePackage = options.casePackage;
+  } else {
+    refreshLegacyCasePackage(state, fieldModel, modelOptions);
+  }
+  addLegacyLateralEvidenceLayer(group);
   try {
     const ph = typeof document !== "undefined" ? document.getElementById("placeholder") : null;
     if (ph) ph.style.display = "none";

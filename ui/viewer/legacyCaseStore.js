@@ -5,7 +5,7 @@ import {
   targetSessionForStep,
   targetSessionForDetection,
 } from "./legacyTargetSession.js";
-import { toggleTargetInReport, recordVisit } from "./legacyFieldSession.js";
+import { toggleTargetInReport, recordVisit, setTargetCheckStatus } from "./legacyFieldSession.js";
 
 /**
  * Lightweight Legacy vaka store.
@@ -27,6 +27,15 @@ export function createLegacyCaseStore(appState) {
 
   const syncObservation = (detectionId, patch = {}) => {
     state.legacyCase = setCaseObservation(state.legacyCase, detectionId, patch);
+    if (state.legacyCasePackage) {
+      state.legacyCasePackage.operator = {
+        ...state.legacyCasePackage.operator,
+        observations: { ...(state.legacyCase.observations || {}) },
+        reportTargets: [...(state.legacyReportTargetIds || [])],
+        targetChecks: { ...(currentSession()?.targetChecks || state.legacyCasePackage.operator.targetChecks || {}) },
+      };
+      state.legacyCasePackage.updatedAt = new Date().toISOString().slice(0, 19);
+    }
     return state.legacyCase;
   };
 
@@ -39,6 +48,7 @@ export function createLegacyCaseStore(appState) {
         workflowPhase: state.legacyTargetSession?.workflowPhase || null,
         observations: state.legacyCase?.observations || {},
         reportTargetIds: [...(state.legacyReportTargetIds || [])],
+        casePackage: state.legacyCasePackage || null,
       };
     },
 
@@ -110,6 +120,20 @@ export function createLegacyCaseStore(appState) {
       return this.snapshot;
     },
 
+    /** Operatör doğrulama kararı: confirmed/rejected — öğrenme katmanının girdisi. */
+    setCheckStatus(detectionId, status) {
+      const id = String(detectionId || "");
+      const next = String(status || "").trim();
+      if (!id || !next) return null;
+      const session = currentSession();
+      if (session) {
+        setSession(setTargetCheckStatus(session, id, next));
+        void state.legacyFieldSessionController?.persist?.();
+      }
+      syncObservation(id, { reviewed: true, status: next });
+      return this.snapshot;
+    },
+
     toggleReport(detectionId) {
       const id = String(detectionId || "");
       if (!id) return false;
@@ -136,6 +160,7 @@ export function createLegacyCaseStore(appState) {
     clearCase() {
       state.legacyDikResult = null;
       state.legacyFieldModel = null;
+      state.legacyCasePackage = null;
       state.legacyCase = null;
       state.legacyReportTargetIds = [];
       state.legacyDikRawContent = null;

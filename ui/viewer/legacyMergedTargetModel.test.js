@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLegacyMergePresentation, buildLegacyTargetConfidenceChart, buildLegacyTargetTimeline, mergeLegacyDetections } from "./legacyMergedTargetModel.js";
+import { buildLegacyEvidenceRelations, buildLegacyMergePresentation, buildLegacyTargetConfidenceChart, buildLegacyTargetTimeline, lateralCalibrationOf, mergeLegacyDetections } from "./legacyMergedTargetModel.js";
 
 const detection = (id, x, y, top, bottom, stepIndex, kind = "Metal anomali adayı", size = null) => ({
   detectionId: id,
@@ -20,6 +20,79 @@ const detection = (id, x, y, top, bottom, stepIndex, kind = "Metal anomali aday�
 });
 
 describe("legacyMergedTargetModel", () => {
+  it("komşu derinlik uyumlu kanıtları lateral yanıt adayı olarak açıklar", () => {
+    const relations = buildLegacyEvidenceRelations([
+      { ...detection("a", 2, 1, 1.8, 2.4, 4), strength: 3.2 },
+      { ...detection("b", 2.45, 1, 1.9, 2.5, 5), strength: 2.1 },
+    ]);
+    expect(relations).toHaveLength(1);
+    expect(relations[0]).toMatchObject({
+      fromDetectionId: "a",
+      toDetectionId: "b",
+      relation: "lateral-response-candidate",
+      stepGap: 1,
+      proxy: true,
+    });
+    expect(relations[0].scorePct).toBeGreaterThanOrEqual(55);
+    expect(relations[0].reasons).toEqual(expect.arrayContaining(["komşu tarama adımı", "derinlik aralıkları örtüşüyor"]));
+  });
+
+  it("1 m saha kazığı okumalarını medyanla sınırlı lateral derinlik ölçeğine çevirir", () => {
+    expect(lateralCalibrationOf({ fieldCalibrationReadings: [0.48, 0.52, 0.5] })).toMatchObject({
+      applied: true,
+      readingCount: 3,
+      observedM: 0.5,
+      depthScale: 1.33,
+      quality: "repeatable",
+      scoreAdjustment: "clamped",
+    });
+    expect(lateralCalibrationOf({ fieldCalibrationReadings: [] }).applied).toBe(false);
+    expect(lateralCalibrationOf({
+      fieldCalibrationReadings: [0.5, 0.5, 0.5],
+      fieldCalibrationObservedM: 0.8,
+      fieldCalibrationDepthScale: 1.1,
+    })).toMatchObject({ observedM: 0.8, depthScale: 1.1 });
+  });
+
+  it("saha kalibrasyonu lateral skoru ve gerekçeyi etkiler, fiziksel footprinti değil", () => {
+    const input = [
+      { ...detection("a", 2, 1, 1.8, 2.4, 4), strength: 3.2 },
+      { ...detection("b", 2.7, 1, 1.9, 2.5, 5), strength: 2.1 },
+    ];
+    const base = buildLegacyEvidenceRelations(input);
+    const calibrated = buildLegacyEvidenceRelations(input, { fieldCalibrationReadings: [0.5, 0.5, 0.5] });
+    expect(calibrated).toHaveLength(1);
+    expect(calibrated[0].score).toBeGreaterThan(base[0].score);
+    expect(calibrated[0].calibrationScoreDeltaPct).toBeGreaterThan(0);
+    expect(calibrated[0].calibration).toMatchObject({ applied: true, readingCount: 3 });
+    expect(calibrated[0].reasons.some((reason) => reason.includes("saha kalibrasyonu uygulandı"))).toBe(true);
+    const target = mergeLegacyDetections(input)[0];
+    expect(target.footprints[0].widthM).toBeCloseTo(0.24, 5);
+  });
+
+  it("uzak veya derinliği ayrışan kanıtları lateral aday yapmaz", () => {
+    const relations = buildLegacyEvidenceRelations([
+      detection("near", 1, 1, 1, 1.4, 1),
+      detection("far", 4, 1, 1, 1.4, 2),
+      detection("deep", 1.1, 1, 4, 4.5, 2),
+    ]);
+    expect(relations).toEqual([]);
+  });
+
+  it("lateral response proxy gerçek footprint boyutunu değiştirmez", () => {
+    const [relation] = buildLegacyEvidenceRelations([
+      detection("a", 2, 1, 2, 2.4, 3, "Metal anomali adayı", 0.2),
+      detection("b", 2.35, 1, 2, 2.4, 4, "Metal anomali adayı", 0.2),
+    ]);
+    expect(relation.responseRadiusM).toBeGreaterThan(0.2);
+    const [target] = mergeLegacyDetections([
+      detection("a", 2, 1, 2, 2.4, 3, "Metal anomali adayı", 0.4),
+      detection("b", 2.35, 1, 2, 2.4, 4, "Metal anomali adayı", 0.4),
+    ]);
+    expect(target.footprints[0].widthM).toBeCloseTo(0.4, 5);
+    expect(target.footprints[1].widthM).toBeCloseTo(0.4, 5);
+  });
+
   it("aynı fiziksel hedefin farklı adım kanıtlarını birleştirir", () => {
     const targets = mergeLegacyDetections([
       detection("a", 2, 1, 0.9, 1.3, 3),

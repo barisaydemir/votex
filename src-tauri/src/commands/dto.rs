@@ -76,6 +76,12 @@ pub struct AnalyzeImageRequest {
     /// Toprak profili: off|sand|loam|wet_clay|laterite|organic
     #[serde(default)]
     pub soil_profile: Option<String>,
+    /// Hassasiyet faktörü (0.0 – 1.0), varsayılan 0.5 (Dengeli)
+    #[serde(default)]
+    pub sensitivity: Option<f32>,
+    /// Doğrudan HSV eşleşme toleransı eşiği (0.1 – 0.7)
+    #[serde(default)]
+    pub match_threshold: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

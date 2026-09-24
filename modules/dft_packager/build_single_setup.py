@@ -48,7 +48,7 @@ def _resolve_release_dir() -> Path:
 RELEASE = _resolve_release_dir()
 BUNDLE_NSIS = RELEASE / "bundle" / "nsis"
 ISS = HERE / "DFT_Suite.iss"
-PACKAGE_VERSION = "0.4.110"
+PACKAGE_VERSION = "0.4.121"
 
 ISCC_CANDIDATES = [
     Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
@@ -228,6 +228,15 @@ def main() -> int:
         shutil.copytree(rt, STAGING / "runtimes")
         stage_votex(STAGING / "VOTEX")
         stage_dta(STAGING / "DTA")
+        # DTA yorum kılavuzu (schema/VOTEX_EKRAN.md) pakete girsin —
+        # stage_dta yalnız actions/core/memory/config klasörlerini kopyalar.
+        try:
+            schema_src = DTA_SRC / "schema"
+            if schema_src.is_dir():
+                shutil.copytree(schema_src, STAGING / "DTA" / "schema", ignore=shutil.ignore_patterns("__pycache__"))
+                log("DTA schema/ staged")
+        except Exception as exc:
+            log(f"schema stage atlandı: {exc}")
         write_info()
 
     # Inno OutputDir relative to iss location

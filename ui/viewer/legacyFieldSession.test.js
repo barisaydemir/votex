@@ -11,6 +11,7 @@ import {
   sessionKeyOf,
   sessionProgressOf,
   setTargetCheckStatus,
+  setLateralCalibration,
   setMergeReview,
   toggleTargetInReport,
 } from "./legacyFieldSession.js";
@@ -107,6 +108,29 @@ describe("legacyFieldSession", () => {
     };
     const pruned = pruneSessions(sessions, 2);
     expect(Object.keys(pruned).sort()).toEqual(["mid", "new"]);
+  });
+
+  it("lateral kalibrasyon snapshot'ını normalize edip yeniden yüklenebilir tutar", () => {
+    let session = createEmptyFieldSession("fp-calib");
+    session = setLateralCalibration(session, {
+      mode: "field-stake",
+      referenceDepthM: 1,
+      readings: [0.48, 0.51, 0.5, 9],
+      beforeM: 0.5,
+      afterM: 1.01,
+      depthScale: 1.02,
+      quality: "repeatable",
+    });
+    const restored = normalizeFieldSession(session);
+    expect(restored.schemaVersion).toBe(3);
+    expect(restored.lateralCalibration).toMatchObject({
+      mode: "field-stake",
+      readings: [0.48, 0.51, 0.5],
+      beforeM: 0.5,
+      afterM: 1.01,
+      depthScale: 1.02,
+      quality: "repeatable",
+    });
   });
 
   it("ayırma kararı ve birleşme politikası oturumla birlikte kalır", () => {

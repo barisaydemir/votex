@@ -165,6 +165,42 @@ pub fn set_legacy_field_sessions(
     Ok(s)
 }
 
+/// Doğrulanmış hedeflerden öğrenilen eşik modelini kaydet/güncelle (null = sıfırla).
+/// Model frontend'de (legacyThresholdLearning.js) üretilir; Rust yalnız kalıcı tutar
+/// ve boyutunu sınırlar — tek doğruluk kaynağı frontend'de kalır.
+#[tauri::command]
+pub fn set_legacy_learned_thresholds(
+    learned: Option<serde_json::Value>,
+) -> Result<AppSettings, String> {
+    let mut s = app_settings::load_settings();
+    match learned {
+        None => s.legacy_learned_thresholds = None,
+        Some(value) => {
+            // Kaba şema doğrulaması: beklenen alanlar sayısal olmalı.
+            let obj = value
+                .as_object()
+                .ok_or_else(|| "Öğrenilmiş eşik modeli nesne olmalıdır".to_string())?;
+            for field in ["confidenceStrong", "sigmaStrong"] {
+                let v = obj
+                    .get(field)
+                    .and_then(|v| v.as_f64())
+                    .ok_or_else(|| format!("{field} sayısal olmalıdır"))?;
+                if !v.is_finite() {
+                    return Err(format!("{field} sonlu bir sayı olmalıdır"));
+                }
+            }
+            // Serileştirilmiş model küçüktür; yine de settings şişmesini engelle.
+            let raw = serde_json::to_string(&value).map_err(|e| e.to_string())?;
+            if raw.len() > 64 * 1024 {
+                return Err("Öğrenilmiş eşik modeli çok büyük".into());
+            }
+            s.legacy_learned_thresholds = Some(value);
+        }
+    }
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
 /// CSV filtre tercihlerini toplu olarak kaydet (yeniden başlasa da hatırlanır).
 #[tauri::command]
 pub fn set_csv_filter_prefs(
