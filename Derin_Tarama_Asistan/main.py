@@ -536,6 +536,11 @@ class JarvisLive:
         except Exception:
             pass
         self.ui.hide_for_panel_mode()
+        # Ayarliysa sesli yanitlari otomatik susdur (SFX + tray modu esliginde)
+        try:
+            self.ui.on_panel_hidden_changed(True)
+        except Exception:
+            pass
         return True
 
     def _on_votex_window_restore(self) -> bool:
@@ -545,6 +550,10 @@ class JarvisLive:
         except Exception:
             pass
         self.ui.restore_from_panel_mode()
+        try:
+            self.ui.on_panel_hidden_changed(False)
+        except Exception:
+            pass
         return True
 
     # votex_chat poller'ının pencere isteklerini ui callback'lerine köprülediği işleyiciler

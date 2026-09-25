@@ -1,3 +1,10 @@
+## 0.4.151 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- DTA ayarı: 'Tray'de sesli yaniti susdur' onay kutusu (varsayılan açık) — panel pencereyi tray'e gizlediğinde SFX ve sesli yanıtlar otomatik susar, geri getirilince devam eder.
+- SoundManager'a panel sessiz mod kapısı eklendi; ayar paneline onay kutusu yerleşti (panel_h 300/320 → 322/342).
+
 ## 0.4.150 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

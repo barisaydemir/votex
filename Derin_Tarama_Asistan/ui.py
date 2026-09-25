@@ -14,9 +14,11 @@ from PIL import Image, ImageTk
 
 from app_config import (
     has_gemini_api_key,
+    is_panel_hide_quiet,
     is_tablet_ui,
     load_app_config,
     save_app_config,
+    set_panel_hide_quiet,
     get_vendor_credit,
     VENDOR_CREDIT,
     PRODUCT_NAME,
@@ -160,6 +162,8 @@ class SoundManager:
         self._enabled = True
         self._ambient_proc = None
         self._volume = 0.20
+        # Panel tray modu ses kapisi: True iken tum SFX bastirilir
+        self._panel_quiet = False
         self._ambient_stop = None
         self._ambient_thread = None
         self._foreground_proc = None
@@ -197,6 +201,9 @@ class SoundManager:
                 pass
 
     def _start_audio(self, path: Path, volume: float):
+        with self._lock:
+            if self._panel_quiet:
+                return None
         proc = play_audio_file(path, volume)
         with self._lock:
             self._all_sound_procs.add(proc)
@@ -238,6 +245,12 @@ class SoundManager:
                 proc = self._start_audio(_HUD_FILE, volume)
             except Exception:
                 break
+
+            if proc is None:
+                # Panel tray sessiz modu: sessizce bekle, kapı açılınca devam
+                if stop_event.wait(0.4):
+                    break
+                continue
 
             with self._lock:
                 if self._ambient_stop is not stop_event or not self._enabled:
@@ -304,7 +317,7 @@ class SoundManager:
         if not path.exists():
             return
         with self._lock:
-            if not self._enabled:
+            if not self._enabled or self._panel_quiet:
                 return
             if loop and self._foreground_tag == tag and self._foreground_thread and self._foreground_thread.is_alive():
                 return
@@ -424,6 +437,27 @@ class SoundManager:
         else:
             self._stop_ambient()
             self._stop_foreground()
+
+    def mute_for_panel(self):
+        """Panel tray modu: SFX'i durdur ve geri acilana kadar bastir.
+        _enabled'a dokunmaz — SFX anahtari bozulmaz, yalniz kapilar kapanir.
+        """
+        with self._lock:
+            self._panel_quiet = True
+        self._stop_ambient()
+        self._stop_foreground()
+        with self._lock:
+            strays = [p for p in self._all_sound_procs if p]
+        for proc in strays:
+            self._terminate_process(proc)
+            self._forget_process(proc)
+
+    def unmute_for_panel(self):
+        """Panel tray modu sonlandi; SFX otonom calismasina devam eder."""
+        with self._lock:
+            self._panel_quiet = False
+        if self._enabled and not self._foreground_tag:
+            self.start_ambient()
 
     def set_volume(self, volume: float):
         with self._lock:
@@ -582,7 +616,7 @@ class JarvisUI:
             "panel_x": 8 if self._tablet_mode else 14,
             "panel_y": (HDR_H_TABLET if self._tablet_mode else HDR_H) + 8,
             "panel_w": min(300, self.W - 16) if self._tablet_mode else 320,
-            "panel_h": 300 if self._tablet_mode else 320,
+            "panel_h": 322 if self._tablet_mode else 342,
         }
         # Baslik pencere adi — guncel urun adi
         try:
@@ -605,6 +639,9 @@ class JarvisUI:
         self.on_window_restore_request = None
         # Panel gizle modu: konuşma sırasında pencere tray'e küçültülür
         self._panel_hide_mode = False
+        # Panel tray modunda sesli yanit otomatik susma secenegi (ayar paneli)
+        self._panel_quiet_var = None
+        self._panel_quiet_check = None
 
         # ── Voice ────────────────────────────────────────────────────────────
         self._current_voice = self._load_voice()
@@ -1059,6 +1096,22 @@ class JarvisUI:
             bg="#041111",
             font=font_body_bold(8),
         )
+        self._panel_quiet_var = tk.BooleanVar(value=is_panel_hide_quiet())
+        self._panel_quiet_check = tk.Checkbutton(
+            self._settings_body,
+            text="Tray'de sesli yaniti susdur",
+            variable=self._panel_quiet_var,
+            command=self._on_panel_quiet_toggle,
+            fg=C_TEXT,
+            bg="#041111",
+            activebackground="#041111",
+            activeforeground=C_TEXT,
+            selectcolor="#02110f",
+            font=font_body_bold(9),
+            anchor="w",
+            highlightthickness=0,
+            borderwidth=0,
+        )
         self._settings_status_primary = tk.Label(
             self._settings_body,
             text="",
@@ -1135,6 +1188,26 @@ class JarvisUI:
         self._draw_settings_button()
         self._place_layout_widgets()
 
+    def _on_panel_quiet_toggle(self):
+        """'Tray'de sesli yaniti susdur' onay kutusu degisti."""
+        enabled = bool(self._panel_quiet_var.get())
+        set_panel_hide_quiet(enabled)
+        if enabled and self._panel_hide_mode:
+            self.sound.mute_for_panel()
+        else:
+            self.sound.unmute_for_panel()
+
+    def on_panel_hidden_changed(self, hidden: bool):
+        """Panel tray modu degistince sesli yanitlari susdurur/geri acar.
+        Yalniz ayar actiksa etki eder (kapaliysa ses asla susmaz).
+        """
+        if not self._panel_quiet_var or not bool(self._panel_quiet_var.get()):
+            return
+        if hidden:
+            self.sound.mute_for_panel()
+        else:
+            self.sound.unmute_for_panel()
+
     def _draw_settings_tabs(self):
         for key, canvas, label in (
             ("settings", self._settings_tab_settings, "SETTINGS"),
@@ -1166,12 +1239,13 @@ class JarvisUI:
         self._settings_status_primary.place(x=0, y=38, width=inner_w)
         self._settings_status_secondary.place(x=0, y=58, width=inner_w)
         self._settings_sfx_label.place(x=0, y=92)
-        self._volume_label.place(x=0, y=116)
-        self._volume_scale.place(x=0, y=136, width=inner_w, height=26)
-        self._voice_label.place(x=0, y=178)
-        self._voice_menu.place(x=88, y=172, width=inner_w - 88, height=30)
+        self._panel_quiet_check.place(x=0, y=112)
+        self._volume_label.place(x=0, y=134)
+        self._volume_scale.place(x=0, y=154, width=inner_w, height=26)
+        self._voice_label.place(x=0, y=196)
+        self._voice_menu.place(x=88, y=190, width=inner_w - 88, height=30)
         self._settings_vendor_label.configure(wraplength=max(160, inner_w - 8))
-        self._settings_vendor_label.place(x=0, y=214, width=inner_w)
+        self._settings_vendor_label.place(x=0, y=228, width=inner_w)
 
     def _refresh_settings_status(self):
         if not hasattr(self, "_settings_status_primary"):

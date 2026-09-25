@@ -68,6 +68,15 @@ def get_app_config_value(key: str, default=None):
     return load_app_config().get(key, default)
 
 
+def is_panel_hide_quiet() -> bool:
+    """VOTEX paneli pencereyi tray'e gizlediginde sesli yanit otomatik susulsun mu?"""
+    return bool(get_app_config_value("panel_hide_quiet_audio", True))
+
+
+def set_panel_hide_quiet(enabled: bool) -> None:
+    save_app_config({"panel_hide_quiet_audio": bool(enabled)})
+
+
 def has_gemini_api_key() -> bool:
     value = str(get_app_config_value("gemini_api_key", "") or "").strip()
     return bool(value)
