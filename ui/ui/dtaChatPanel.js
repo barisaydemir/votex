@@ -145,9 +145,16 @@ async function pollOnce() {
       }));
       recordTurnsToSession(canonical);
       renderTurns(resp.turns);
-      if (!els.host.hidden && els.host.dataset.open !== "1") {
-        // Yeni mesaj geldi ama panel kapalıysa rozetle
-        els.badge.hidden = false;
+      if (els.host.dataset.open !== "1") {
+        // DTA konuşmaya devam ederken yanıtlar panelde görünür olsun:
+        // asistan yanıtı gelince panel kendiliğinden açılır.
+        const hasAssistant = resp.turns.some((t) => String(t.role) === "assistant");
+        if (hasAssistant) {
+          els.host.dataset.open = "1";
+          els.badge.hidden = true;
+        } else {
+          els.badge.hidden = false;
+        }
       }
     }
   } catch {

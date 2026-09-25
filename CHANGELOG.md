@@ -1,3 +1,11 @@
+## 0.4.145 — 25 Eylül 2026
+
+### DTA panel yanıtları görünür konuşma akışı
+
+- DTA konuşması her zamanki gibi kendi penceresinde ve sesli sürer; yanıtları artık VOTEX panelinde de kendiliğinden açılır: asistan yanıtı gelince katlanır panel açılır, kullanıcı sözü yalnız rozetle bildirilir.
+- Panel kapalıyken bile konuşma halkadan panelin sohbet günlüğüne düşer; panel açılınca tüm geçmiş görünecek şekilde kalır.
+- VOTEX 0.4.145 Windows setup üretildi.
+
 ## 0.4.144 — 25 Eylül 2026
 
 ### VotexArtemis ayrı kurulum paketi

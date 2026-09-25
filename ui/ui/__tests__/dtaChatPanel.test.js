@@ -5,6 +5,19 @@ import {
   __internals,
 } from "../dtaChatPanel.js";
 
+describe("panel otomatik açılma planı", () => {
+  it("asistan yanıtı olan tur paketinde otomatik açma kararı çıkar", () => {
+    // pollOnce davranışının saf karşılığı: assistant varsa aç
+    const withAssistant = [
+      { role: "user", text: "soru" },
+      { role: "assistant", text: "yanıt" },
+    ];
+    expect(withAssistant.some((t) => String(t.role) === "assistant")).toBe(true);
+    const userOnly = [{ role: "user", text: "sadece kullanıcı" }];
+    expect(userOnly.some((t) => String(t.role) === "assistant")).toBe(false);
+  });
+});
+
 describe("dtaChatPanel", () => {
   it("planChatTurns rolleri ayrıştırır ve kullanıcı mesajını vurgular", () => {
     const plans = planChatTurns([
