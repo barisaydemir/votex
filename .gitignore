@@ -67,3 +67,6 @@ votex-android/app/build/
 
 # Geçici plan dosyaları
 .tmp_brainstorm_plan.txt
+
+# Artemis ayrı paket staging (derleme çıktısı)
+modules/dft_packager/staging_artemis/
