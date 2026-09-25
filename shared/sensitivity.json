@@ -1,13 +1,15 @@
 {
-  "description": "Yapı tespit hassasiyeti (%0-100 / 0.0-1.0) → teknik eşik eşlemesi. TEK KAYNAK: JS (ui/hybrid/sensitivity.js) ve Rust (src-tauri/src/sensitivity.rs) bu katsayıları okur; golden vektörler iki taraftaki birim testlerle ortak doğrulanır.",
+  "description": "Yapı tespit hassasiyeti (%0-100 / 0.0-1.0) → teknik eşik eşlemesi. TEK KAYNAK: JS (ui/hybrid/sensitivity.js) ve Rust (src-tauri/src/sensitivity.rs) bu katsayıları okur; golden vektörler iki taraftaki birim testlerle ortak doğrulanır. Kademe modeli: confirmed (ONAYLI) tespitler hassasiyet eşiğinden muaftır; çubuk yalnız ADAY eşiğini (min_confidence/min_area) ve keşif tohumunu (seed_z) hareket ettirir.",
   "match_threshold": { "min": 0.15, "range": 0.45 },
   "min_area": { "max": 250, "range": 235 },
   "min_confidence": { "max": 0.8, "range": 0.65 },
+  "seed_z": { "max": 2.5, "range": 1.5 },
+  "confirmed": { "z": 2.0, "confidence": 0.75 },
   "golden": [
-    { "percent": 0,   "match_threshold": 0.15,   "min_area": 250, "min_confidence": 0.8 },
-    { "percent": 25,  "match_threshold": 0.2625, "min_area": 191, "min_confidence": 0.6375 },
-    { "percent": 50,  "match_threshold": 0.375,  "min_area": 133, "min_confidence": 0.475 },
-    { "percent": 75,  "match_threshold": 0.4875, "min_area": 74,  "min_confidence": 0.3125 },
-    { "percent": 100, "match_threshold": 0.6,    "min_area": 15,  "min_confidence": 0.15 }
+    { "percent": 0,   "match_threshold": 0.15,   "min_area": 250, "min_confidence": 0.8,   "seed_z": 2.5 },
+    { "percent": 25,  "match_threshold": 0.2625, "min_area": 191, "min_confidence": 0.6375, "seed_z": 2.125 },
+    { "percent": 50,  "match_threshold": 0.375,  "min_area": 133, "min_confidence": 0.475, "seed_z": 1.75 },
+    { "percent": 75,  "match_threshold": 0.4875, "min_area": 74,  "min_confidence": 0.3125, "seed_z": 1.375 },
+    { "percent": 100, "match_threshold": 0.6,    "min_area": 15,  "min_confidence": 0.15,  "seed_z": 1.0 }
   ]
 }

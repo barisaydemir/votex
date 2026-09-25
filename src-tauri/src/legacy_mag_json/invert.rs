@@ -132,7 +132,7 @@ pub fn fit_compact_dipole(
     depth_m_map: f32,
     seed_cx: f32,
     seed_cy: f32,
-    sensor_height_m: f32,
+    _sensor_height_m: f32,
 ) -> Option<LegacyInvertProxy> {
     if gw < 2 || gh < 2 || resid.len() < (gw * gh) as usize || counts.len() < resid.len() {
         return None;

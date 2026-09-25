@@ -1,9 +1,19 @@
 /**
- * sensitivity.js — Yapı Tespit Hassasiyeti ve Eşik Dönüştürücü.
+ * sensitivity.js — Yapı Tespit Hassasiyeti ve Kademe Dönüştürücü.
  *
  * Eşik katsayılarının TEK KAYNAĞI `shared/sensitivity.json` dosyasıdır;
  * Rust tarafı (`src-tauri/src/sensitivity.rs`) aynı dosyayı `include_str!`
  * ile okur. `golden` vektörleri iki taraftaki birim testlerle ortak doğrulanır.
+ *
+ * Kademe modeli:
+ *   - ONAYLI (confirmed): yüksek oranlı tespitler (z-skor ≥ confirmedZ VEYA
+ *     güven ≥ confirmedConf) hassasiyet eşiğinden MUAFTIR — çubuk kısalsa da
+ *     asla silinmezler. Amaç: yüksek oranlı yapı ve anomalileri açığa çıkarmak.
+ *   - ADAY (candidate): min_confidence / min_area aday eşiğini geçenler.
+ *   - GÜRÜLTÜ (noise): kalanlar — listeden düşer, 3D'de soluk gösterilir.
+ *
+ * Çubuk ayrıca keşif tohumunu (seed_z) sürer: yüksek hassasiyet zayıf ama
+ * tutarlı anomalileri de KEŞFEDER, düşük hassasiyet yalnız güçlü sinyali.
  */
 import spec from "../../shared/sensitivity.json";
 
@@ -13,6 +23,16 @@ const AREA_MAX = spec.min_area.max;
 const AREA_RANGE = spec.min_area.range;
 const CONF_MAX = spec.min_confidence.max;
 const CONF_RANGE = spec.min_confidence.range;
+const SEED_Z_MAX = spec.seed_z.max;
+const SEED_Z_RANGE = spec.seed_z.range;
+const CONFIRMED_Z = spec.confirmed.z;
+const CONFIRMED_CONF = spec.confirmed.confidence;
+
+/** Güven alanı 0–1'e normalize (0–100 ölçeğinde gelmiş olabilir). */
+function confNorm(a) {
+  if (typeof a?.confidence !== "number") return null;
+  return a.confidence > 1 ? a.confidence / 100 : a.confidence;
+}
 
 /**
  * Hassasiyet yüzdesini (%0 - %100) teknik analiz eşiklerine dönüştürür.
@@ -23,6 +43,9 @@ const CONF_RANGE = spec.min_confidence.range;
  *   matchThreshold: number,
  *   minArea: number,
  *   minConfidence: number,
+ *   seedZ: number,
+ *   confirmedZ: number,
+ *   confirmedConf: number,
  *   label: string,
  *   badgeColor: string,
  *   description: string
@@ -39,33 +62,36 @@ export function calculateSensitivityParameters(percent = 50) {
   // Min Yapı Piksel Alanı (250px kütlesel .. 15px ince detay)
   const minArea = Math.round(AREA_MAX - norm * AREA_RANGE);
 
-  // Min Güven Skoru (%80 katı .. %15 hassas sinyaller)
+  // ADAY güven eşiği (%80 katı .. %15 hassas sinyaller) — ONAYLI kademe muaf
   const minConfidence = Number((CONF_MAX - norm * CONF_RANGE).toFixed(2));
+
+  // Keşif tohumu (σ): 2.5σ yalnız güçlü .. 1.0σ zayıf ama tutarlı anomaliler
+  const seedZ = Number((SEED_Z_MAX - norm * SEED_Z_RANGE).toFixed(3));
 
   let label = "Dengeli";
   let badgeColor = "#eab308";
-  let description = "Standart anomali ve yapı tespiti";
+  let description = "Dengeli keşif · yüksek oranlılar ONAYLI, zayıflar ADAY";
 
   if (p <= 20) {
     label = "🔴 Katı (Düşük)";
     badgeColor = "#ef4444";
-    description = "Sadece belirgin büyük kütleler (sıfır gürültü)";
+    description = "Katı aday eşiği · ONAYLI yüksek oranlı yapılar her koşulda görünür";
   } else if (p <= 45) {
     label = "🟠 Düşük";
     badgeColor = "#f97316";
-    description = "Büyük ve orta ölçekli yapı odakları";
+    description = "Yalnız güçlü-orta yapılar aday olur · ONAYLI kademe muaf";
   } else if (p <= 65) {
     label = "🟡 Dengeli";
     badgeColor = "#eab308";
-    description = "Optimal sahil ve yapı analizi";
+    description = "Dengeli keşif · yüksek oranlılar ONAYLI, zayıflar ADAY";
   } else if (p <= 85) {
     label = "🟢 Yüksek";
     badgeColor = "#3edc8c";
-    description = "İnce zayıf anomali ve katman izleri";
+    description = "Zayıf anomali keşfi açık · tohum eşiği düşer, yeni yapılar açığa çıkar";
   } else {
     label = "🔵 Maksimum (Detaylı)";
     badgeColor = "#3b82f6";
-    description = "Hassas küçük detaylar ve renk sapmaları";
+    description = "Maksimum keşif · en zayıf tutarlı sinyaller bile aday kademeye girer";
   }
 
   return {
@@ -74,6 +100,9 @@ export function calculateSensitivityParameters(percent = 50) {
     matchThreshold,
     minArea,
     minConfidence,
+    seedZ,
+    confirmedZ: CONFIRMED_Z,
+    confirmedConf: CONFIRMED_CONF,
     label,
     badgeColor,
     description,
@@ -81,27 +110,79 @@ export function calculateSensitivityParameters(percent = 50) {
 }
 
 /**
- * Tespit edilen anomalileri hassasiyet seviyesine göre filtreler.
- * @param {Array} anomalies — Tespit edilen anomali/yapı nesneleri listesi
- * @param {number} sensitivityPercent — %0 - %100 hassasiyet
- * @returns {Array} Filtrelenmiş anomali listesi
+ * Tespitin "oran" skoru (0–1): manyetik güç (z-skor) + güven bileşimi.
+ * Yüksek oranlı tespitlerin sıralanması ve vurgulanması için kullanılır.
+ * @param {Object} a — tespit nesnesi ({zScore, magnetic, confidence, area})
+ * @returns {number} 0–1 arası oran skoru
  */
-export function filterDetectionsBySensitivity(anomalies = [], sensitivityPercent = 50) {
+export function detectionScore(a = {}) {
+  const strength =
+    typeof a.zScore === "number"
+      ? Math.min(1, Math.abs(a.zScore) / 4)
+      : Math.min(1, Math.abs(a.magnetic || 0) / 500);
+  const conf = confNorm(a) ?? 0.5;
+  return Math.max(0, Math.min(1, 0.65 * strength + 0.35 * conf));
+}
+
+/**
+ * Tek tespiti kademele: 'confirmed' | 'candidate' | 'noise'.
+ * ONAYLI tespitler hassasiyet eşiğinden muaftır.
+ * @param {Object} a — tespit nesnesi
+ * @param {Object} params — calculateSensitivityParameters çıktısı
+ * @returns {'confirmed'|'candidate'|'noise'}
+ */
+export function tierDetection(a, params) {
+  const conf = confNorm(a);
+  const zs = Math.abs(a.zScore || 0);
+  if (zs >= params.confirmedZ || (conf != null && conf >= params.confirmedConf)) {
+    return "confirmed";
+  }
+  const areaOk = typeof a.area !== "number" || a.area >= params.minArea;
+  const judged = conf != null || typeof a.zScore === "number";
+  if (!judged) return areaOk ? "candidate" : "noise";
+  if (conf != null && conf >= params.minConfidence && areaOk) return "candidate";
+  return "noise";
+}
+
+/**
+ * Tespit listesini kademeleyip `tier` ve `score` alanlarıyla zenginleştirir.
+ * @param {Array} anomalies
+ * @param {number} sensitivityPercent — %0 - %100
+ * @returns {Array} tier/score eklenmiş yeni liste (orijinal sıra korunur)
+ */
+export function annotateTiers(anomalies = [], sensitivityPercent = 50) {
   if (!Array.isArray(anomalies)) return [];
   const params = calculateSensitivityParameters(sensitivityPercent);
+  return anomalies.map((a) => ({
+    ...a,
+    tier: tierDetection(a, params),
+    score: detectionScore(a),
+  }));
+}
 
-  return anomalies.filter((a) => {
-    // Area kontrolü
-    if (typeof a.area === "number" && a.area < params.minArea) {
-      return false;
-    }
-    // Confidence kontrolü (0-1 veya 0-100 formatında olabilir)
-    if (typeof a.confidence === "number") {
-      const confNorm = a.confidence > 1 ? a.confidence / 100 : a.confidence;
-      if (confNorm < params.minConfidence) return false;
-    }
-    return true;
-  });
+/**
+ * Kademe kırılımı: {confirmed, candidate, noise, kept}.
+ */
+export function summarizeTiers(anomalies = [], sensitivityPercent = 50) {
+  const tiers = annotateTiers(anomalies, sensitivityPercent);
+  const counts = { confirmed: 0, candidate: 0, noise: 0, kept: 0 };
+  for (const t of tiers) {
+    counts[t.tier] += 1;
+    if (t.tier !== "noise") counts.kept += 1;
+  }
+  return counts;
+}
+
+/**
+ * Tespitleri hassasiyet seviyesine göre süzer — TEK KESİM NOKTASI.
+ * ONAYLI (yüksek oranlı) tespitler her koşulda geçer; çubuk yalnız ADAY
+ * eşiğini (min güven / min alan) uygular.
+ * @param {Array} anomalies — Tespit edilen anomali/yapı nesneleri listesi
+ * @param {number} sensitivityPercent — %0 - %100 hassasiyet
+ * @returns {Array} ONAYLI + ADAY tespitler (kademe/score alanlarıyla)
+ */
+export function filterDetectionsBySensitivity(anomalies = [], sensitivityPercent = 50) {
+  return annotateTiers(anomalies, sensitivityPercent).filter((t) => t.tier !== "noise");
 }
 
 /**

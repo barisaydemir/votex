@@ -3,6 +3,9 @@ import {
   calculateSensitivityParameters,
   filterDetectionsBySensitivity,
   sensitivityPercentForMinConfidence,
+  tierDetection,
+  summarizeTiers,
+  detectionScore,
 } from "../sensitivity.js";
 import spec from "../../../shared/sensitivity.json";
 
@@ -12,6 +15,7 @@ describe("sensitivity.js — Yapı Hassasiyeti Birim Testleri", () => {
     expect(p.matchThreshold).toBe(0.15);
     expect(p.minArea).toBe(250);
     expect(p.minConfidence).toBe(0.8);
+    expect(p.seedZ).toBe(2.5);
     expect(p.label).toContain("Katı");
   });
 
@@ -20,6 +24,7 @@ describe("sensitivity.js — Yapı Hassasiyeti Birim Testleri", () => {
     expect(p.matchThreshold).toBeCloseTo(0.375, 2);
     expect(p.minArea).toBe(133);
     expect(p.minConfidence).toBe(0.48);
+    expect(p.seedZ).toBeCloseTo(1.75, 3);
     expect(p.label).toContain("Dengeli");
   });
 
@@ -28,7 +33,14 @@ describe("sensitivity.js — Yapı Hassasiyeti Birim Testleri", () => {
     expect(p.matchThreshold).toBe(0.6);
     expect(p.minArea).toBe(15);
     expect(p.minConfidence).toBe(0.15);
+    expect(p.seedZ).toBe(1.0);
     expect(p.label).toContain("Maksimum");
+  });
+
+  it("ONAYLI kademe eşikleri sabittir (confirmedZ / confirmedConf)", () => {
+    const p = calculateSensitivityParameters(0);
+    expect(p.confirmedZ).toBe(spec.confirmed.z);
+    expect(p.confirmedConf).toBe(spec.confirmed.confidence);
   });
 
   it("anomalileri minArea ve minConfidence kriterlerine göre süzer", () => {
@@ -49,6 +61,47 @@ describe("sensitivity.js — Yapı Hassasiyeti Birim Testleri", () => {
     expect(maxDet.map((a) => a.id)).toEqual([1, 2]);
   });
 
+  it("YÜKSEK ORANLI (z-skor) tespit ONAYLI olur ve %0'da bile silinmez", () => {
+    // Düşük güvenli ama güçlü manyetik anomali — amaç: yüksek oranlılar açığa çıksın
+    const strongWeak = [{ id: "guclu", zScore: 2.4, confidence: 0.2, area: 4 }];
+    const p = calculateSensitivityParameters(0);
+    expect(tierDetection(strongWeak[0], p)).toBe("confirmed");
+
+    const kept = filterDetectionsBySensitivity(strongWeak, 0);
+    expect(kept).toHaveLength(1);
+    expect(kept[0].tier).toBe("confirmed");
+  });
+
+  it("güveni yüksek tespit de ONAYLI olur (confirmedConf)", () => {
+    const det = { id: "guvenli", confidence: 0.9, area: 2 };
+    expect(tierDetection(det, calculateSensitivityParameters(0))).toBe("confirmed");
+  });
+
+  it("ADAY kademe eşiği, GÜRÜLTÜ dışarıda kalır", () => {
+    const p = calculateSensitivityParameters(50); // minConf 0.48, minArea 133
+    expect(tierDetection({ confidence: 0.5, area: 200 }, p)).toBe("candidate");
+    expect(tierDetection({ confidence: 0.3, area: 200 }, p)).toBe("noise");
+    expect(tierDetection({ confidence: 0.5, area: 50 }, p)).toBe("noise");
+  });
+
+  it("summarizeTiers kademe kırılımını verir", () => {
+    const list = [
+      { id: 1, zScore: 2.2, confidence: 0.3 }, // confirmed
+      { id: 2, confidence: 0.6, area: 200 }, // candidate
+      { id: 3, confidence: 0.2, area: 5 }, // noise
+    ];
+    const t = summarizeTiers(list, 50);
+    expect(t).toEqual({ confirmed: 1, candidate: 1, noise: 1, kept: 2 });
+  });
+
+  it("detectionScore yüksek oranlıyı üstte tutar", () => {
+    const strong = detectionScore({ zScore: 3.5, confidence: 0.5 });
+    const weak = detectionScore({ zScore: 0.5, confidence: 0.5 });
+    expect(strong).toBeGreaterThan(weak);
+    expect(strong).toBeLessThanOrEqual(1);
+    expect(weak).toBeGreaterThanOrEqual(0);
+  });
+
   it("min güven → hassasiyet yüzdesi ters eşlemesi 5'lik adıma yuvarlanır", () => {
     expect(sensitivityPercentForMinConfidence(0.8)).toBe(0);
     expect(sensitivityPercentForMinConfidence(0.15)).toBe(100);
@@ -61,7 +114,7 @@ describe("sensitivity.js — Yapı Hassasiyeti Birim Testleri", () => {
       { type: "chamber", confidence: 0.45, size: 3 },
       { type: "void", confidence: 0.2, size: 2 },
     ];
-    // %0 → min güven 0.80: yalnız güçlü metal
+    // %0 → min güven 0.80: yalnız güçlü metal (0.85 aynı zamanda ONAYLI)
     expect(filterDetectionsBySensitivity(structures, 0)).toHaveLength(1);
     // %65 → min güven 0.38: metal + oda
     expect(filterDetectionsBySensitivity(structures, 65)).toHaveLength(2);
@@ -83,6 +136,7 @@ describe("sensitivity.js — Yapı Hassasiyeti Birim Testleri", () => {
       expect(Math.abs(p.matchThreshold - g.match_threshold)).toBeLessThanOrEqual(0.001);
       expect(p.minArea).toBe(g.min_area);
       expect(Math.abs(p.minConfidence - g.min_confidence)).toBeLessThanOrEqual(0.01);
+      expect(Math.abs(p.seedZ - g.seed_z)).toBeLessThanOrEqual(0.001);
     }
   });
 });

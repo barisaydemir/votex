@@ -1,9 +1,8 @@
 use super::parse::{
-    average_step_spacing, cell_f32, estimate_step_count_from_spacing, looks_like_legacy_dik,
-    parse_outer_and_table, parse_samples, parse_samples_with_steps, resolve_scan_segments,
-    samples_from_table, scan_step_metrics, OuterDoc, Sample, ScanTable,
+    average_step_spacing, estimate_step_count_from_spacing, parse_outer_and_table,
+    resolve_scan_segments, samples_from_table, scan_step_metrics, Sample,
 };
-use super::level::{level_legacy_mag_json, median_f64, zero_order_median_level_xy};
+use super::level::zero_order_median_level_xy;
 use super::types::*;
 
 fn magnitude(s: &Sample) -> f32 {
@@ -2139,7 +2138,8 @@ pub fn analyze_legacy_dik_with_options(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::level::{cell_f64, zero_order_median_level_xy};
+    use super::super::level::{cell_f64, level_legacy_mag_json, median_f64, zero_order_median_level_xy};
+    use super::super::parse::looks_like_legacy_dik;
 
     fn mini_json() -> String {
         let rows: Vec<String> = (0..40)

@@ -1,4 +1,4 @@
-use super::parse::{cell_f32, parse_outer_and_table};
+use super::parse::parse_outer_and_table;
 use super::types::{LegacyLevelResult, LevelStats, SegmentMedian};
 
 pub fn median_f64(values: &[f64]) -> f64 {

@@ -58,10 +58,17 @@ pub fn wall_ring_support_with_clarity(b: &Blob, walls: &[WallCue]) -> (f32, f32)
     }
     let cover = hit as f32 / n as f32;
     let strength = (weight / n as f32).clamp(0.0, 1.0);
-    let support = (cover * 0.55 + strength * 0.55).clamp(0.0, 1.0);
+    let raw_support = (cover * 0.55 + strength * 0.55).clamp(0.0, 1.0);
     // Duvar netliği: güçlü vuruşların oranı (0–1)
     let clarity = if hit > 0 {
         strong_hits as f32 / hit as f32
+    } else {
+        0.0
+    };
+    // Seyrek/bulanık lekeler kazı dolgusunda da oluşabilir. Duvar desteği ancak
+    // yeterli kapsama ve netlik birlikte varsa yapı kanıtı sayılır.
+    let support = if raw_support >= 0.16 && clarity >= 0.45 {
+        raw_support
     } else {
         0.0
     };

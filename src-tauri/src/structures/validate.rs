@@ -181,7 +181,10 @@ pub fn link_chambers_with_path(
                 continue;
             }
             let conf = (0.35 + path * 0.5 + if geo_link { 0.12 } else { 0.0 }).clamp(0.0, 1.0);
-            if conf < (min_confidence - if side { 0.14 } else { 0.0 }).max(0.22) {
+            // ONAYLI (yüksek oranlı) bağlantılar hassasiyet eşiğinden muaftır.
+            if conf < (min_confidence - if side { 0.14 } else { 0.0 }).max(0.22)
+                && !crate::sensitivity::is_confirmed(conf)
+            {
                 rejected += 1;
                 continue;
             }
