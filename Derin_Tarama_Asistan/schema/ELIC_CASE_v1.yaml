@@ -1,0 +1,55 @@
+# ELIC Case Package — schema_version 1.0 (FROZEN)
+# DTA (field) <-> Votex (office). Do not remove 1.0 keys; bump version for breaking changes.
+
+schema_version: "1.0"
+schema_id: elic_case
+
+package_layout:
+  - manifest.json      # required
+  - analysis.json      # required
+  - inference.json     # required
+  - voice_summary.txt  # required
+  - screen.png         # required
+  - survey.json        # optional
+  - recording/         # optional Faz 4 (session.json, frames/, video)
+  - frames/            # optional (REC legacy)
+  - session.mp4        # optional
+
+manifest_required:
+  - schema_version
+  - schema_id
+  - source             # Derin_Tarama_Asistan
+  - capture_time       # ISO8601
+  - product            # {name, short}
+
+analysis_required:
+  - heatmap_stats      # metal_pct void_pct soil_pct wall_pct glow_pct
+  - hud                # depth_m heading heading_deg anomaly_gauge surface_ref_ok active_sensor
+
+inference_required:
+  - hypotheses
+  - summary or disclaimer
+
+relation_enums:
+  - metal_in_void
+  - void_with_wall
+  - metal_with_wall
+  - glow_near_void
+
+hypothesis_enums:
+  - void_candidate
+  - metal_candidate
+  - metal_in_void
+  - structure_glow
+  - wall_edge
+  - clear_soil
+
+disclaimer: |
+  Ince cizgiler (glow / duvar kenari) ipucu niteliklidir;
+  manyetik alan nesne etrafindan suzulerek bu renkleri uretir.
+  Kesin tesbit degildir; mumkunse termal ile dogrulayin.
+
+python:
+  schema: actions/elic_case_schema.py
+  export: actions/elic_case_export.py
+  validate: validate_case_path()

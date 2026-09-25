@@ -1,0 +1,11 @@
+# JARVIS Windows - Gerekli paketler
+google-genai
+SpeechRecognition
+pyaudio
+psutil
+Pillow
+requests
+pyautogui
+Flask
+imageio
+imageio-ffmpeg

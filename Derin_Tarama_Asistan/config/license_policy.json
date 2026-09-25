@@ -1,0 +1,6 @@
+{
+  "enforce": false,
+  "product_family": "dft_elic_votex",
+  "updated_at": "2026-07-14T13:40:00+00:00",
+  "note": "ElitePad / saha tablette gelistirme ve kullanim icin false. Saha kilit icin: python tools/license_enforce.py on"
+}

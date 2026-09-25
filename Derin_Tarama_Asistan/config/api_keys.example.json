@@ -1,0 +1,9 @@
+{
+    "gemini_api_key": "",
+    "voice": "Charon",
+    "assistant_name": "Derin Tarama Asistan",
+    "elic_window_title": "Proton ELIC",
+    "votex_window_title": "Votex",
+    "elic_depth_cap_m": 10,
+    "ui_profile": "tablet"
+}
