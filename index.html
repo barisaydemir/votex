@@ -1702,6 +1702,16 @@
             <button type="button" id="dta-chat-toggle" class="dta-chat-head" title="DTA sohbetini aç/kapat">
               <span class="dta-chat-title">DTA · <span id="dta-chat-status" data-state="off">DTA bekleniyor</span></span>
               <span id="dta-chat-badge" class="dta-chat-badge" hidden>●</span>
+              <label class="dta-chat-collapse-label" title="Yanıttan sonra panelin kendiliğinden katlanma süresi (0 = açık kalsın)">
+                <select id="dta-chat-collapse" aria-label="Otomatik katlanma süresi">
+                  <option value="0">açık kalsın</option>
+                  <option value="5">5 sn</option>
+                  <option value="10">10 sn</option>
+                  <option value="15">15 sn</option>
+                  <option value="30">30 sn</option>
+                  <option value="60">60 sn</option>
+                </select>
+              </label>
               <span class="dta-chat-caret">▴</span>
             </button>
             <div class="dta-chat-body-wrap">

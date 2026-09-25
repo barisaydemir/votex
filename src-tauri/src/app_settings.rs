@@ -119,6 +119,13 @@ pub struct AppSettings {
     /// Doğrulanmış hedeflerden öğrenilen eşik modeli (yerel istatistik kalibrasyonu)
     #[serde(default)]
     pub legacy_learned_thresholds: Option<serde_json::Value>,
+    /// DTA paneli otomatik katlanma süresi (saniye). 0 = hiç katlama (açık kalsın).
+    #[serde(default = "default_dta_panel_auto_collapse")]
+    pub dta_panel_auto_collapse_secs: u32,
+}
+
+fn default_dta_panel_auto_collapse() -> u32 {
+    0
 }
 
 fn default_soil_profile() -> String {
@@ -221,6 +228,7 @@ impl Default for AppSettings {
             legacy_depth_calib_notes: Vec::new(),
             legacy_field_sessions: std::collections::HashMap::new(),
             legacy_learned_thresholds: None,
+            dta_panel_auto_collapse_secs: default_dta_panel_auto_collapse(),
         }
     }
 }

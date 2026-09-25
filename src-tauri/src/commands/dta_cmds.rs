@@ -108,6 +108,18 @@ pub fn set_legacy_depth_params(
     Ok(s)
 }
 
+/// DTA paneli otomatik katlanma süresi (saniye). 0 = hiç katlama.
+#[tauri::command]
+pub fn set_dta_panel_auto_collapse(secs: u32) -> Result<AppSettings, String> {
+    if secs > 3600 {
+        return Err("Katlanma süresi en fazla 3600 saniye olabilir".into());
+    }
+    let mut s = app_settings::load_settings();
+    s.dta_panel_auto_collapse_secs = secs;
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
 /// Kalibrasyon defteri notlarını kaydet (en fazla 20).
 #[tauri::command]
 pub fn set_legacy_depth_calib_notes(

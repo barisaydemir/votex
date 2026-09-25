@@ -72,6 +72,11 @@ export function setHints3dVisible(enabled) {
   return invokeDesktop("set_hints_3d_visible", { enabled });
 }
 
+/** DTA paneli otomatik katlanma süresi (saniye; 0 = hiç katlama). */
+export function setDtaPanelAutoCollapse(secs) {
+  return invokeDesktop("set_dta_panel_auto_collapse", { secs });
+}
+
 export function setLegacyDepthParams(params = {}) {
   return invokeDesktop("set_legacy_depth_params", {
     sensorHeightM: params.sensorHeightM ?? null,

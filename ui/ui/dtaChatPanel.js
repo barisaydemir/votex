@@ -36,6 +36,10 @@ let chatLog = [];
 let chatCaseKey = "";
 let fieldSessionControllerRef = null;
 let persistTimer = null;
+/** Otomatik katlama zamanlayıcısı (panel açıkken asistan yanıtı sonrası çalışır) */
+let autoCollapseTimer = null;
+/** Ayarlı süre (saniye). 0 = hiç katlama. loadAutoCollapseSetting ile dolar. */
+let autoCollapseSecs = 0;
 
 /** DOM referansları (bind sonrası dolar) */
 let els = null;
@@ -152,6 +156,7 @@ async function pollOnce() {
         if (hasAssistant) {
           els.host.dataset.open = "1";
           els.badge.hidden = true;
+          scheduleAutoCollapse();
         } else {
           els.badge.hidden = false;
         }
@@ -166,6 +171,79 @@ function updateStatus() {
   if (!els?.status) return;
   els.status.dataset.state = onlineState ? "online" : "off";
   els.status.textContent = onlineState ? "DTA bağlı" : "DTA bekleniyor";
+}
+
+/**
+ * Otomatik katlama zamanlayıcısını (yeniden) kurar: panel açıkken çağrılır.
+ * Süre 0 ise zamanlayıcı kurulmaz (panel açık kalır).
+ */
+export function scheduleAutoCollapse() {
+  if (autoCollapseTimer) {
+    clearTimeout(autoCollapseTimer);
+    autoCollapseTimer = null;
+  }
+  if (!els?.host || els.host.dataset.open !== "1") return;
+  const secs = Number(autoCollapseSecs) || 0;
+  if (secs <= 0) return;
+  autoCollapseTimer = setTimeout(() => {
+    autoCollapseTimer = null;
+    if (!els?.host) return;
+    // Kullanıcı bu arada elle yazışmaya başladıysa katlamayalım
+    if (document.activeElement === els.input) {
+      scheduleAutoCollapse();
+      return;
+    }
+    els.host.dataset.open = "0";
+  }, secs * 1000);
+}
+
+/** Kullanıcı panelle etkileşime girdiğinde zamanlayıcıyı yeniler. */
+function resetAutoCollapseOnActivity() {
+  if (els?.host?.dataset.open === "1") scheduleAutoCollapse();
+}
+
+/** Ayarlı süreyi bellek + kalıcı ayarlara yazar. */
+export async function setAutoCollapseSecs(secs) {
+  const value = Math.max(0, Math.min(3600, Math.floor(Number(secs) || 0)));
+  autoCollapseSecs = value;
+  syncCollapseSelect();
+  scheduleAutoCollapse();
+  try {
+    const { setDtaPanelAutoCollapse } = await import("../api/tauri.js");
+    await setDtaPanelAutoCollapse(value);
+  } catch {
+    /* Tauri olmayan ortamda yalnız bellek */
+  }
+}
+
+function syncCollapseSelect() {
+  if (!els?.collapse) return;
+  const known = [0, 5, 10, 15, 30, 60];
+  if (!known.includes(Number(autoCollapseSecs))) {
+    // Özel değer: geçici option ekle
+    let opt = els.collapse.querySelector("option[data-custom]");
+    if (!opt) {
+      opt = document.createElement("option");
+      opt.dataset.custom = "1";
+      els.collapse.appendChild(opt);
+    }
+    opt.value = String(autoCollapseSecs);
+    opt.textContent = `${autoCollapseSecs} sn`;
+  }
+  els.collapse.value = String(autoCollapseSecs);
+}
+
+/** Kalıcı ayardan süreyi yükler (panel bind anında bir kez). */
+export async function loadAutoCollapseSetting() {
+  try {
+    const { getAppSettings } = await import("../api/tauri.js");
+    const s = await getAppSettings();
+    autoCollapseSecs = Math.max(0, Math.min(3600, Math.floor(Number(s?.dtaPanelAutoCollapseSecs) || 0)));
+  } catch {
+    autoCollapseSecs = 0;
+  }
+  syncCollapseSelect();
+  return autoCollapseSecs;
 }
 
 function updateCollapsedHeight() {
@@ -315,6 +393,7 @@ export function bindDtaChatPanel() {
     badge: $("dta-chat-badge"),
     toggle: $("dta-chat-toggle"),
     chips: $("dta-chat-chips"),
+    collapse: $("dta-chat-collapse"),
   };
 
   els.toggle?.addEventListener("click", () => {
@@ -323,7 +402,18 @@ export function bindDtaChatPanel() {
     if (collapsed) {
       els.badge.hidden = true;
       els.input?.focus();
+      scheduleAutoCollapse();
+    } else if (autoCollapseTimer) {
+      clearTimeout(autoCollapseTimer);
+      autoCollapseTimer = null;
     }
+  });
+  els.collapse?.addEventListener("change", () => {
+    void setAutoCollapseSecs(Number(els.collapse.value) || 0);
+  });
+  // Panel etkileşimi zamanlayıcıyı tazeler
+  ["click", "keydown", "scroll"].forEach((evt) => {
+    host.addEventListener(evt, resetAutoCollapseOnActivity, { passive: true });
   });
   els.send?.addEventListener("click", () => sendMessage());
   els.input?.addEventListener("keydown", (e) => {
@@ -338,6 +428,7 @@ export function bindDtaChatPanel() {
   if (!pollTimer) {
     pollTimer = setInterval(pollOnce, POLL_INTERVAL_MS);
   }
+  void loadAutoCollapseSetting();
   pollOnce();
   return host;
 }
@@ -346,6 +437,10 @@ export function stopDtaChatPanel() {
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
+  }
+  if (autoCollapseTimer) {
+    clearTimeout(autoCollapseTimer);
+    autoCollapseTimer = null;
   }
 }
 

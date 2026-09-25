@@ -4953,3 +4953,23 @@ button.legacy-step-card.is-selected { border-color: #f4c875; border-left-color: 
 #dta-chat-panel .dta-chat-chip:hover {
   background: rgba(244, 200, 117, 0.22);
 }
+
+#dta-chat-panel .dta-chat-collapse-label {
+  margin-left: 0.35rem;
+}
+
+#dta-chat-panel #dta-chat-collapse {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line, #2a3440);
+  border-radius: var(--r-sharp, 3px);
+  color: var(--muted, #8b96a5);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.55rem;
+  padding: 0.05rem 0.2rem;
+}
+
+#dta-chat-panel #dta-chat-collapse:hover {
+  color: var(--accent, #f4c875);
+  border-color: var(--accent, #f4c875);
+}

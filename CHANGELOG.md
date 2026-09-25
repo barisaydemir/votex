@@ -1,3 +1,11 @@
+## 0.4.146 — 25 Eylül 2026
+
+### DTA panel otomatik katlanma süresi ayarı
+
+- Panel başlığına otomatik katlanma süresi seçici eklendi (açık kalsın / 5 / 10 / 15 / 30 / 60 sn); seçim %APPDATA%\Votex\settings.json içinde kalıcı saklanır (dtaPanelAutoCollapseSecs).
+- Zamanlayıcı panel etkileşiminde (tıklama/klavye/kaydırma) yenilenir; kullanıcı yazışmadaysa katlama ertelenir. Varsayılan: açık kalsın (0).
+- VOTEX 0.4.146 Windows setup üretildi.
+
 ## 0.4.145 — 25 Eylül 2026
 
 ### DTA panel yanıtları görünür konuşma akışı

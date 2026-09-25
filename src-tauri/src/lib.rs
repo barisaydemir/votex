@@ -130,6 +130,7 @@ pub fn run() {
             commands::dta_cmds::set_structures_through_red,
             commands::dta_cmds::set_hints_3d_visible,
             commands::dta_cmds::set_legacy_depth_params,
+            commands::dta_cmds::set_dta_panel_auto_collapse,
             commands::dta_cmds::set_legacy_depth_calib_notes,
             commands::dta_cmds::set_legacy_learned_thresholds,
             commands::dta_cmds::set_legacy_field_sessions,
