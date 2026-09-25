@@ -1,3 +1,168 @@
+## 0.4.142 — 25 Eylül 2026
+
+### DTA köprü canlı doğrulama ve outbox ucu
+
+- Köprüye POST /dta/chat/outbox eklendi: panel→DTA mesajı artık HTTP üzerinden de yazılabiliyor; canlı doğrulama ve dış araç entegrasyonu için test yolu.
+- Paketleme kaynağı (DTA_SRC) senkronlandı: votex_chat.py ve main.py panel sohbet desteğiyle artık setup'a giriyor.
+- Canlı doğrulama: DTA+VOTEX birlikte başlatıldı; heartbeat, chat push, since-cursor ve ack akışı uçtan uca doğrulandı.
+- VOTEX 0.4.142 Windows setup üretildi.
+
+## 0.4.141 — 25 Eylül 2026
+
+### DTA köprü canlı doğrulama ve outbox ucu
+
+- Köprüye POST /dta/chat/outbox eklendi: panel→DTA mesajı artık HTTP üzerinden de yazılabiliyor; canlı doğrulama ve dış araç entegrasyonu için test yolu.
+- Paketleme kaynağı (DTA_SRC) senkronlandı: votex_chat.py ve main.py panel sohbet desteğiyle artık setup'a giriyor.
+- Canlı doğrulama: DTA+VOTEX birlikte başlatıldı; heartbeat, chat push, since-cursor ve ack akışı uçtan uca doğrulandı.
+- VOTEX 0.4.141 Windows setup üretildi.
+
+## 0.4.140 — 25 Eylül 2026
+
+### DTA köprü canlı doğrulama ve outbox ucu
+
+- Köprüye POST /dta/chat/outbox eklendi: panel→DTA mesajı artık HTTP üzerinden de yazılabiliyor; canlı doğrulama ve dış araç entegrasyonu için test yolu.
+- Paketleme kaynağı (DTA_SRC) senkronlandı: votex_chat.py ve main.py panel sohbet desteğiyle artık setup'a giriyor.
+- Canlı doğrulama: DTA+VOTEX birlikte başlatıldı; heartbeat, chat push, since-cursor ve ack akışı uçtan uca doğrulandı.
+- VOTEX 0.4.140 Windows setup üretildi.
+
+## 0.4.139 — 25 Eylül 2026
+
+### DTA panel sohbet kalıcılığı
+
+- DTA panel sohbet geçmişi vaka oturumuna eklendi: konuşma turları fingerprint anahtarlı saha oturumuyla saklanır, arşivden aynı JSON tekrar açıldığında sohbet geri yüklenir.
+- Rust halkası + oturum geri yüklemesi çift kayıt üretmez: rol+metin imzası ile dedup; en fazla 100 tur saklanır.
+- Yeni vakada sohbet sıfırlanır; eski oturum kayıtları (dtaChat alanı olmadan) geriye uyumlu açılır.
+- VOTEX 0.4.139 Windows setup üretildi.
+
+## 0.4.138 — 25 Eylül 2026
+
+### DTA panel hedef kısayolları
+
+- DTA sohbet paneline hedef kartı kısayolları eklendi: '3D'deki 2. hedefi açıkla' gibi saha soruları tek tıkla Jarvis'e gider.
+- Kısayol sırası paneldeki BİRLEŞİK HEDEFLER kartlarıyla birebir aynıdır (ÖNCE İNCELE/ADAY); paralel numaralandırma üretilmez.
+- Tüm hedeflere ek olarak 'Özet' kısayolu ekler; çipler vaka değişince kendiliğinden tazelenir.
+- VOTEX 0.4.138 Windows setup üretildi.
+
+## 0.4.137 — 25 Eylül 2026
+
+### DTA sohbet paneli köprüsü
+
+- VOTEX 3D altına yarı saydam DTA sohbet paneli eklendi: konuşma turları ve panel mesajları localhost köprüsünde akar.
+- Rust köprüsüne POST /dta/chat, GET /dta/chat/since ve GET /dta/chat/pending uçları + sohbet halkası (son 100 tur) eklendi; DTA konuşma turu bitince kullanıcı sözü ve asistan yanıtı panele itilir.
+- DTA arka planda 2 saniyede bir panel mesajlarını çekip Jarvis'e iletir; köprü kapalıysa kuyrukta bekletir.
+- Daha önce konuşma verisi API'den geçmiyordu; panel için yeni sohbet uçları eklendi, ipucu/durum uçları değişmedi.
+- VOTEX 0.4.137 Windows setup üretildi.
+
+## 0.4.136 — 25 Eylül 2026
+
+### JSON dik taramada termal isteği kapat
+
+- DTA'ya aktarılan Legacy3DMAG JSON dik tarama özetinde termal sensör doğrulaması istenmemesi açıkça belirtildi.
+- İstisna yalnız JSON dik tarama bağlamına uygulanır; diğer ELIC analizleri aynı kalır.
+- VOTEX 0.4.136 Windows setup üretildi.
+
+## 0.4.135 — 25 Eylül 2026
+
+### DTA arşiv karar açıklığı
+
+- Benzer kabul ve ret kararlarını kapsayan arşiv bağlamı için kullanıcıya gösterilen ifade netleştirildi.
+- VOTEX 0.4.135 Windows setup üretildi.
+
+## 0.4.134 — 25 Eylül 2026
+
+### DTA benzer vaka bağlamı
+
+- DTA vaka özetine, kullanıcı seçimiyle arşivden benzer doğrulanmış operatör kararları eklenebilir.
+- Benzerlik eşleştirmesi model eğitimi veya teşhis değildir; arşiv kimlikleri aktarılmaz.
+- VOTEX 0.4.134 Windows setup üretildi.
+
+## 0.4.133 — 25 Eylül 2026
+
+### JSON hedef kesiti
+
+- Legacy JSON aday kartlarına ölçüm gridinden X/Y kesit profili eklendi.
+- Ölçülmemiş hücreler boş bırakılır; model derinliği ölçüm profilinden ayrı gösterilir.
+- VOTEX 0.4.133 Windows setup üretildi.
+
+## 0.4.132 — 24 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- JSON 3D aday karşılaştırma görünümü
+- VOTEX 0.4.132 Windows setup üretildi.
+
+## 0.4.131 — 24 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Bakım sürümü.
+- VOTEX 0.4.131 Windows setup üretildi.
+
+## 0.4.130 — 24 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Bakım sürümü.
+- VOTEX 0.4.130 Windows setup üretildi.
+
+## 0.4.129 — 24 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Bakım sürümü.
+- VOTEX 0.4.129 Windows setup üretildi.
+
+## 0.4.128 — 24 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Bakım sürümü.
+- VOTEX 0.4.128 Windows setup üretildi.
+
+## 0.4.127 — 24 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Bakım sürümü.
+- VOTEX 0.4.127 Windows setup üretildi.
+
+## 0.4.126 — 24 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Bakım sürümü.
+- VOTEX 0.4.126 Windows setup üretildi.
+
+## 0.4.125 — 24 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Bakım sürümü.
+- VOTEX 0.4.125 Windows setup üretildi.
+
+## 0.4.124 — 24 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Bakım sürümü.
+- VOTEX 0.4.124 Windows setup üretildi.
+
+## 0.4.123 — 24 Eylül 2026
+
+### Hassasiyet çubuğu yeniden tasarımı: kademe + keşif
+
+- ONAYLI/ADAY kademe modeli: yüksek oranlı tespitler (z-skor ≥ 2σ veya güven ≥ 0.75) hassasiyet eşiğinden muaftır — çubuk kısalsa da asla silinmezler.
+- Çubuk artık keşfi yönetir: tohum eşiği manyetik genlik z-skoruna bağlı (2.5σ ↔ 1.0σ); bitişik tohumlar birleşerek yapı olur, alan filtresi birleşik yapıda uygulanır ve kümeler şekil sınıflanır (metal/oda/tünel/boşluk).
+- Silme yerine soldurma: 3D'de kademe görselleri (ONAYLI parlak, ADAY saydam, gürültü soluk), panelde kırılım sayacı (●onaylı · ◌aday · elendi).
+- Rust yapı motorunda hysteresis muafiyeti (build/validate/mod kapıları) — JS/Rust parite testleri genişletildi.
+
+## 0.4.122 — 24 Eylül 2026
+
+### Paketleme öncesi arayüz sağlık kontrolü
+
+- build_single_setup.py'e zorunlu arayüz sağlık kontrolü eklendi: tag dengesi ve main.layout panel düzeni sözleşmesi (panel-ops · panel-stage · panel-intel) bozuksa paketleme baştan durur.
+- scripts/uiHealth.test.js ile 5 regresyon testi; --check-ui ile tek başına çalıştırılabilir.
+
 ## 0.4.121 — 24 Eylül 2026
 
 ### Arayüz düzeni düzeltmesi

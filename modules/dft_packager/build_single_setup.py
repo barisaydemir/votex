@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime
+from html.parser import HTMLParser
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -48,7 +49,7 @@ def _resolve_release_dir() -> Path:
 RELEASE = _resolve_release_dir()
 BUNDLE_NSIS = RELEASE / "bundle" / "nsis"
 ISS = HERE / "DFT_Suite.iss"
-PACKAGE_VERSION = "0.4.121"
+PACKAGE_VERSION = "0.4.142"
 
 ISCC_CANDIDATES = [
     Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
@@ -86,6 +87,134 @@ def run(cmd: list[str], cwd: Path | None = None) -> None:
     r = subprocess.run(cmd, cwd=str(cwd) if cwd else None)
     if r.returncode != 0:
         raise SystemExit(f"Başarısız ({r.returncode}): {' '.join(cmd)}")
+
+
+# ── Zorunlu arayüz sağlık kontrolü ──────────────────────────────────────────
+# Paketlemeden önce index.html yapı bütünlüğünü doğrular. Kapanmamış bir
+# <details>/<div> tüm panelleri yutup arayüzü neredeyse tamamen boşaltabilir
+# (0.4.119'da yaşandı); bu kontrol bozuk paketin üretilmesini engeller.
+#   1) Tag dengesi: açılan her etiket kapanmalı, yetim </...> olmamalı.
+#   2) Panel düzeni sözleşmesi: main.layout doğrudan çocukları sırasıyla
+#      #panel-ops · #panel-stage · #panel-intel olmalı.
+
+UI_CHECK_TAGS = (
+    "div",
+    "details",
+    "summary",
+    "section",
+    "main",
+    "label",
+    "span",
+    "p",
+    "button",
+)
+UI_VOID_TAGS = frozenset(
+    "area base br col embed hr img input link meta param source track wbr".split()
+)
+UI_LAYOUT_MAIN_CLASS = "layout"
+UI_LAYOUT_CHILDREN = ("panel-ops", "panel-stage", "panel-intel")
+
+
+class _UiHtmlProbe(HTMLParser):
+    """Yığın tabanlı etiket izleyici + main.layout çocuk kaydı."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.stack: list[tuple[str, int, bool]] = []
+        self.errors: list[str] = []
+        self.layout_children: list[str] = []
+        self.layout_seen = False
+        self._layout_depth: int | None = None
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag in UI_VOID_TAGS:
+            return
+        line = self.getpos()[0]
+        depth = len(self.stack)
+        if tag == "main":
+            if UI_LAYOUT_MAIN_CLASS in (dict(attrs).get("class") or "").split():
+                self.layout_seen = True
+                self._layout_depth = depth + 1
+        elif self._layout_depth is not None and depth == self._layout_depth:
+            attr = dict(attrs)
+            self.layout_children.append(attr.get("id") or f"<{tag}>")
+        self.stack.append((tag, line, tag in UI_CHECK_TAGS))
+
+    def handle_startendtag(self, tag: str, attrs) -> None:
+        pass  # kendini kapatan etiketler yığını etkilemez
+
+    def handle_endtag(self, tag: str) -> None:
+        line = self.getpos()[0]
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                for t, ln, tracked in self.stack[i + 1 :]:
+                    if tracked:
+                        self.errors.append(f"satır {ln}: <{t}> kapanmadan </{tag}> kapandı")
+                del self.stack[i:]
+                if tag == "main":
+                    self._layout_depth = None
+                return
+        if tag in UI_CHECK_TAGS:
+            self.errors.append(f"satır {line}: yetim </{tag}> — açılışı yok")
+
+
+def ui_health_errors(html: str) -> list[str]:
+    """HTML metnindeki yapı hatalarını döndürür; boş liste = sağlıklı."""
+    probe = _UiHtmlProbe()
+    probe.feed(html)
+    probe.close()
+    errors = list(probe.errors)
+    for tag, line, tracked in probe.stack:
+        if tracked:
+            errors.append(f"satır {line}: <{tag}> kapanmadan dosya bitti")
+    if not probe.layout_seen:
+        errors.append("main.layout bulunamadı — panel düzeni sözleşmesi doğrulanamadı")
+    elif probe.layout_children != list(UI_LAYOUT_CHILDREN):
+        errors.append(
+            "panel düzeni sözleşmesi bozuldu — main.layout doğrudan çocukları "
+            "beklenen #"
+            + " · #".join(UI_LAYOUT_CHILDREN)
+            + " · bulunan "
+            + (" · ".join(probe.layout_children) or "(yok)")
+            + " (bir panel yutulmuş/iç içe geçmiş olabilir)"
+        )
+    return errors
+
+
+def ui_health_targets() -> list[Path]:
+    targets = [VOTEX / "index.html"]
+    dist_html = VOTEX / "dist" / "index.html"
+    if dist_html.is_file():
+        targets.append(dist_html)
+    return targets
+
+
+def ui_health_check(paths: list[Path] | None = None) -> None:
+    """Zorunlu paketleme öncesi kontrol — hata varsa paketleme durur."""
+    log("UI sağlık kontrolü (zorunlu): tag dengesi + panel düzeni sözleşmesi")
+    failed = False
+    for path in paths or ui_health_targets():
+        try:
+            label = str(path.resolve().relative_to(VOTEX))
+        except ValueError:
+            label = path.name
+        if not path.is_file():
+            log(f"  ✗ bulunamadı: {label}")
+            failed = True
+            continue
+        errors = ui_health_errors(path.read_text(encoding="utf-8"))
+        if errors:
+            failed = True
+            for err in errors:
+                log(f"  ✗ {label}: {err}")
+        else:
+            log(f"  ✓ {label}: etiket dengesi + panel düzeni sözleşmesi OK")
+    if failed:
+        raise SystemExit(
+            "Arayüz sağlık kontrolü BAŞARISIZ — paketleme durduruldu. "
+            "Kapanmamış/yetim etiketler veya panel düzeni sözleşmesi bozuk; "
+            "bozuk arayüzlü kurulum üretilmesi engellendi."
+        )
 
 
 def ensure_runtimes() -> Path:
@@ -196,7 +325,20 @@ def main() -> int:
         action="store_true",
         help="staging silinmez; VoteX'e dokunulmaz, sadece mevcut DTA+VOTEX ile Setup derlenir",
     )
+    ap.add_argument(
+        "--check-ui",
+        nargs="*",
+        metavar="HTML",
+        help="yalnız arayüz sağlık kontrolünü çalıştır (varsayılan: index.html + dist/index.html)",
+    )
     args = ap.parse_args()
+
+    if args.check_ui is not None:
+        ui_health_check([Path(p) for p in args.check_ui] or None)
+        return 0
+
+    # Zorunlu: paketleme başlamadan arayüz sağlık kontrolü
+    ui_health_check()
 
     iscc = find_iscc()
     log(f"ISCC: {iscc}")

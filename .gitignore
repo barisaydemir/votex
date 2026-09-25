@@ -45,3 +45,25 @@ __pycache__/
 tmp/
 temp/
 yama/
+
+# DTA yerel çalışma verileri (venv, build çıktıları, loglar, kullanıcı verileri)
+Derin_Tarama_Asistan/.venv_jarvis/
+Derin_Tarama_Asistan/dist/
+Derin_Tarama_Asistan/logs/
+Derin_Tarama_Asistan/reports/
+Derin_Tarama_Asistan/__pycache__/
+Derin_Tarama_Asistan/actions/__pycache__/
+Derin_Tarama_Asistan/core/__pycache__/
+Derin_Tarama_Asistan/tools/__pycache__/
+Derin_Tarama_Asistan/memory/__pycache__/
+Derin_Tarama_Asistan/config/api_keys.json
+Derin_Tarama_Asistan/config/license.dat
+Derin_Tarama_Asistan/memory/memory.json
+
+# Gradle derleme çıktıları
+votex-android/.gradle/
+votex-android/build/
+votex-android/app/build/
+
+# Geçici plan dosyaları
+.tmp_brainstorm_plan.txt
