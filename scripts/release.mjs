@@ -65,6 +65,13 @@ export function syncIss(content, version) {
     .replace(/(OutputBaseFilename=DFT_Suite_Setup_)[\d.]+/, `$1${version}`);
 }
 
+/** VotexArtemis.iss — MyAppVersion + OutputBaseFilename (ayrı program paketi). */
+export function syncArtemisIss(content, version) {
+  return content
+    .replace(/(#define MyAppVersion ")[^"]+(")/, `$1${version}$2`)
+    .replace(/(OutputBaseFilename=VotexArtemis_Setup_)[\d.]+/, `$1${version}`);
+}
+
 /** build_single_setup.py — PACKAGE_VERSION. */
 export function syncPackagerPy(content, version) {
   return content.replace(/(PACKAGE_VERSION = ")[^"]+(")/, `$1${version}$2`);
@@ -158,6 +165,7 @@ function main() {
   edit("src-tauri/Cargo.toml", (c) => syncCargoToml(c, version), dryRun);
   edit("src-tauri/tauri.conf.json", (c) => syncTauriConf(c, version), dryRun);
   edit("modules/dft_packager/DFT_Suite.iss", (c) => syncIss(c, version), dryRun);
+  edit("modules/dft_packager/VotexArtemis.iss", (c) => syncArtemisIss(c, version), dryRun);
   edit("modules/dft_packager/build_single_setup.py", (c) => syncPackagerPy(c, version), dryRun);
   edit(
     "CHANGELOG.md",
@@ -205,6 +213,7 @@ function main() {
     `KURULUM_PAKETLERI/Votex_${version}_Kurulum.exe`,
     `modules/dft_packager/dist/DFT_Suite_Setup_${version}.exe`,
     `target/release/bundle/nsis/Votex_${version}_x64-setup.exe`,
+    `KURULUM_PAKETLERI/VotexArtemis_${version}_Kurulum.exe`,
   ];
   console.log("\n📦 Üretilen paketler:");
   for (const rel of artifacts) {

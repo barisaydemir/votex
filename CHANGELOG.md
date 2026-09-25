@@ -1,3 +1,21 @@
+## 0.4.144 — 25 Eylül 2026
+
+### VotexArtemis ayrı kurulum paketi
+
+- VotexArtemis ayrı program: VotexArtemis.iss ile ayrı AppId, ayrı kurulum klasörü; DFT Suite'e dokunmaz.
+- build_single_setup.py --artemis modu: hafif paket (votex.exe + resources), koşullu runtime kurulumu, ayrık %APPDATA%\VotexArtemis veri dizini.
+- Not: 0.4.143 NSIS ağı hatasından (os error 10051) sonra bu commitle birlikte yeniden üretildi.
+- VOTEX 0.4.144 Windows setup üretildi.
+
+## 0.4.143 — 25 Eylül 2026
+
+### VotexArtemis ayrı kurulum paketi
+
+- VotexArtemis artık ayrı bir program olarak kuruluyor: VotexArtemis.iss ile ayrı AppId, {autopf}\VotexArtemis klasörü, masaüstü/Başlat kısayolları; mevcut DFT Suite / VOTEX / DTA kurulumlarına dokunmaz, eski kaldırıcıları çalıştırmaz, süreç kapatmaz.
+- build_single_setup.py --artemis modu: yalnız votex.exe + resources stage edilir, VotexArtemis.exe olarak adlandırılır, runtime'lar (VC++/WebView2/Node/Rust) sistemde yoksa koşullu kurulur, setup meta votex_artemis_setup_meta.json'a yazılır.
+- Kullanıcı verileri %APPDATA%\VotexArtemis altında ayrık; birinci çıktı KURULUM_PAKETLERI\VotexArtemis_<sürüm>_Kurulum.exe (58 MB, DTA'sız hafif paket).
+- VOTEX 0.4.143 Windows setup üretildi.
+
 ## 0.4.142 — 25 Eylül 2026
 
 ### DTA köprü canlı doğrulama ve outbox ucu

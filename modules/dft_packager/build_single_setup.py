@@ -49,7 +49,7 @@ def _resolve_release_dir() -> Path:
 RELEASE = _resolve_release_dir()
 BUNDLE_NSIS = RELEASE / "bundle" / "nsis"
 ISS = HERE / "DFT_Suite.iss"
-PACKAGE_VERSION = "0.4.142"
+PACKAGE_VERSION = "0.4.144"
 
 ISCC_CANDIDATES = [
     Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
@@ -297,6 +297,126 @@ def stage_dta(dest: Path) -> None:
     _stage(dest)
 
 
+ARTEMIS_ISS = HERE / "VotexArtemis.iss"
+ARTEMIS_STAGING = HERE / "staging_artemis"
+
+
+def write_artemis_info() -> None:
+    """VotexArtemis ayrı kurulum bilgilendirme metni."""
+    (ARTEMIS_STAGING / "INFO_BEFORE.txt").write_text(
+        f"""VotexArtemis kurulumu (sürüm {PACKAGE_VERSION})
+
+VotexArtemis AYRI BİR PROGRAMDIR:
+  • {chr(123)}autopf{chr(125)}\\VotexArtemis klasörüne kurulur; mevcut
+    DFT Suite / VOTEX / Derin Tarama Asistan kurulumlarına DOKUNMAZ.
+  • Eski kurulum kaldırılmaz; süreçler kapatılmaz.
+  • Kullanıcı verileri %APPDATA%\\VotexArtemis altında ayrı tutulur.
+  • Gerekli çalışma zamanları (VC++ / WebView2 / Node / Rust) sistemde
+    yoksa sessiz kurulur; varsa atlanır.
+
+Kurulum yönetici izni ister ve birkaç dakika sürebilir.
+Kısayol: masaüstü ve Başlat menüsü → VotexArtemis.
+""",
+        encoding="utf-8",
+    )
+
+
+def build_artemis_setup(args) -> int:
+    """VotexArtemis — ayrı program kurulumu üret.
+
+    DFT Suite akışından farkları:
+    - Yalnız votex.exe + resources stage edilir (DTA yok).
+    - VotexArtemis.exe olarak adlandırılır.
+    - VotexArtemis.iss derlenir: ayrı AppId, {autopf}\\VotexArtemis
+      klasörü, eski kurulumlara dokunmayan [Code] bölümü.
+    - Çıktı: dist/VotexArtemis_Setup_<sürüm>.exe + KURULUM_PAKETLERI.
+    """
+    # Zorunlu: paketleme başlamadan arayüz sağlık kontrolü (aynı sözleşme)
+    ui_health_check()
+
+    iscc = find_iscc()
+    log(f"ISCC: {iscc}")
+
+    DIST.mkdir(parents=True, exist_ok=True)
+
+    if ARTEMIS_STAGING.exists():
+        shutil.rmtree(ARTEMIS_STAGING)
+    ARTEMIS_STAGING.mkdir(parents=True)
+
+    rt = HERE / "payload" / "runtimes"
+    if not (rt / "VC_redist.x64.exe").is_file():
+        log("Runtime dosyaları eksik — indiriliyor…")
+        run([sys.executable, str(HERE / "fetch_votex_runtimes.py")])
+    shutil.copytree(rt, ARTEMIS_STAGING / "runtimes")
+
+    if not args.skip_tauri:
+        log("Tauri NSIS / release build…")
+        build_tauri()
+    else:
+        log("Tauri build atlandı (--skip-tauri)")
+
+    app_stage = ARTEMIS_STAGING / "VotexArtemis"
+    stage_votex(app_stage)
+    # Ayrı program kimliği: exe adını değiştir (Tauri votex.exe üretir)
+    src_exe = app_stage / "Votex.exe"
+    if src_exe.is_file():
+        shutil.move(str(src_exe), str(app_stage / "VotexArtemis.exe"))
+        log("Votex.exe -> VotexArtemis.exe olarak adlandırıldı")
+    else:
+        raise SystemExit("staging Votex.exe yok — tauri build çıktısı eksik")
+
+    write_artemis_info()
+
+    log("Inno Setup derleniyor -> VotexArtemis_Setup.exe...")
+    run([str(iscc), str(ARTEMIS_ISS)], cwd=HERE)
+
+    out = DIST / f"VotexArtemis_Setup_{PACKAGE_VERSION}.exe"
+    if not out.is_file():
+        cands = sorted(
+            DIST.glob("VotexArtemis_Setup*.exe"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not cands:
+            raise SystemExit(f"VotexArtemis setup üretilemedi: {DIST}")
+        out = cands[0]
+
+    sha256 = hashlib.sha256()
+    with out.open("rb") as setup_file:
+        for chunk in iter(lambda: setup_file.read(1024 * 1024), b""):
+            sha256.update(chunk)
+
+    meta = {
+        "created": datetime.now().isoformat(timespec="seconds"),
+        "version": PACKAGE_VERSION,
+        "output": str(out),
+        "size_bytes": out.stat().st_size,
+        "size_mb": round(out.stat().st_size / (1024 * 1024), 1),
+        "sha256": sha256.hexdigest(),
+        "package": "votex-artemis",
+        "standalone_program": True,
+        "touch_dft_suite": False,
+        "user_action": f"Sadece VotexArtemis_Setup_{PACKAGE_VERSION}.exe çalıştır",
+        "notes": [
+            f"VotexArtemis {PACKAGE_VERSION} — DFT Suite'ten bağımsız ayrı program",
+            "Kurulum: {autopf}\\VotexArtemis · veriler: %APPDATA%\\VotexArtemis",
+            "Runtime'lar koşullu kurulur; mevcut sistem bileşenleri korunur",
+        ],
+    }
+    (DIST / "votex_artemis_setup_meta.json").write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    kurulum = VOTEX / "KURULUM_PAKETLERI"
+    kurulum.mkdir(parents=True, exist_ok=True)
+    dest = kurulum / f"VotexArtemis_{PACKAGE_VERSION}_Kurulum.exe"
+    shutil.copy2(out, dest)
+    log(f"KURULUM_PAKETLERI: {dest}")
+    log(f"TAMAM: {out} ({meta['size_mb']} MB)")
+    log("Kullanıcıya sadece bu dosyayı verin.")
+    return 0
+
+
 def write_info() -> None:
     (STAGING / "INFO_BEFORE.txt").write_text(
         """DFT Suite kurulumu
@@ -321,6 +441,11 @@ def main() -> int:
     ap.add_argument("--skip-tauri", action="store_true")
     ap.add_argument("--skip-fetch", action="store_true")
     ap.add_argument(
+        "--artemis",
+        action="store_true",
+        help="ayrı program modu: VotexArtemis_Setup üret (DFT Suite'e dokunmayan bağımsız kurulum)",
+    )
+    ap.add_argument(
         "--keep-staging",
         action="store_true",
         help="staging silinmez; VoteX'e dokunulmaz, sadece mevcut DTA+VOTEX ile Setup derlenir",
@@ -332,6 +457,8 @@ def main() -> int:
         help="yalnız arayüz sağlık kontrolünü çalıştır (varsayılan: index.html + dist/index.html)",
     )
     args = ap.parse_args()
+    if args.artemis:
+        return build_artemis_setup(args)
 
     if args.check_ui is not None:
         ui_health_check([Path(p) for p in args.check_ui] or None)
