@@ -1,6 +1,8 @@
 import {
+  appendDtaChatTurns,
   createEmptyFieldSession,
   createFieldSessionStore,
+  normalizeDtaChat,
   sessionKeyOf,
   sessionProgressOf,
   setLateralCalibration,
@@ -52,6 +54,16 @@ export function createLegacyFieldSessionController({ getSettings, saveSessions, 
     setLateralCalibration(snapshot = null) {
       active = setLateralCalibration(active, snapshot);
       return active;
+    },
+    /** DTA panel sohbet turunu oturuma ekler (dedup'lı) ve dizi olarak döner. */
+    appendDtaChat(turns = []) {
+      if (!active) return [];
+      active = appendDtaChatTurns(active, turns);
+      return [...(active.dtaChat || [])];
+    },
+    /** Kayıtlı sohbet geçmişini döner (normalize edilmiş). */
+    dtaChatLog() {
+      return normalizeDtaChat(active?.dtaChat);
     },
     async persist() {
       if (!active?.key) return active;

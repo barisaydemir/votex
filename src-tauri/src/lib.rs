@@ -11,6 +11,7 @@ mod capture;
 mod commands;
 mod csv_import;
 mod dta_bridge;
+mod dta_chat;
 mod license;
 mod legacy_mag_json;
 mod magnetic;
@@ -35,6 +36,7 @@ use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
+        .manage(crate::dta_chat::new_ring())
         .setup(|app| {
             dta_bridge::start_bridge(app.handle().clone());
             // Son kayÄ±tlÄ± 3D oturum + DTA ipuÃ§larÄ±nÄ± yÃ¼kle
@@ -139,6 +141,9 @@ pub fn run() {
             commands::dta_cmds::pick_dta_launch_path,
             commands::dta_cmds::launch_dta,
             commands::dta_cmds::interpret_votex_screen,
+            commands::dta_cmds::send_dta_panel_message,
+            commands::dta_cmds::get_dta_chat_since,
+            commands::dta_cmds::get_dta_chat_pending,
             commands::dta_cmds::get_map_dta_hints,
             commands::dta_cmds::set_map_dta_hints_enabled,
             commands::dta_cmds::add_contact_hints,

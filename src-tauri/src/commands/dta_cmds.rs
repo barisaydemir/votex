@@ -1,6 +1,7 @@
 //! DTA başlat / ayar komutları.
 
 use crate::app_settings::{self, AppSettings, AutoLaunchOutcome};
+use crate::commands::AppState;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
@@ -572,6 +573,50 @@ pub fn launch_dta() -> Result<LaunchResult, String> {
 pub fn interpret_votex_screen() -> Result<InterpretResult, String> {
     let (ok, via, message) = app_settings::request_votex_interpret()?;
     Ok(InterpretResult { ok, via, message })
+}
+
+/// VOTEX panelinden DTA'ya mesaj gönderir (outbox'a yazar; DTA poller çeker).
+#[tauri::command]
+pub fn send_dta_panel_message(
+    ring: tauri::State<'_, crate::dta_chat::ChatRing>,
+    text: String,
+) -> Result<crate::dta_chat::ChatPostResponse, String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err("Mesaj boş olamaz".to_string());
+    }
+    let id = ring.push_outbox(trimmed);
+    let pending = ring.pending();
+    Ok(crate::dta_chat::ChatPostResponse {
+        ok: true,
+        accepted: 1,
+        last_id: id,
+        pending,
+    })
+}
+
+/// Panelin yeni konuşma turlarını çekmesi (Rust içi; HTTP /dta/chat/since ile aynı halka).
+#[tauri::command]
+pub fn get_dta_chat_since(
+    ring: tauri::State<'_, crate::dta_chat::ChatRing>,
+    state: tauri::State<'_, AppState>,
+    cursor: u64,
+) -> Result<crate::dta_chat::ChatSinceResponse, String> {
+    let last_ms = state.dta_last_contact_ms.load(std::sync::atomic::Ordering::Relaxed);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let dta_online = last_ms > 0 && now_ms >= last_ms && (now_ms - last_ms) <= 180_000;
+    Ok(crate::dta_chat::handle_chat_since(&ring, cursor, dta_online))
+}
+
+/// Panelin bekleyen panel→DTA mesajlarını görmesi (ack durumu).
+#[tauri::command]
+pub fn get_dta_chat_pending(
+    ring: tauri::State<'_, crate::dta_chat::ChatRing>,
+) -> Result<Vec<crate::dta_chat::ChatTurn>, String> {
+    Ok(ring.pending())
 }
 
 /// Aktif haritanın kayıtlı DTA ipuçları (gösterim + açık/kapalı).

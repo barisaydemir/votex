@@ -124,6 +124,21 @@ export function interpretVotexScreen() {
   return invokeDesktop("interpret_votex_screen");
 }
 
+/** VOTEX panelinden DTA'ya mesaj gönderir (sohbet halkası outbox'una yazar). */
+export function sendDtaPanelMessage(text) {
+  return invokeDesktop("send_dta_panel_message", { text });
+}
+
+/** DTA sohbet halkasındaki yeni turları çeker (cursor: son görülen tur id). */
+export function getDtaChatSince(cursor = 0) {
+  return invokeDesktop("get_dta_chat_since", { cursor });
+}
+
+/** Panel→DTA giden, henüz ack'lenmemiş mesajlar. */
+export function getDtaChatPending() {
+  return invokeDesktop("get_dta_chat_pending");
+}
+
 export function getMapDtaHints() {
   return invokeDesktop("get_map_dta_hints");
 }

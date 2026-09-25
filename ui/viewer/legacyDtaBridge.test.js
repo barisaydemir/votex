@@ -109,5 +109,8 @@ describe("legacyDtaBridge", () => {
     expect(text).toContain("legacy-dik-shape-1");
     expect(text).toContain("proxy");
     expect(text).toContain("Adım 1");
+    expect(text).toContain("yalnızca Legacy3DMAG JSON dik taramasıdır");
+    expect(text).toContain("termal sensör doğrulaması isteme/önerme");
+    expect(text).toContain("termal dışındaki uygun takip/doğrulama adımlarını belirt");
   });
 });

@@ -27,11 +27,66 @@ export function createEmptyFieldSession(key, metadata = {}) {
     splitDetectionIds: normalizeTargetList(metadata.splitDetectionIds),
     mergePolicy: metadata.mergePolicy || null,
     lateralCalibration: normalizeLateralCalibration(metadata.lateralCalibration),
+    /** DTA panel sohbet geçmişi (kanonik turlar; en fazla 100) */
+    dtaChat: [],
     lastTargetId: null,
     lastStepIndex: null,
     targetChecks: {},
     updatedAt: null,
   };
+}
+
+/** DTA panel sohbet turunu normalize eder; bozuk girdiyi atar. */
+export function normalizeDtaChatTurn(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const role = String(raw.role || "").toLowerCase();
+  const normalizedRole = role === "user" ? "user" : role === "system" ? "system" : role === "assistant" ? "assistant" : "";
+  if (!normalizedRole) return null;
+  const text = String(raw.text || "").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  const ts = Number(raw.ts);
+  return {
+    role: normalizedRole,
+    text: text.slice(0, 2000),
+    ts: Number.isFinite(ts) && ts > 0 ? Math.floor(ts) : 0,
+  };
+}
+
+/** Sohbet geçmişini normalize eder; en fazla 100 tur tutar. */
+export function normalizeDtaChat(raw, max = 100) {
+  const list = Array.isArray(raw) ? raw : [];
+  const turns = [];
+  for (const item of list) {
+    const turn = normalizeDtaChatTurn(item);
+    if (turn) turns.push(turn);
+    if (turns.length >= max) break;
+  }
+  return turns;
+}
+
+/**
+ * Sohbete tur ekler (idempotent imza ile): aynı rol+metin zaten son 5 turda
+ * varsa tekrar eklemez; böylece Rust halkası + oturum geri yüklemesi
+ * çift kayıt üretmez.
+ */
+export function appendDtaChatTurns(session, turns = []) {
+  if (!session) return session;
+  const existing = normalizeDtaChat(session.dtaChat);
+  const recentSignatures = new Set(
+    existing.slice(-5).map((t) => `${t.role}:${t.text.slice(0, 120)}`)
+  );
+  const additions = [];
+  for (const raw of Array.isArray(turns) ? turns : []) {
+    const turn = normalizeDtaChatTurn(raw);
+    if (!turn) continue;
+    const signature = `${turn.role}:${turn.text.slice(0, 120)}`;
+    if (recentSignatures.has(signature)) continue;
+    recentSignatures.add(signature);
+    additions.push(turn);
+  }
+  if (!additions.length) return touch(session);
+  const merged = [...existing, ...additions];
+  return touch({ ...session, dtaChat: merged.slice(-100) });
 }
 
 export function normalizeTargetList(value) {
@@ -96,6 +151,7 @@ export function normalizeFieldSession(raw) {
     splitDetectionIds: normalizeTargetList(raw?.splitDetectionIds),
     mergePolicy: raw?.mergePolicy && typeof raw.mergePolicy === "object" ? raw.mergePolicy : null,
     lateralCalibration: normalizeLateralCalibration(raw?.lateralCalibration),
+    dtaChat: normalizeDtaChat(raw?.dtaChat),
     lastTargetId: raw?.lastTargetId == null ? null : String(raw.lastTargetId),
     lastStepIndex: Number.isFinite(Number(raw?.lastStepIndex)) && Number(raw?.lastStepIndex) > 0
       ? Number(raw.lastStepIndex)

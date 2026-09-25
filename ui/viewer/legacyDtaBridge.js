@@ -183,6 +183,8 @@ export function formatLegacyDtaCaseBriefText(brief) {
     "LEGACY3DMAG DİK ÇEKİM VAKA ÖZETİ (VOTEX → DTA bağlamı)",
     brief.disclaimer,
     "",
+    "VAKA ÖZELİ · Bu bağlam yalnızca Legacy3DMAG JSON dik taramasıdır. Bu vaka için termal sensör doğrulaması isteme/önerme; recommend_sensor_switch(target=thermal) veya verify_with_thermal aracını çağırma. Bu kuralı diğer ELIC veya sensör analizlerine genelleme.",
+    "",
     `Dosya: ${brief.source.fileName || "—"} · fingerprint: ${brief.source.fingerprint || "—"}`,
     `Tarama: ${brief.scan.stepCount} adım${brief.scan.matrixLabel ? ` (${brief.scan.matrixLabel})` : ""} · ${brief.scan.detectionCount} tespit · ${brief.scan.mergedTargetCount} birleşik hedef${brief.scan.truncated ? " · özet kırpıldı" : ""}`,
     `Birleşme profili: ${brief.mergeProfile}${brief.depthParams ? ` · parametre h=${brief.depthParams.sensorHeightM} m, bipolar=${brief.depthParams.bipolarSepFactor}, dipol=%${Math.round(brief.depthParams.dipoleBlend * 100)}` : ""}`,
@@ -229,7 +231,7 @@ export function formatLegacyDtaCaseBriefText(brief) {
   lines.push(
     "",
     `Operatör gözlemleri: ${brief.observations.reviewedCount} incelendi · ${brief.observations.reportCount} raporda · ${brief.observations.notesCount} not`,
-    "Görev: Bu özeti saha dilinde yorumla; proxy değerlerini kesin teşhis gibi sunma; eksik doğrulama noktalarını öner.",
+    "Görev: Bu özeti saha dilinde yorumla; proxy değerlerini kesin teşhis gibi sunma; termal dışındaki uygun takip/doğrulama adımlarını belirt.",
   );
   return lines.join("\n");
 }

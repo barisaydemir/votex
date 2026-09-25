@@ -11,6 +11,8 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::commands::{decode_image_bytes, AppState};
 use crate::structures::StructureHint;
+use crate::dta_chat;
+use crate::dta_chat::ChatRing;
 
 pub const DTA_BRIDGE_ADDR: &str = "127.0.0.1:18765";
 
@@ -133,6 +135,78 @@ fn handle_connection(mut stream: std::net::TcpStream, app: &AppHandle) -> Result
                 })
                 .to_string(),
             )
+        }
+        ("POST", "/dta/chat/outbox") => {
+            // Panel → DTA mesajı (send_dta_panel_message komutunun HTTP karşılığı;
+            // gövde: {"text": "..."} veya düz metin)
+            let ring = app.state::<ChatRing>();
+            let text = serde_json::from_str::<serde_json::Value>(body)
+                .ok()
+                .and_then(|v| {
+                    v.get("text")
+                        .and_then(|t| t.as_str().map(String::from))
+                        .or_else(|| v.as_str().map(String::from))
+                })
+                .unwrap_or_else(|| body.trim().to_string());
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                (400, serde_json::json!({"ok": false, "message": "text bos"}).to_string())
+            } else {
+                let id = ring.push_outbox(trimmed);
+                let pending = ring.pending();
+                let resp = serde_json::json!({
+                    "ok": true,
+                    "accepted": 1,
+                    "lastId": id,
+                    "pending": pending,
+                });
+                (200, resp.to_string())
+            }
+        }
+        ("POST", "/dta/chat") | ("POST", "/chat") => {
+            let ring = app.state::<ChatRing>();
+            match dta_chat::handle_chat_post(&ring, body) {
+                Ok(resp) => (
+                    200,
+                    serde_json::to_string(&resp).unwrap_or_else(|_| "{}".into()),
+                ),
+                Err(e) => (
+                    400,
+                    serde_json::json!({"ok": false, "message": e}).to_string(),
+                ),
+            }
+        }
+        ("GET", "/dta/chat/since") => {
+            let ring = app.state::<ChatRing>();
+            let cursor = raw
+                .split_once('?')
+                .and_then(|(_, q)| {
+                    q.split('&').find_map(|kv| {
+                        let (k, v) = kv.split_once('=')?;
+                        (k == "cursor")
+                            .then(|| v.parse::<u64>().ok())
+                            .flatten()
+                    })
+                })
+                .unwrap_or(0);
+            let state = app.state::<AppState>();
+            let last_ms = state.dta_last_contact_ms.load(Ordering::Relaxed);
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            let dta_online = last_ms > 0 && now_ms >= last_ms && (now_ms - last_ms) <= 180_000;
+            let resp = dta_chat::handle_chat_since(&ring, cursor, dta_online);
+            (200, serde_json::to_string(&resp).unwrap_or_else(|_| "{}".into()))
+        }
+        ("GET", "/dta/chat/pending") => {
+            let ring = app.state::<ChatRing>();
+            let pending = ring.pending();
+            let resp = serde_json::json!({
+                "ok": true,
+                "pending": pending,
+            });
+            (200, resp.to_string())
         }
         ("POST", "/guide") | ("POST", "/dta/guide") => {
             let req: GuideRequest = serde_json::from_str(body)
