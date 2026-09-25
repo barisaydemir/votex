@@ -545,3 +545,13 @@ export function buildLegacyMergePresentation(detections, options = {}) {
 export function mergedTargetForDetection(targets, detectionId) {
   return (Array.isArray(targets) ? targets : []).find((target) => target.detectionIds.includes(String(detectionId))) || null;
 }
+
+/** Orders target candidates for operator review; this is not a probability of being real. */
+export function rankLegacyTargetsForReview(targets = []) {
+  const consistencyRank = { tight: 2, medium: 1, loose: 0 };
+  return [...(Array.isArray(targets) ? targets : [])].sort((a, b) =>
+    (Number(b.consistency?.evidenceCount ?? b.detectionIds?.length) || 0) - (Number(a.consistency?.evidenceCount ?? a.detectionIds?.length) || 0)
+    || (consistencyRank[b.consistency?.level] ?? -1) - (consistencyRank[a.consistency?.level] ?? -1)
+    || (Number(b.confidence) || 0) - (Number(a.confidence) || 0)
+  );
+}

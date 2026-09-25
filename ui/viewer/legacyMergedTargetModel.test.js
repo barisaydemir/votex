@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLegacyEvidenceRelations, buildLegacyMergePresentation, buildLegacyTargetConfidenceChart, buildLegacyTargetTimeline, lateralCalibrationOf, mergeLegacyDetections } from "./legacyMergedTargetModel.js";
+import { buildLegacyEvidenceRelations, buildLegacyMergePresentation, buildLegacyTargetConfidenceChart, buildLegacyTargetTimeline, lateralCalibrationOf, mergeLegacyDetections, rankLegacyTargetsForReview } from "./legacyMergedTargetModel.js";
 
 const detection = (id, x, y, top, bottom, stepIndex, kind = "Metal anomali adayı", size = null) => ({
   detectionId: id,
@@ -20,6 +20,18 @@ const detection = (id, x, y, top, bottom, stepIndex, kind = "Metal anomali aday�
 });
 
 describe("legacyMergedTargetModel", () => {
+  it("operator incelemesi için önce tekrarlı ve tutarlı kanıtları sıralar", () => {
+    const targets = [
+      { targetId: "single", detectionIds: ["a"], confidence: 0.99, consistency: { level: "tight", evidenceCount: 1 } },
+      { targetId: "repeated-loose", detectionIds: ["b", "c"], confidence: 0.8, consistency: { level: "loose", evidenceCount: 2 } },
+      { targetId: "repeated-tight", detectionIds: ["d", "e"], confidence: 0.7, consistency: { level: "tight", evidenceCount: 2 } },
+    ];
+    expect(rankLegacyTargetsForReview(targets).map((target) => target.targetId)).toEqual([
+      "repeated-tight", "repeated-loose", "single",
+    ]);
+    expect(targets[0].targetId).toBe("single");
+  });
+
   it("komşu derinlik uyumlu kanıtları lateral yanıt adayı olarak açıklar", () => {
     const relations = buildLegacyEvidenceRelations([
       { ...detection("a", 2, 1, 1.8, 2.4, 4), strength: 3.2 },
