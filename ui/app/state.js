@@ -20,6 +20,11 @@ export const $ = (id) => document.getElementById(id);
 export const state = {
   /** Yapı Tespit Hassasiyeti yüzdesi (%0 - %100) */
   sensitivityPercent: 50,
+  confidencePercent: 48,
+  displayConfidencePercent: 50,
+  symmetryPercent: 0,
+  signalRatioPercent: 50,
+  wallSupportPercent: 50,
   pendingFile: null,
   surfaceState: null,
   renderer: null,
@@ -121,7 +126,7 @@ export const state = {
   /** Adım, tespit ve saha metrelerini birleştiren ortak görünüm modeli */
   legacyFieldModel: null,
   /** Legacy harita: full = tüm kanıtlar, merged = birleşik hedefler, both = ikisi */
-  legacyMapViewMode: "full",
+  legacyMapViewMode: "merged",
   /** Birleşik hedef seçimi */
   legacySelectedMergedTargetId: null,
   /** Seçili birleşik hedefin 3D sunumu: simple | evidence | full */

@@ -12,7 +12,7 @@ import { loadImageFromFile } from './imageProcessor.js';
 import { runUnifiedAnalysis, createUnified2DMap } from './unifiedAnalysis.js';
 import { CoordinateAligner, drawControlPoints } from './coordinateAlignment.js';
 import { initClickToAlign, getPoints, getQuality, clearPoints, toggleGrid, destroy as destroyClickAlign } from './clickToAlign.js';
-import { calculateSensitivityParameters, filterDetectionsBySensitivity } from './sensitivity.js';
+import { calculateSensitivityParameters, summarizeTiers } from './sensitivity.js';
 
 // ── Durum ──
 
@@ -227,11 +227,12 @@ export function showResults(result) {
     const d = result.depthResult?.stats;
     const h = result.hints?.length || 0;
     const st = result.structures?.length || 0;
+    const tc = result.tierCounts || null;
 
     statsEl.innerHTML = `
       <div class="us-row"><span class="us-label">Image</span><span class="us-value">${s.filledCells} hücre, ${(s.matchRate * 100).toFixed(0)}% eşleşme</span></div>
       <div class="us-row"><span class="us-label">Derinlik</span><span class="us-value">${d?.depthMin?.toFixed(1) || 0}..${d?.depthMax?.toFixed(1) || 0}m, ort ${d?.avgDepth?.toFixed(1) || 0}m</span></div>
-      <div class="us-row"><span class="us-label">Yapılar</span><span class="us-value">${st} tespit</span></div>
+      <div class="us-row"><span class="us-label">Yapılar</span><span class="us-value">${st} tespit${tc ? ` · ${tc.confirmed} ●onaylı · ${tc.candidate} ◌aday · ${tc.noise} elendi` : ''}</span></div>
       <div class="us-row"><span class="us-label">İpuçları</span><span class="us-value">${h} (3D'de gösteriliyor)</span></div>
       <div class="us-row"><span class="us-label">Süre</span><span class="us-value">${result.elapsed}ms</span></div>
     `;
@@ -280,9 +281,10 @@ function updateSensitivityCount(sensitivityVal) {
     el.title = 'Analiz henüz yapılmadı';
     return;
   }
-  const kept = filterDetectionsBySensitivity(all, sensitivityVal);
-  el.textContent = `🎯 Tespit: ${kept.length} yapı`;
-  el.title = `${all.length} adaydan hassasiyet süzgecinden geçenler`;
+  // Kademe kırılımı: ● ONAYLI (yüksek oranlı, çubuktan muaf) · ◌ ADAY · elenen
+  const t = summarizeTiers(all, sensitivityVal);
+  el.textContent = `🎯 ${t.confirmed} ●onaylı · ${t.candidate} ◌aday · ${t.noise} elendi`;
+  el.title = `${all.length} toplam · onaylı (yüksek oranlı) tespitler her koşulda görünür`;
 }
 
 // ── Eşik Slider Bağlantıları ──

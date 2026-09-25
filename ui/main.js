@@ -41,6 +41,7 @@ import { bindModuleRail } from "./modules/rail.js";
 import { initHeartbeat, heartbeatSet } from "./ui/heartbeat.js";
 import { initTreeAnimations } from "./ui/treeAnimate.js";
 import { applyDtaLinkStatus, refreshDtaLink, startDtaLinkMonitor } from "./ui/dtaLink.js";
+import { bindDtaChatPanel } from "./ui/dtaChatPanel.js";
 import { logProbFromSurface, startProbEngineMonitor, refreshProbEngine } from "./ui/probEngine.js";
 import { syncStageHudFromSurface } from "./ui/stageHud.js";
 import { wireLicenseUi, refreshLicenseBadge } from "./ui/licenseBadge.js";
@@ -478,7 +479,7 @@ async function build3D() {
     const targetKind = selectedTargetKind();
     // Hassasiyet slider'ı → teknik eşikler (min güven 0.80 ↔ 0.15)
     const sens = calculateSensitivityParameters(state.sensitivityPercent);
-    const minConfidence = sens.minConfidence;
+    const minConfidence = state.confidencePercent / 100;
     const modeLabel = viewMode === "side" ? t("stats.side") : t("stats.top");
     const targetLabel = t("msg.targetBit", { label: targetKindLabel(targetKind) });
     logLine(t("msg.analyzeStart", { mode: modeLabel, target: targetLabel, thr: minConfidence.toFixed(2) }), "info");
@@ -491,6 +492,9 @@ async function build3D() {
       minArea: sens.minArea,
       sensitivity: sens.normalized,
       matchThreshold: sens.matchThreshold,
+      confidencePercent: state.confidencePercent,
+      signalRatioPercent: state.signalRatioPercent,
+      wallSupportPercent: state.wallSupportPercent,
       viewMode,
       minConfidence,
       targetKind,
@@ -1180,6 +1184,45 @@ if (minConfEl) {
   });
   syncConf();
 }
+const extraSensitivityControls = [
+  ["main-confidence-slider", "main-confidence-value", "confidencePercent"],
+  ["main-display-confidence-slider", "main-display-confidence-value", "displayConfidencePercent"],
+  ["main-symmetry-slider", "main-symmetry-value", "symmetryPercent"],
+  ["main-signal-slider", "main-signal-value", "signalRatioPercent"],
+  ["main-wall-slider", "main-wall-value", "wallSupportPercent"],
+];
+for (const [sliderId, valueId, stateKey] of extraSensitivityControls) {
+  const slider = $(sliderId);
+  const value = $(valueId);
+  if (!slider) continue;
+  const syncExtra = () => {
+    const next = Number(slider.value);
+    state[stateKey] = Number.isFinite(next) ? next : 50;
+    if (value) value.textContent = stateKey === "symmetryPercent" && state[stateKey] === 0
+      ? "Kapalı"
+      : `%${state[stateKey]}`;
+    window.dispatchEvent(new CustomEvent("votex:analysis-tuning-change", {
+      detail: { key: stateKey, value: state[stateKey] },
+    }));
+  };
+  slider.addEventListener("input", () => {
+    syncExtra();
+    if (["displayConfidencePercent", "symmetryPercent"].includes(stateKey) && state.surfaceState) {
+      const vertExag = (Number($("z-scale")?.value) || 10) / 10;
+      const wire = $("wireframe")?.value === "1";
+      const depScale = (Number($("depression-scale")?.value) || 10) / 10;
+      buildMesh(state.surfaceState, vertExag, wire, depScale);
+      renderStructureList(state.surfaceState);
+      return;
+    }
+    if (mainSensDebounce) clearTimeout(mainSensDebounce);
+    mainSensDebounce = setTimeout(() => {
+      if (state.pendingFile && !$("btn-build-3d")?.disabled) build3D();
+    }, 150);
+  });
+  slider.addEventListener("votex:analysis-tuning-sync", syncExtra);
+  syncExtra();
+}
 document.querySelectorAll('input[name="shot-type"]').forEach((el) => {
   el.addEventListener("change", () => {
     updateShotHint();
@@ -1448,6 +1491,7 @@ refreshMapHintsPanel();
 startUpdateMonitor();
 bindDtaGuide();
 startDtaLinkMonitor();
+bindDtaChatPanel();
 startSoilMonitor();
 startThroughRedMonitor({
   onSurface: (surface) => applySurface(surface),

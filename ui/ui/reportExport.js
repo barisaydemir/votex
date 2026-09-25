@@ -378,7 +378,7 @@ function generateReportHTML(stats, scenePNG) {
       <div style="background:#0e1520;border:1px solid #1e2d3d;border-left:4px solid ${confColor};border-radius:8px;padding:12px 16px;margin:8px 0;page-break-inside:avoid">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-weight:700;font-size:14px">${i + 1}. ${kindLabel(ch.kind)}</span>
-          <span style="background:${confColor};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">${conf}% güven</span>
+          <span style="background:${confColor};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">${conf}% güven skoru</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;color:#8ea8b8">
           <div>SNR: <strong style="color:#e8f0f4">${fmtSNR(snr)}</strong></div>
@@ -404,7 +404,7 @@ function generateReportHTML(stats, scenePNG) {
       <div style="background:#0e1520;border:1px solid #1e2d3d;border-left:4px solid ${confColor};border-radius:8px;padding:12px 16px;margin:8px 0;page-break-inside:avoid">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-weight:700;font-size:14px">🚇 Tünel #${i + 1}</span>
-          <span style="background:${confColor};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">${conf}% güven</span>
+          <span style="background:${confColor};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">${conf}% güven skoru</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;color:#8ea8b8">
           <div>SNR: <strong style="color:#e8f0f4">${fmtSNR(snr)}</strong></div>

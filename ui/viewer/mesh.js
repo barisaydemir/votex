@@ -42,6 +42,30 @@ function enableShadows(root) {
   });
 }
 
+function applyStructureConfidenceStyle(root, confidence) {
+  const score = Number(confidence);
+  const normalized = Number.isFinite(score) ? Math.max(0, Math.min(1, score)) : 0.5;
+  const opacityFactor = normalized >= 0.65
+    ? 1
+    : normalized >= 0.35
+      ? 0.28 + ((normalized - 0.35) / 0.3) * 0.72
+      : 0.18;
+  root.userData.confidence = normalized;
+  root.userData.confidenceTier = normalized >= 0.65 ? "strong" : normalized >= 0.35 ? "candidate" : "weak";
+  root.traverse((object) => {
+    if (object.userData?.isBadge || object.userData?.isDetailLabel) return;
+    const materials = object.material ? (Array.isArray(object.material) ? object.material : [object.material]) : [];
+    for (const material of materials) {
+      if (!material || typeof material.opacity !== "number") continue;
+      material.userData ||= {};
+      material.userData.baseOpacity ??= material.opacity;
+      material.transparent = true;
+      material.opacity = material.userData.baseOpacity * opacityFactor;
+      material.needsUpdate = true;
+    }
+  });
+}
+
 /** mapW×mapD dikdörtgen 1 m ızgara. */
 function makeRectMeterGrid(mapW, mapD) {
   const hw = mapW * 0.5;
@@ -134,14 +158,29 @@ export function buildMesh(surface, vertExag, wireframe, depressionScale) {
   const tunnels = structs.tunnels || [];
   const metals = structs.metals || [];
   const waters = structs.waters || [];
+  const minDisplayConfidence = Math.max(0, Math.min(0.8, Number(state.displayConfidencePercent ?? 50) / 100));
+  const minSymmetry = Math.max(0, Math.min(1, Number(state.symmetryPercent ?? 0) / 100));
+  const visibleChambers = chambers.filter((ch) => {
+    const score = Number(ch.confidence);
+    const symmetry = Number(ch.geometry?.symmetryIndex ?? ch.geometry?.symmetry_index);
+    return (!Number.isFinite(score) || score >= minDisplayConfidence)
+      && (!minSymmetry || !Number.isFinite(symmetry) || symmetry >= minSymmetry);
+  });
+  const visibleTunnels = tunnels.filter((t) => {
+    const score = Number(t.confidence);
+    const symmetry = Number(t.geometry?.symmetryIndex ?? t.geometry?.symmetry_index);
+    return (!Number.isFinite(score) || score >= minDisplayConfidence)
+      && (!minSymmetry || !Number.isFinite(symmetry) || symmetry >= minSymmetry);
+  });
   let num = 1;
 
-  chambers.forEach((ch, i) => {
+  visibleChambers.forEach((ch, i) => {
     if (ch.kind === "cavity") return;
     const id = `chamber-${i}`;
     try {
       const g = makeChamber(ch, mapW, mapD, vertExag, wireframe, id, num, sideView);
       if (g) {
+        applyStructureConfidenceStyle(g, ch.confidence);
         state.structureGroup.add(g);
         num += 1;
       }
@@ -149,11 +188,12 @@ export function buildMesh(surface, vertExag, wireframe, depressionScale) {
       /* bir oda sahneyi boşaltmasın */
     }
   });
-  tunnels.forEach((t, i) => {
+  visibleTunnels.forEach((t, i) => {
     const id = `tunnel-${i}`;
     try {
       const tun = makeTunnel(t, mapW, mapD, vertExag, wireframe, id, num, sideView);
       if (tun) {
+        applyStructureConfidenceStyle(tun, t.confidence);
         state.structureGroup.add(tun);
         num += 1;
       }

@@ -298,7 +298,29 @@
               <span>🔵 Maksimum</span>
             </div>
             <div id="main-sensitivity-desc" class="sens-desc">
-              Standart anomali ve yapı tespiti (Katı ↔ Detaylı)
+              Yüksek oranlı yapı/anomaliler ONAYLI olarak her koşulda görünür; çubuk aday eşiğini ve keşfi yönetir
+            </div>
+            <div class="sens-extra-controls" aria-label="Analiz destek ayarları">
+              <label class="sens-extra-control">
+                <span>Güven <b id="main-confidence-value">%48</b></span>
+                <input type="range" id="main-confidence-slider" min="15" max="80" step="1" value="48" aria-label="Güven yüzdesi" />
+              </label>
+              <label class="sens-extra-control">
+                <span>Çizim eşiği <b id="main-display-confidence-value">%50</b></span>
+                <input type="range" id="main-display-confidence-slider" min="0" max="80" step="1" value="50" aria-label="Minimum yapı çizim güveni" />
+              </label>
+              <label class="sens-extra-control">
+                <span>Simetri filtresi <b id="main-symmetry-value">Kapalı</b></span>
+                <input type="range" id="main-symmetry-slider" min="0" max="100" step="1" value="0" aria-label="Minimum simetri filtresi" />
+              </label>
+              <label class="sens-extra-control">
+                <span>Sinyal oranı <b id="main-signal-value">%50</b></span>
+                <input type="range" id="main-signal-slider" min="0" max="100" step="5" value="50" aria-label="Sinyal oranı" />
+              </label>
+              <label class="sens-extra-control">
+                <span>Duvar desteği <b id="main-wall-value">%50</b></span>
+                <input type="range" id="main-wall-slider" min="0" max="100" step="5" value="50" aria-label="Duvar desteği" />
+              </label>
             </div>
           </div>
 
@@ -646,6 +668,10 @@
                     </div>
                     <div id="legacy-target-title" class="legacy-target-title">Henüz hedef seçilmedi</div>
                     <div id="legacy-target-metrics" class="legacy-target-metrics"></div>
+                    <details id="legacy-target-section" class="legacy-target-section" open hidden>
+                      <summary>Hedef kesiti · ölçüm profili ve tahmini derinlik</summary>
+                      <div id="legacy-target-section-content"></div>
+                    </details>
                     <label class="legacy-target-view-control">
                       <span>Birleşik hedef görünümü</span>
                       <select id="legacy-target-view-mode" class="legacy-select" title="Seçili birleşik hedefin 3D görünümü">
@@ -825,9 +851,9 @@
                 </label>
                 <label class="legacy-input-row" id="legacy-map-view-row">
                   <span class="legacy-input-label">Harita katmanı</span>
-                  <select id="legacy-map-view" class="legacy-select" title="Tam tarama haritası veya birleşik hedef haritası">
-                    <option value="full">Tam harita · tüm kanıtlar</option>
-                    <option value="merged">Birleşik hedefler</option>
+                  <select id="legacy-map-view" class="legacy-select" title="Öncelikli hedefler veya ham tarama kanıtları">
+                    <option value="merged">Öncelikli hedefler</option>
+                    <option value="full">Ham kanıtlar · tüm tarama</option>
                     <option value="both">Birleşik + ham kanıtlar</option>
                   </select>
                   <span class="legacy-input-help">tam / hedef</span>
@@ -925,6 +951,7 @@
                   <button type="button" id="btn-legacy-export-geojson" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Tespitleri GeoJSON olarak kaydet">GeoJSON</button>
                   <button type="button" id="btn-legacy-export-summary" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Yazdırılabilir saha özeti (HTML → PDF)">Saha özeti</button>
                   <button type="button" id="btn-legacy-dta-brief-copy" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Vaka özetini DTA/Gemini bağlamı için panoya kopyala">DTA özeti</button>
+                  <label class="legacy-dta-case-context" title="Seçili adayla benzer, operatör kararı kayıtlı vakaları tarar. Seçerseniz özet metnine eklenir ve DTA'ya yapıştırdığınızda paylaşılır."><input type="checkbox" id="legacy-dta-similar-cases" /> Benzer, karar kayıtlı arşiv vakalarını ekle</label>
                 </div>
                 <div id="legacy-saha-brief" class="legacy-saha-brief" style="display:none;" aria-live="polite">
                   <div class="legacy-saha-brief-kicker">SAHA ÖZETİ</div>
@@ -1281,7 +1308,7 @@
                   <span>🔵 Maksimum</span>
                 </div>
                 <div id="unified-sensitivity-desc" style="font-size:0.58rem;color:var(--muted);margin-top:0.25rem;">
-                  Standart anomali ve yapı tespiti (Katı ↔ Detaylı)
+                  Yüksek oranlı yapı/anomaliler ONAYLI olarak her koşulda görünür; çubuk aday eşiğini ve keşfi yönetir
                 </div>
               </div>
 
@@ -1668,6 +1695,22 @@
             </div>
             <div class="placeholder" id="placeholder" data-i18n-html="stage.placeholder">
               JPG / PNG yükle → çekim tipi seç → <strong>Analizi Başlat</strong>
+            </div>
+          </div>
+          <!-- DTA sohbet paneli: 3D altında yarı saydam şerit (localhost köprüsü) -->
+          <div id="dta-chat-panel" data-open="0" class="dta-chat" style="flex-shrink:0;border-top:1px solid var(--line);">
+            <button type="button" id="dta-chat-toggle" class="dta-chat-head" title="DTA sohbetini aç/kapat">
+              <span class="dta-chat-title">DTA · <span id="dta-chat-status" data-state="off">DTA bekleniyor</span></span>
+              <span id="dta-chat-badge" class="dta-chat-badge" hidden>●</span>
+              <span class="dta-chat-caret">▴</span>
+            </button>
+            <div class="dta-chat-body-wrap">
+              <div id="dta-chat-chips" class="dta-chat-chips" hidden></div>
+              <div id="dta-chat-body" aria-live="polite"></div>
+              <div class="dta-chat-input-row">
+                <input type="text" id="dta-chat-input" placeholder="DTA'ya yaz… (Enter: gönder)" maxlength="2000" autocomplete="off" />
+                <button type="button" id="dta-chat-send" class="mil compact" title="Gönder">➤</button>
+              </div>
             </div>
           </div>
           <!-- Heatmap: 3D sahnenin altında bölünmüş görünüm (sadece CSV modülününde) -->

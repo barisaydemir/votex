@@ -82,6 +82,15 @@ pub struct AnalyzeImageRequest {
     /// Doğrudan HSV eşleşme toleransı eşiği (0.1 – 0.7)
     #[serde(default)]
     pub match_threshold: Option<f32>,
+    /// Bağımsız güven yüzdesi (0–100), min güven eşiğini doğrudan ayarlar.
+    #[serde(default)]
+    pub confidence_percent: Option<f32>,
+    /// Sinyal/gürültü oranı yüzdesi (0–100), sinyal kapısını ayarlar.
+    #[serde(default)]
+    pub signal_ratio_percent: Option<f32>,
+    /// Duvar ipucu katkısı yüzdesi (0–100).
+    #[serde(default)]
+    pub wall_support_percent: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

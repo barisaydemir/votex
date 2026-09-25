@@ -144,6 +144,18 @@ pub fn compute_image_edge_analysis(img: &RgbaImage, grid_w: u32, grid_h: u32) ->
 
 /// Yeşil/sarı + koyu–açık kontrast → yapı ipucu (yüzeye yakın olasılık yüksek).
 /// Beyaz çizgi alan değildir; duvar/tünel ipucu olarak ayrı okunur.
+#[derive(Debug, Clone, Copy)]
+pub struct SurfaceAnalysisTuning {
+    pub signal_ratio: f32,
+    pub wall_support: f32,
+}
+
+impl Default for SurfaceAnalysisTuning {
+    fn default() -> Self {
+        Self { signal_ratio: 0.5, wall_support: 0.5 }
+    }
+}
+
 pub fn colormap_to_surface(
     img: &RgbaImage,
     _lut_strip_px: u32,
@@ -156,6 +168,26 @@ pub fn colormap_to_surface(
     soil: &SoilParams,
     deep: bool,
     staged: bool,
+) -> Result<Surface3D, String> {
+    colormap_to_surface_with_tuning(
+        img, _lut_strip_px, max_grid, file_name, view_mode, min_confidence,
+        target_kind, dta_hints, soil, deep, staged, SurfaceAnalysisTuning::default(),
+    )
+}
+
+pub fn colormap_to_surface_with_tuning(
+    img: &RgbaImage,
+    _lut_strip_px: u32,
+    max_grid: u32,
+    file_name: Option<String>,
+    view_mode: &str,
+    min_confidence: f32,
+    target_kind: &str,
+    dta_hints: &[StructureHint],
+    soil: &SoilParams,
+    deep: bool,
+    staged: bool,
+    tuning: SurfaceAnalysisTuning,
 ) -> Result<Surface3D, String> {
     let view_mode = if view_mode.eq_ignore_ascii_case("side") {
         "side"
@@ -212,6 +244,7 @@ pub fn colormap_to_surface(
         dta_hints,
         deep,
         staged,
+        tuning,
     )?;
 
     let fit = fit_structures(

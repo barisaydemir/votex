@@ -82,7 +82,9 @@ pub fn build_surface_3d(
     // Hassasiyet faktörü oturuma da yazılır (tekrar üretilebilirlik).
     let sensitivity_factor = req.sensitivity.map(|s| s.clamp(0.0, 1.0));
     let min_confidence = req
-        .min_confidence
+        .confidence_percent
+        .map(|p| (p / 100.0).clamp(0.15, 0.80))
+        .or(req.min_confidence)
         .or_else(|| sensitivity_factor.map(crate::sensitivity::min_confidence))
         .unwrap_or(0.45);
     let target_kind = req.target_kind.as_deref().unwrap_or("auto").to_string();
@@ -115,7 +117,11 @@ pub fn build_surface_3d(
         .unwrap_or(settings.soil_profile.as_str());
     let soil = crate::soil_profile::resolve_params(soil_id, settings.soil_correction_enabled);
 
-    let surface = crate::surface::colormap_to_surface(
+    let tuning = crate::surface::SurfaceAnalysisTuning {
+        signal_ratio: req.signal_ratio_percent.unwrap_or(50.0).clamp(0.0, 100.0) / 100.0,
+        wall_support: req.wall_support_percent.unwrap_or(50.0).clamp(0.0, 100.0) / 100.0,
+    };
+    let surface = crate::surface::colormap_to_surface_with_tuning(
         &img,
         lut,
         192,
@@ -127,6 +133,7 @@ pub fn build_surface_3d(
         &soil,
         false,
         false,
+        tuning,
     )?;
 
     {
