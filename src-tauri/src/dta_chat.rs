@@ -76,6 +76,9 @@ pub struct ChatSinceResponse {
     pub turns: Vec<ChatTurn>,
     /// DTA canlı mı (son temas ≤ 180 sn)
     pub dta_online: bool,
+    /// DTA penceresi panel isteğiyle tray'e küçültülmüş mü (rozet + no-op restore koşulu)
+    #[serde(default)]
+    pub window_hidden: bool,
 }
 
 #[derive(Default)]
@@ -228,7 +231,12 @@ pub fn handle_chat_post(ring: &ChatRing, body: &str) -> Result<ChatPostResponse,
     })
 }
 
-pub fn handle_chat_since(ring: &ChatRing, cursor: u64, dta_online: bool) -> ChatSinceResponse {
+pub fn handle_chat_since(
+    ring: &ChatRing,
+    cursor: u64,
+    dta_online: bool,
+    window_hidden: bool,
+) -> ChatSinceResponse {
     let turns = ring.since(cursor);
     let next_cursor = turns
         .last()
@@ -239,6 +247,7 @@ pub fn handle_chat_since(ring: &ChatRing, cursor: u64, dta_online: bool) -> Chat
         cursor: next_cursor,
         turns,
         dta_online,
+        window_hidden,
     }
 }
 
@@ -254,18 +263,20 @@ mod tests {
         assert_eq!(resp.accepted, 2);
         assert_eq!(resp.last_id, 2);
 
-        let since = handle_chat_since(&ring, 0, true);
+        let since = handle_chat_since(&ring, 0, true, false);
         assert_eq!(since.turns.len(), 2);
         assert_eq!(since.turns[0].role, "user");
         assert_eq!(since.turns[1].role, "assistant");
         assert!(since.dta_online);
+        assert!(!since.window_hidden);
         assert_eq!(since.cursor, 2);
 
         // cursor'dan sonra yeni tur gelir
         handle_chat_post(&ring, r#"{"turns":[{"role":"assistant","text":"ikinci tur"}]}"#).unwrap();
-        let since2 = handle_chat_since(&ring, since.cursor, true);
+        let since2 = handle_chat_since(&ring, since.cursor, true, true);
         assert_eq!(since2.turns.len(), 1);
         assert_eq!(since2.turns[0].text, "ikinci tur");
+        assert!(since2.window_hidden);
     }
 
     #[test]
@@ -290,9 +301,10 @@ mod tests {
         let body = r#"{"turns":[{"role":"KULLANICI","text":"  "},{"role":"assistant","text":"ok"}]}"#;
         let resp = handle_chat_post(&ring, body).unwrap();
         assert_eq!(resp.accepted, 1);
-        let since = handle_chat_since(&ring, 0, false);
+        let since = handle_chat_since(&ring, 0, false, false);
         assert_eq!(since.turns[0].role, "assistant");
         assert!(!since.dta_online);
+        assert!(!since.window_hidden);
     }
 
     #[test]
@@ -302,7 +314,7 @@ mod tests {
             let body = format!(r#"{{"turns":[{{"role":"assistant","text":"t{i}"}}]}}"#);
             handle_chat_post(&ring, &body).unwrap();
         }
-        let since = handle_chat_since(&ring, 0, true);
+        let since = handle_chat_since(&ring, 0, true, false);
         assert_eq!(since.turns.len(), MAX_TURNS);
     }
 }

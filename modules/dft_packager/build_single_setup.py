@@ -49,7 +49,7 @@ def _resolve_release_dir() -> Path:
 RELEASE = _resolve_release_dir()
 BUNDLE_NSIS = RELEASE / "bundle" / "nsis"
 ISS = HERE / "DFT_Suite.iss"
-PACKAGE_VERSION = "0.4.149"
+PACKAGE_VERSION = "0.4.150"
 
 ISCC_CANDIDATES = [
     Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",

@@ -101,6 +101,17 @@ export function planChatTurns(turns) {
   });
 }
 
+/**
+ * 'D gizli' rozet görünürlük planı (DOM'suz, test edilebilir).
+ * DTA penceresi panel isteğiyle tray'e küçültüldüğünde ve panel açıkken
+ * başlıkta küçük bir rozet gösterilir; katlı panelde 'D'yi göster'
+ * buton etiketi durumu zaten taşır.
+ */
+export function planHiddenBadge(input = {}) {
+  const { windowHidden = false, panelOpen = false } = input || {};
+  return { visible: !!(windowHidden && panelOpen) };
+}
+
 function hhmm(ts) {
   if (!ts) return "";
   try {
@@ -141,6 +152,13 @@ async function pollOnce() {
     const wasOnline = onlineState;
     onlineState = !!resp.dtaOnline;
     if (onlineState !== wasOnline) updateStatus();
+    // Panel-gizli durumu Rust AppState ile senkron tut (rozet + buton etiketi)
+    const hidden = !!resp.windowHidden;
+    if (hidden !== dtaWindowHidden) {
+      dtaWindowHidden = hidden;
+      updateHideDtaUi();
+    }
+    syncHiddenBadge();
     refreshTargetChips();
     if (Array.isArray(resp.turns) && resp.turns.length) {
       chatCursor = Number(resp.cursor) || chatCursor;
@@ -158,6 +176,7 @@ async function pollOnce() {
         if (hasAssistant) {
           els.host.dataset.open = "1";
           els.badge.hidden = true;
+          syncHiddenBadge();
           scheduleAutoCollapse();
         } else {
           els.badge.hidden = false;
@@ -173,6 +192,13 @@ function updateStatus() {
   if (!els?.status) return;
   els.status.dataset.state = onlineState ? "online" : "off";
   els.status.textContent = onlineState ? "DTA bağlı" : "DTA bekleniyor";
+}
+
+/** 'D gizli' rozetini panel-gizli durumuna göre senkronlar. */
+function syncHiddenBadge() {
+  if (!els?.hiddenBadge) return;
+  const open = els.host?.dataset.open === "1";
+  els.hiddenBadge.hidden = !planHiddenBadge({ windowHidden: dtaWindowHidden, panelOpen: open }).visible;
 }
 
 /**
@@ -196,6 +222,7 @@ export function scheduleAutoCollapse() {
       return;
     }
     els.host.dataset.open = "0";
+    syncHiddenBadge();
   }, secs * 1000);
 }
 
@@ -231,6 +258,7 @@ function updateHideDtaUi() {
     ? "DTA penceresini geri getir"
     : "DTA penceresini tray'e küçült (konuşma sürer)";
   els.hideDta.dataset.hidden = dtaWindowHidden ? "1" : "0";
+  syncHiddenBadge();
 }
 
 /** Ayarlı süreyi bellek + kalıcı ayarlara yazar. */
@@ -426,6 +454,7 @@ export function bindDtaChatPanel() {
     chips: $("dta-chat-chips"),
     collapse: $("dta-chat-collapse"),
     hideDta: $("dta-chat-hide-dta"),
+    hiddenBadge: $("dta-chat-hidden-badge"),
   };
 
   els.toggle?.addEventListener("click", () => {
@@ -439,6 +468,7 @@ export function bindDtaChatPanel() {
       clearTimeout(autoCollapseTimer);
       autoCollapseTimer = null;
     }
+    syncHiddenBadge();
   });
   els.collapse?.addEventListener("change", () => {
     void setAutoCollapseSecs(Number(els.collapse.value) || 0);

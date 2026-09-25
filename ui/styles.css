@@ -4847,6 +4847,16 @@ button.legacy-step-card.is-selected { border-color: #f4c875; border-left-color: 
   font-size: 0.6rem;
 }
 
+#dta-chat-panel .dta-chat-hidden-badge {
+  background: rgba(244, 200, 117, 0.14);
+  border: 1px solid rgba(244, 200, 117, 0.45);
+  border-radius: 999px;
+  color: var(--accent, #f4c875);
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  padding: 0.06rem 0.45rem;
+}
+
 #dta-chat-panel .dta-chat-caret {
   margin-left: auto;
   transition: transform 0.15s ease;

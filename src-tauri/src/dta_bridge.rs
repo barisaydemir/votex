@@ -226,7 +226,8 @@ fn handle_connection(mut stream: std::net::TcpStream, app: &AppHandle) -> Result
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(0);
             let dta_online = last_ms > 0 && now_ms >= last_ms && (now_ms - last_ms) <= 180_000;
-            let resp = dta_chat::handle_chat_since(&ring, cursor, dta_online);
+            let window_hidden = state.dta_window_hidden.load(Ordering::Relaxed);
+            let resp = dta_chat::handle_chat_since(&ring, cursor, dta_online, window_hidden);
             (200, serde_json::to_string(&resp).unwrap_or_else(|_| "{}".into()))
         }
         ("GET", "/dta/chat/pending") => {

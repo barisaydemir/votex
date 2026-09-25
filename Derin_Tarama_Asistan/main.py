@@ -540,6 +540,10 @@ class JarvisLive:
 
     def _on_votex_window_restore(self) -> bool:
         """Gizlenen pencereyi geri getirir."""
+        try:
+            self.ui.write_log("SYS: Pencere VOTEX panelinden geri getirildi")
+        except Exception:
+            pass
         self.ui.restore_from_panel_mode()
         return True
 

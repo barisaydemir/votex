@@ -643,7 +643,15 @@ pub fn get_dta_chat_since(
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
     let dta_online = last_ms > 0 && now_ms >= last_ms && (now_ms - last_ms) <= 180_000;
-    Ok(crate::dta_chat::handle_chat_since(&ring, cursor, dta_online))
+    let window_hidden = state
+        .dta_window_hidden
+        .load(std::sync::atomic::Ordering::Relaxed);
+    Ok(crate::dta_chat::handle_chat_since(
+        &ring,
+        cursor,
+        dta_online,
+        window_hidden,
+    ))
 }
 
 /// Panelin bekleyen panel→DTA mesajlarını görmesi (ack durumu).

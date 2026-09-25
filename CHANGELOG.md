@@ -1,3 +1,10 @@
+## 0.4.150 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- DTA penceresi tray'deyken panel başlığında 'D gizli' rozeti; durum /dta/chat/since ve get_dta_chat_since yanıtlarındaki windowHidden ile senkron.
+- DTA panel-gizli moddayken kendi kendine restore olmaz: bring_to_front no-op, pencere yalnız panel 'D'yi göster' isteğiyle geri gelir.
+
 ## 0.4.149 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

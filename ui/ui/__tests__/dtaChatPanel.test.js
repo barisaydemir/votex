@@ -2,8 +2,25 @@ import { describe, it, expect } from "vitest";
 import {
   planChatTurns,
   planTargetShortcuts,
+  planHiddenBadge,
   __internals,
 } from "../dtaChatPanel.js";
+
+describe("planHiddenBadge — 'D gizli' rozet planı", () => {
+  it("rozet yalnız DTA penceresi gizli VE panel açıkken görünür", () => {
+    expect(planHiddenBadge({ windowHidden: true, panelOpen: true })).toEqual({ visible: true });
+    expect(planHiddenBadge({ windowHidden: true, panelOpen: false }).visible).toBe(false);
+    expect(planHiddenBadge({ windowHidden: false, panelOpen: true }).visible).toBe(false);
+    expect(planHiddenBadge({ windowHidden: false, panelOpen: false }).visible).toBe(false);
+  });
+
+  it("eksik/bozuk girdide güvenli varsayılan (gizli)", () => {
+    expect(planHiddenBadge()).toEqual({ visible: false });
+    expect(planHiddenBadge(null).visible).toBe(false);
+    expect(planHiddenBadge({ windowHidden: 1, panelOpen: "evet" }).visible).toBe(true);
+    expect(planHiddenBadge({ windowHidden: "1", panelOpen: 0 }).visible).toBe(false);
+  });
+});
 
 describe("panel otomatik açılma planı", () => {
   it("asistan yanıtı olan tur paketinde otomatik açma kararı çıkar", () => {

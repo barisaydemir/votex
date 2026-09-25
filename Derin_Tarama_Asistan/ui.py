@@ -821,9 +821,17 @@ class JarvisUI:
         self.root.update_idletasks()
 
     def bring_to_front(self):
-        """ELIC yakalama sonrasi DTA'yi one al (tablet topmost)."""
+        """ELIC yakalama sonrasi DTA'yi one al (tablet topmost).
+        VOTEX paneli pencereyi tray'e gizlediyse no-op: pencere, panel
+        'D'yi göster' isteklendikçe gizli kalmalı (kendi kendine restore yok).
+        """
+        if self._panel_hide_mode:
+            return
+
         def _do():
             try:
+                if self._panel_hide_mode:
+                    return  # bekleyen after() kuyruğu için ikinci kontrol
                 if self._tablet_mode:
                     self.root.attributes("-topmost", True)
                 self.root.lift()
