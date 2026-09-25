@@ -40,6 +40,8 @@ let persistTimer = null;
 let autoCollapseTimer = null;
 /** Ayarlı süre (saniye). 0 = hiç katlama. loadAutoCollapseSetting ile dolar. */
 let autoCollapseSecs = 0;
+/** DTA penceresi tray'de gizli mi (Rust dta_window_hidden ile senkron) */
+let dtaWindowHidden = false;
 
 /** DOM referansları (bind sonrası dolar) */
 let els = null;
@@ -200,6 +202,35 @@ export function scheduleAutoCollapse() {
 /** Kullanıcı panelle etkileşime girdiğinde zamanlayıcıyı yeniler. */
 function resetAutoCollapseOnActivity() {
   if (els?.host?.dataset.open === "1") scheduleAutoCollapse();
+}
+
+/**
+ * DTA penceresini tray'e küçültür / geri getirir (istemci tarafı geçici
+ * durum, Rust dta_window_hidden ile senkron; DTA poller istekleri çeker).
+ */
+export async function toggleDtaWindowHidden() {
+  const next = !dtaWindowHidden;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("request_dta_window", { action: next ? "hide" : "restore" });
+    dtaWindowHidden = next;
+    updateHideDtaUi();
+  } catch (e) {
+    console.warn("dta window toggle:", e);
+    if (els?.status) {
+      els.status.textContent = "Pencere isteği iletilemedi";
+      setTimeout(updateStatus, 2500);
+    }
+  }
+}
+
+function updateHideDtaUi() {
+  if (!els?.hideDta) return;
+  els.hideDta.textContent = dtaWindowHidden ? "D'yi göster" : "D'yi gizle";
+  els.hideDta.title = dtaWindowHidden
+    ? "DTA penceresini geri getir"
+    : "DTA penceresini tray'e küçült (konuşma sürer)";
+  els.hideDta.dataset.hidden = dtaWindowHidden ? "1" : "0";
 }
 
 /** Ayarlı süreyi bellek + kalıcı ayarlara yazar. */
@@ -394,6 +425,7 @@ export function bindDtaChatPanel() {
     toggle: $("dta-chat-toggle"),
     chips: $("dta-chat-chips"),
     collapse: $("dta-chat-collapse"),
+    hideDta: $("dta-chat-hide-dta"),
   };
 
   els.toggle?.addEventListener("click", () => {
@@ -411,6 +443,7 @@ export function bindDtaChatPanel() {
   els.collapse?.addEventListener("change", () => {
     void setAutoCollapseSecs(Number(els.collapse.value) || 0);
   });
+  els.hideDta?.addEventListener("click", () => void toggleDtaWindowHidden());
   // Panel etkileşimi zamanlayıcıyı tazeler
   ["click", "keydown", "scroll"].forEach((evt) => {
     host.addEventListener(evt, resetAutoCollapseOnActivity, { passive: true });

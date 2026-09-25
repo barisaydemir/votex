@@ -53,6 +53,8 @@ pub struct AppState {
     pub dta_last_hint_count: AtomicU64,
     /// Aktif BLE cihaz oturumu (canlı veri akışı)
     pub bt_link: Mutex<Option<crate::bt_link::BtSession>>,
+    /// DTA penceresi panel tarafından gizli mi (tray modu)
+    pub dta_window_hidden: AtomicBool,
 }
 
 impl Default for AppState {
@@ -66,6 +68,7 @@ impl Default for AppState {
             dta_last_contact_ms: AtomicU64::new(0),
             dta_last_hint_count: AtomicU64::new(0),
             bt_link: Mutex::new(None),
+            dta_window_hidden: AtomicBool::new(false),
         }
     }
 }

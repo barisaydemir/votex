@@ -162,6 +162,24 @@ impl ChatRing {
         id
     }
 
+    /// Pencere gizle/geri getir isteği; DTA poller'ı sistem mesajı olarak çeker.
+    pub fn push_window_request(&self, action: &str) -> u64 {
+        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let id = g.next_id.0.fetch_add(1, Ordering::Relaxed) + 1;
+        g.outbox.push(ChatTurn {
+            id,
+            role: "system".into(),
+            text: format!("__window_{action}__"),
+            ts: now_ms(),
+            meta: Some("window".into()),
+        });
+        if g.outbox.len() > MAX_TURNS {
+            let drop = g.outbox.len() - MAX_TURNS;
+            g.outbox.drain(0..drop);
+        }
+        id
+    }
+
     fn since(&self, cursor: u64) -> Vec<ChatTurn> {
         let g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         g.turns.iter().filter(|t| t.id > cursor).cloned().collect()

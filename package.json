@@ -1,7 +1,7 @@
 {
   "name": "votex",
   "private": true,
-  "version": "0.4.146",
+  "version": "0.4.148",
   "type": "module",
   "scripts": {
     "dev": "vite",

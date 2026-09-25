@@ -600,6 +600,11 @@ class JarvisUI:
         self.on_stop_command = None
         self.on_voice_change = None
         self.on_effects_state_change = None
+        # VOTEX panelinden gelen pencere gizle/geri getir istekleri (main.py bağlar)
+        self.on_window_hide_request = None
+        self.on_window_restore_request = None
+        # Panel gizle modu: konuşma sırasında pencere tray'e küçültülür
+        self._panel_hide_mode = False
 
         # ── Voice ────────────────────────────────────────────────────────────
         self._current_voice = self._load_voice()
@@ -829,6 +834,41 @@ class JarvisUI:
             self.root.after(0, _do)
         except Exception:
             _do()
+
+    # ── VOTEX panel: pencereyi tray'e küçült / geri getir ───────────────────
+    def hide_for_panel_mode(self):
+        """DTA penceresini görev çubuğundan da çekip arka plana alır.
+        Konuşma (ses + araçlar) aynen sürer; yalnız pencere görünmez olur.
+        """
+        def _do():
+            try:
+                self.root.withdraw()
+                self._panel_hide_mode = True
+            except Exception:
+                pass
+        try:
+            self.root.after(0, _do)
+        except Exception:
+            _do()
+
+    def restore_from_panel_mode(self):
+        """Gizlenen pencereyi eski konum/boyutla geri getirir."""
+        def _do():
+            try:
+                self.root.deiconify()
+                self.root.lift()
+                if self._tablet_mode:
+                    self.root.attributes("-topmost", True)
+                self._panel_hide_mode = False
+            except Exception:
+                pass
+        try:
+            self.root.after(0, _do)
+        except Exception:
+            _do()
+
+    def is_hidden_for_panel(self) -> bool:
+        return bool(self._panel_hide_mode)
 
     def _enter_fullscreen(self):
         sw = max(self.root.winfo_screenwidth(), self.root.winfo_width(), self.W)

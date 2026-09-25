@@ -110,23 +110,82 @@ def fetch_pending_panel_messages() -> list[dict[str, Any]]:
         return []
 
 
+def _send_ack() -> dict[str, Any]:
+    """Mevcut _ack_cursor'ı tek başına VOTEX'e bildirir (push gerektirmez)."""
+    global _ack_cursor
+    if _ack_cursor <= 0:
+        return {"ok": True, "accepted": 0}
+    payload: dict[str, Any] = {"turns": [], "ackCursor": _ack_cursor}
+    try:
+        return _http_json("POST", "/dta/chat", payload)
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+
 def _poll_loop(on_message: Callable[[str], None]) -> None:
     global _ack_cursor
     while not _poll_stop.is_set():
         try:
             messages = fetch_pending_panel_messages()
+            processed = False
             for msg in messages:
                 text = str(msg.get("text") or "").strip()
                 msg_id = int(msg.get("id") or 0)
                 if text and msg_id > _ack_cursor:
                     _ack_cursor = msg_id
-                    try:
-                        on_message(text)
-                    except Exception:
-                        pass
+                    processed = True
+                    # Pencere istekleri sistem mesajıdır (__window_hide__ / __window_restore__);
+                    # on_message'a ham metinle değil, pencere geri çağrılarıyla iletilir.
+                    if text == "__window_hide__":
+                        try:
+                            on_window_hide(text)
+                        except Exception:
+                            pass
+                    elif text == "__window_restore__":
+                        try:
+                            on_window_restore(text)
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            on_message(text)
+                        except Exception:
+                            pass
+            if processed and not messages:
+                # ulaşılmaz kol; korunma amaçlı
+                _send_ack()
         except Exception:
             pass
+        # İşlenen mesaj varsa ack'i hemen gönder (push beklenmez);
+        # böylece pencere istekleri tek başına da onaylanır.
+        if _ack_cursor > 0:
+            _send_ack()
         _poll_stop.wait(POLL_INTERVAL_S)
+
+
+# Pencere istek geri çağrıları (main.py bağlar; imza: (text) -> None)
+_on_window_hide: Callable[[str], None] | None = None
+_on_window_restore: Callable[[str], None] | None = None
+
+
+def set_window_handlers(
+    on_hide: Callable[[str], None] | None,
+    on_restore: Callable[[str], None] | None,
+) -> None:
+    """Pencere gizle/geri getir isteklerinin işleyicilerini bağlar."""
+    global _on_window_hide, _on_window_restore
+    _on_window_hide = on_hide
+    _on_window_restore = on_restore
+
+
+def on_window_hide(text: str) -> None:
+    if _on_window_hide:
+        _on_window_hide(text)
+
+
+def on_window_restore(text: str) -> None:
+    if _on_window_restore:
+        _on_window_restore(text)
 
 
 def start_panel_message_poller(on_message: Callable[[str], None]) -> None:

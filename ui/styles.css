@@ -4973,3 +4973,26 @@ button.legacy-step-card.is-selected { border-color: #f4c875; border-left-color: 
   color: var(--accent, #f4c875);
   border-color: var(--accent, #f4c875);
 }
+
+#dta-chat-panel .dta-chat-hide-btn {
+  background: rgba(110, 231, 160, 0.08);
+  border: 1px solid rgba(110, 231, 160, 0.3);
+  border-radius: 999px;
+  color: #6ee7a0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.55rem;
+  letter-spacing: 0.03em;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.5rem;
+}
+
+#dta-chat-panel .dta-chat-hide-btn:hover {
+  background: rgba(110, 231, 160, 0.2);
+}
+
+#dta-chat-panel .dta-chat-hide-btn[data-hidden="1"] {
+  background: rgba(244, 200, 117, 0.12);
+  border-color: rgba(244, 200, 117, 0.4);
+  color: var(--accent, #f4c875);
+}

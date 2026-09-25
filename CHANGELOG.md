@@ -1,3 +1,21 @@
+## 0.4.148 — 25 Eylül 2026
+
+### Panelden DTA penceresini gizle/geri getir
+
+- Panel başlığına 'D'yi gizle' düğmesi eklendi: DTA Tk penceresi tray'e küçültülür (withdraw), konuşma sesli ve araçlarla aynen sürer; düğme 'D'yi göster' olur.
+- Köprüye GET /dta/window, POST /dta/window/hide ve /dta/window/restore uçları; istekler outbox'a __window_hide__/__window_restore__ sistem mesajı olarak yazılır, DTA poller işleyip ui.hide_for_panel_mode/restore_from_panel_mode çağırır.
+- votex_chat poller işlenen mesajları push beklemeden tek başına ackCursor ile onaylar; pencere istekleri kuyruğa birikmez. Rust'ta dta_window_hidden durumu AppState'te.
+- VOTEX 0.4.148 Windows setup üretildi.
+
+## 0.4.147 — 25 Eylül 2026
+
+### Panelden DTA penceresini gizle/geri getir
+
+- Panel başlığına 'D'yi gizle' düğmesi eklendi: DTA Tk penceresi tray'e küçültülür (withdraw), konuşma sesli ve araçlarla aynen sürer; düğme 'D'yi göster' olur ve geri getirmek için yeter.
+- Köprüye GET /dta/window, POST /dta/window/hide ve /dta/window/restore uçları eklendi; istekler outbox'a __window_hide__/__window_restore__ sistem mesajı olarak yazılır, DTA poller işleyip ui.hide_for_panel_mode/restore_from_panel_mode çağırır.
+- votex_chat poller artık işlenen mesajları push beklemeden tek başına ackCursor ile onaylar; pencere istekleri kuyruğa birikmez. Rust tarafında dta_window_hidden durumu AppState'te tutulur.
+- VOTEX 0.4.147 Windows setup üretildi.
+
 ## 0.4.146 — 25 Eylül 2026
 
 ### DTA panel otomatik katlanma süresi ayarı

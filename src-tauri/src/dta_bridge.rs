@@ -163,6 +163,36 @@ fn handle_connection(mut stream: std::net::TcpStream, app: &AppHandle) -> Result
                 (200, resp.to_string())
             }
         }
+        ("GET", "/dta/window") => {
+            // DTA pencere durumu: DTA chat poller'ı GET /dta/chat/pending çektiğinde
+            // pending boşsa da bu uca bakar; state buradan sorgulanır.
+            let state = app.state::<AppState>();
+            let hidden = state.dta_window_hidden.load(Ordering::Relaxed);
+            let resp = serde_json::json!({
+                "ok": true,
+                "hidden": hidden,
+            });
+            (200, resp.to_string())
+        }
+        ("POST", "/dta/window/hide") | ("POST", "/dta/window/restore") => {
+            // Panel → DTA pencere isteği: outbox'a sistem mesajı yazılır;
+            // DTA chat poller'ı çekip ui callback'ini tetikler.
+            let action = if path.ends_with("/hide") { "hide" } else { "restore" };
+            let state = app.state::<AppState>();
+            let ring = app.state::<ChatRing>();
+            let id = ring.push_window_request(action);
+            state
+                .dta_window_hidden
+                .store(action == "hide", Ordering::Relaxed);
+            let pending = ring.pending();
+            let resp = serde_json::json!({
+                "ok": true,
+                "action": action,
+                "lastId": id,
+                "pending": pending,
+            });
+            (200, resp.to_string())
+        }
         ("POST", "/dta/chat") | ("POST", "/chat") => {
             let ring = app.state::<ChatRing>();
             match dta_chat::handle_chat_post(&ring, body) {

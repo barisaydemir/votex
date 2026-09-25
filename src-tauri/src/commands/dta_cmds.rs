@@ -108,6 +108,29 @@ pub fn set_legacy_depth_params(
     Ok(s)
 }
 
+/// DTA penceresini tray'e küçült / geri getir isteği (panel → köprü → DTA poller).
+#[tauri::command]
+pub fn request_dta_window(
+    state: tauri::State<'_, AppState>,
+    ring: tauri::State<'_, crate::dta_chat::ChatRing>,
+    action: String,
+) -> Result<serde_json::Value, String> {
+    let action = match action.as_str() {
+        "hide" => "hide",
+        "restore" => "restore",
+        _ => return Err("action 'hide' veya 'restore' olmalı".to_string()),
+    };
+    let id = ring.push_window_request(action);
+    state
+        .dta_window_hidden
+        .store(action == "hide", std::sync::atomic::Ordering::Relaxed);
+    Ok(serde_json::json!({
+        "ok": true,
+        "action": action,
+        "lastId": id,
+    }))
+}
+
 /// DTA paneli otomatik katlanma süresi (saniye). 0 = hiç katlama.
 #[tauri::command]
 pub fn set_dta_panel_auto_collapse(secs: u32) -> Result<AppSettings, String> {

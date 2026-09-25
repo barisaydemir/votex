@@ -466,6 +466,8 @@ class JarvisLive:
         self.ui.on_text_command = self._on_text_command
         self.ui.on_pause_toggle = self._on_pause_toggle
         self.ui.on_effects_state_change = self._on_effects_state_change
+        self.ui.on_window_hide_request = self._on_votex_window_hide
+        self.ui.on_window_restore_request = self._on_votex_window_restore
 
     def _on_pause_toggle(self, paused: bool):
         self._paused = paused
@@ -525,6 +527,28 @@ class JarvisLive:
             return False  # bağlantı gelene kadar kuyrukta beklet
         asyncio.run_coroutine_threadsafe(self._send_user_text(text), self._loop)
         return True
+
+    # ── VOTEX panel: pencere gizle/geri getir istekleri ──────────────────
+    def _on_votex_window_hide(self) -> bool:
+        """DTA penceresini tray'e küçültür; konuşma aynen sürer."""
+        try:
+            self.ui.write_log("SYS: Pencere VOTEX panelinden gizlendi (konuşma sürüyor)")
+        except Exception:
+            pass
+        self.ui.hide_for_panel_mode()
+        return True
+
+    def _on_votex_window_restore(self) -> bool:
+        """Gizlenen pencereyi geri getirir."""
+        self.ui.restore_from_panel_mode()
+        return True
+
+    # votex_chat poller'ının pencere isteklerini ui callback'lerine köprülediği işleyiciler
+    def _handle_votex_window_hide(self, _text: str) -> None:
+        self._on_votex_window_hide()
+
+    def _handle_votex_window_restore(self, _text: str) -> None:
+        self._on_votex_window_restore()
 
     async def _send_user_text(self, text: str):
         """Yazi komutu — once client_content (2.5), olmazsa realtime text."""
@@ -1028,6 +1052,11 @@ class JarvisLive:
                     self.out_queue = asyncio.Queue(maxsize=10)
 
                     print(f"[DTA] Baglandi ({model_name}).")
+                    # Pencere gizle/geri getir işleyicilerini bağla + poller'ı başlat
+                    votex_chat.set_window_handlers(
+                        self._handle_votex_window_hide,
+                        self._handle_votex_window_restore,
+                    )
                     # VOTEX panel mesajlarını çekmeye başla (idempotent)
                     votex_chat.start_panel_message_poller(self._on_votex_panel_message)
                     self.ui.set_state("LISTENING")
