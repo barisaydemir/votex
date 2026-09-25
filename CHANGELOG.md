@@ -1,3 +1,10 @@
+## 0.4.149 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Bakım sürümü.
+- VOTEX 0.4.149 Windows setup üretildi.
+
 ## 0.4.148 — 25 Eylül 2026
 
 ### Panelden DTA penceresini gizle/geri getir
