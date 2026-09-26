@@ -1,3 +1,14 @@
+## 0.4.157 — 26 Eylül 2026
+
+### Eklendi
+
+- Kalıcı canlı E2E sürücüsü `scripts/e2e_dta_bridge.py` (+ `npm run test:e2e:bridge` / `:bridge-only`): 0.4.154'ün 18 senaryosu + `/dta/chat` text-gövde kabul regresyonu, boot.log kanıt doğrulamalı.
+
+### Düzeltildi
+
+- Köprüde yarım HTTP isteği: tek `read()` istek ikiye bölününce yanıtsız kapanıyordu; başlık sonu + Content-Length tamamlama döngüsü eklendi.
+- `Content-Length` karakter sayısıyla bildiriliyordu; çok baytlı UTF-8 gövdede yanıt kırpık okunuyordu — bayt sayısına çevrildi.
+
 ## 0.4.155 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

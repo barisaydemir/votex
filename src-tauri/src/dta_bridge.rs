@@ -98,12 +98,52 @@ pub fn start_bridge(app: AppHandle) {
 
 fn handle_connection(mut stream: std::net::TcpStream, app: &AppHandle) -> Result<(), String> {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
-    let mut buf = vec![0u8; 65536];
-    let n = stream.read(&mut buf).map_err(|e| e.to_string())?;
-    if n == 0 {
+    // İstek TCP'de birden çok segmentte gelebilir (başlık + gövde ayrı ayrı);
+    // tek read() yarım isteği yakalayıp yanıtsız kapanmaya yol açıyordu.
+    let mut buf: Vec<u8> = Vec::with_capacity(65536);
+    let mut tmp = [0u8; 16384];
+    loop {
+        let n = stream.read(&mut tmp).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        buf.extend_from_slice(&tmp[..n]);
+        if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+            break;
+        }
+        if buf.len() > 1024 * 1024 {
+            break; // güvenlik sınırı
+        }
+    }
+    // Content-Length kadar gövdeyi tamamla
+    let header_end = buf
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .map(|p| p + 4)
+        .unwrap_or(buf.len());
+    let headers_text = String::from_utf8_lossy(&buf[..header_end]);
+    let content_length: usize = headers_text
+        .lines()
+        .find_map(|l| {
+            let (k, v) = l.split_once(':')?;
+            if k.trim().eq_ignore_ascii_case("content-length") {
+                v.trim().parse::<usize>().ok()
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0);
+    while buf.len() < header_end + content_length {
+        let n = stream.read(&mut tmp).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        buf.extend_from_slice(&tmp[..n]);
+    }
+    if buf.is_empty() {
         return Ok(());
     }
-    let raw = String::from_utf8_lossy(&buf[..n]);
+    let raw = String::from_utf8_lossy(&buf);
     let (method, path, body) = parse_http(&raw)?;
 
     {
@@ -444,7 +484,7 @@ fn write_response(stream: &mut std::net::TcpStream, status: u16, body: &str) -> 
     };
     let header = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        body.len()
+        body.as_bytes().len() // bayt sayısı — karakter sayısı çok baytlı UTF-8'de kırpık yanıt üretiyordu
     );
     stream
         .write_all(header.as_bytes())
