@@ -29,6 +29,25 @@ const ROOT = join(import.meta.dirname, "..");
 
 /* ── Saf dönüştürücüler (birim testlenirler) ─────────────── */
 
+/**
+ * Hash gate karar mantığı (saf — birim testlenir).
+ *
+ * Girdi:
+ *   exeHash / stagedHash — target/release votex.exe ↔ staging Votex.exe SHA-256
+ *   skipBuild            — release --skip-build ile mi koşuldu
+ *   nsisSetupExists      — bu turun NSIS setup'ı üretilmiş mi
+ * Çıktı:
+ *   "ok"                 — hash'ler birebir, bir şey yapma
+ *   "refresh"            — staging bayat ama binary taze: staging'e kopyala +
+ *                          NSIS yeniden paketle (çift bump olmadan düzeltilir)
+ *   "fail"               — otomatik düzeltme imkansız: exit 1
+ */
+export function resolveHashGateAction({ exeHash, stagedHash, skipBuild, nsisSetupExists }) {
+  if (exeHash === stagedHash) return "ok";
+  if (!skipBuild && nsisSetupExists) return "refresh";
+  return "fail";
+}
+
 /** Semver artırımı: "patch" | "minor" | "major" | doğrudan "x.y.z". */
 export function bumpVersion(current, mode = "patch") {
   if (/^\d+\.\d+\.\d+$/.test(mode)) return mode;
@@ -251,35 +270,46 @@ function main() {
     const b = sha256(staged);
     console.log(`\n🔑 votex.exe hash:      ${a.slice(0, 16)}…`);
     console.log(`🔑 staging Votex.exe:  ${b.slice(0, 16)}…`);
-    if (a !== b) {
+    const nsisSetup = join(
+      ROOT,
+      "target",
+      "release",
+      "bundle",
+      "nsis",
+      `Votex_${version}_x64-setup.exe`
+    );
+    const action = resolveHashGateAction({
+      exeHash: a,
+      stagedHash: b,
+      skipBuild,
+      nsisSetupExists: existsSync(nsisSetup),
+    });
+    if (action === "ok") {
+      console.log("✅ Hash'ler birebir aynı — paket taze derleme içeriyor.");
+    } else if (action === "refresh") {
       // Staging bayat olabilir (önceki turda kopyalanmamış) — votex.exe bu
       // turun sürümüyle derlendiğine göre staging'i tazeleyip NSIS setup'ı
       // yeniden paketliyoruz; böylece kullanıcı çift bump'a düşmez.
-      const nsisSetup = join(ROOT, "target", "release", "bundle", "nsis", `Votex_${version}_x64-setup.exe`);
-      if (!skipBuild && existsSync(nsisSetup)) {
-        console.log("♻️  Staging bayat — otomatik tazeleniyor ve NSIS setup yeniden paketleniyor...");
-        copyFileSync(join(ROOT, exe), join(ROOT, staged));
-        run("NSIS Setup yeniden paketleme (tauri build --bundles nsis)", "npm run build:installer");
-        const a2 = sha256(exe);
-        const b2 = sha256(staged);
-        console.log(`🔑 votex.exe hash:      ${a2.slice(0, 16)}…`);
-        console.log(`🔑 staging Votex.exe:  ${b2.slice(0, 16)}…`);
-        if (a2 !== b2) {
-          console.error("❌ Otomatik tazeleme sonrası hash hâlâ uyuşmuyor — manuel müdahale gerekli!");
-          process.exit(1);
-        }
-        console.log("✅ Staging tazelendi — paket bu turun binary'sini içeriyor (çift bump yok).");
-      } else {
-        console.error("❌ HASH UYUŞMAZLIĞI — paket bayat olabilir!");
-        console.error(
-          skipBuild
-            ? "   (--skip-build modunda otomatik tazeleme yapılmaz; binary'yi staging'e kopyalayıp tekrar deneyin)"
-            : "   NSIS setup bulunamadı — manuel müdahale gerekli."
-        );
+      console.log("♻️  Staging bayat — otomatik tazeleniyor ve NSIS setup yeniden paketleniyor...");
+      copyFileSync(join(ROOT, exe), join(ROOT, staged));
+      run("NSIS Setup yeniden paketleme (tauri build --bundles nsis)", "npm run build:installer");
+      const a2 = sha256(exe);
+      const b2 = sha256(staged);
+      console.log(`🔑 votex.exe hash:      ${a2.slice(0, 16)}…`);
+      console.log(`🔑 staging Votex.exe:  ${b2.slice(0, 16)}…`);
+      if (a2 !== b2) {
+        console.error("❌ Otomatik tazeleme sonrası hash hâlâ uyuşmuyor — manuel müdahale gerekli!");
         process.exit(1);
       }
+      console.log("✅ Staging tazelendi — paket bu turun binary'sini içeriyor (çift bump yok).");
     } else {
-      console.log("✅ Hash'ler birebir aynı — paket taze derleme içeriyor.");
+      console.error("❌ HASH UYUŞMAZLIĞI — paket bayat olabilir!");
+      console.error(
+        skipBuild
+          ? "   (--skip-build modunda otomatik tazeleme yapılmaz; binary'yi staging'e kopyalayıp tekrar deneyin)"
+          : "   NSIS setup bulunamadı — manuel müdahale gerekli."
+      );
+      process.exit(1);
     }
   }
 

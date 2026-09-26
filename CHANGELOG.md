@@ -1,3 +1,9 @@
+## 0.4.168 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Test: resolveHashGateAction saf fonksiyon + hash gate tazeleme karari birim testleri (refresh/fail/ok matrisi)
+
 ## 0.4.167 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

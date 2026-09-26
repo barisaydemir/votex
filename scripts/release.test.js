@@ -4,8 +4,10 @@ import {
   syncCargoToml,
   syncTauriConf,
   syncIss,
+  syncArtemisIss,
   syncPackagerPy,
   changelogSection,
+  resolveHashGateAction,
 } from "./release.mjs";
 
 describe("release.mjs — sürüm senkronizasyonu", () => {
@@ -70,5 +72,49 @@ describe("release.mjs — sürüm senkronizasyonu", () => {
     });
     expect(section).toContain("- Bakım sürümü.");
     expect(section).not.toContain("setup üretildi");
+  });
+
+  it("Artemis ISS sürüm + çıktı adını günceller", () => {
+    const iss =
+      "#define MyAppName \"VotexArtemis\"\n#define MyAppVersion \"0.4.118\"\n\n[Setup]\nOutputBaseFilename=VotexArtemis_Setup_0.4.118\n";
+    const out = syncArtemisIss(iss, "0.4.119");
+    expect(out).toContain('#define MyAppVersion "0.4.119"');
+    expect(out).toContain("OutputBaseFilename=VotexArtemis_Setup_0.4.119");
+  });
+});
+
+describe("release.mjs — hash gate tazeleme kararı (resolveHashGateAction)", () => {
+  const H1 = "a".repeat(64);
+  const H2 = "b".repeat(64);
+
+  it("hash'ler birebir → ok (hiçbir şey yapılmaz)", () => {
+    expect(
+      resolveHashGateAction({ exeHash: H1, stagedHash: H1, skipBuild: false, nsisSetupExists: true })
+    ).toBe("ok");
+    expect(
+      resolveHashGateAction({ exeHash: H1, stagedHash: H1, skipBuild: true, nsisSetupExists: false })
+    ).toBe("ok");
+  });
+
+  it("staging bayat + NSIS setup mevcut + build açık → refresh (çift bump yok)", () => {
+    // Çift bump zincirinin kırıldığı yer: gate durmak yerine tazeliyor.
+    expect(
+      resolveHashGateAction({ exeHash: H1, stagedHash: H2, skipBuild: false, nsisSetupExists: true })
+    ).toBe("refresh");
+  });
+
+  it("--skip-build modunda uyuşmazlık otomatik tazelenmez → fail", () => {
+    expect(
+      resolveHashGateAction({ exeHash: H1, stagedHash: H2, skipBuild: true, nsisSetupExists: true })
+    ).toBe("fail");
+    expect(
+      resolveHashGateAction({ exeHash: H1, stagedHash: H2, skipBuild: true, nsisSetupExists: false })
+    ).toBe("fail");
+  });
+
+  it("build açık ama NSIS setup yoksa → fail (tazelenecek paket yok)", () => {
+    expect(
+      resolveHashGateAction({ exeHash: H1, stagedHash: H2, skipBuild: false, nsisSetupExists: false })
+    ).toBe("fail");
   });
 });
