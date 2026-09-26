@@ -11,7 +11,7 @@
 ;   • Kullanıcı verileri %APPDATA%\VotexArtemis altında ayrık tutulur.
 
 #define MyAppName "VotexArtemis"
-#define MyAppVersion "0.4.163"
+#define MyAppVersion "0.4.164"
 #define MyAppPublisher "Digital Future Tech"
 #define MyAppURL "https://digitalfuture.tech"
 
@@ -26,7 +26,7 @@ UsePreviousAppDir=no
 DefaultGroupName=VotexArtemis
 DisableProgramGroupPage=yes
 OutputDir=dist
-OutputBaseFilename=VotexArtemis_Setup_0.4.163
+OutputBaseFilename=VotexArtemis_Setup_0.4.164
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

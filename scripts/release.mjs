@@ -115,8 +115,46 @@ function mb(bytes) {
 
 function printHelp() {
   console.log(
-    "Kullanım: node scripts/release.mjs [patch|minor|major|x.y.z] [-m \"not\"]... [--title \"başlık\"] [--skip-tests] [--skip-build] [--dry-run]"
+    "Kullanım: node scripts/release.mjs [patch|minor|major|x.y.z] [-m \"not\"]... [--title \"başlık\"] [--skip-tests] [--skip-build] [--skip-sync-check] [--dry-run]"
   );
+}
+
+/**
+ * DTA üç kopya senkron guard'ı: repo / surface-z / C:\votex kopyaları
+ * senkron değilse release daha sürümü bump'lamadan durur (DTA'yı da
+ * taşıyan sürümlerde bayat kopya bırakmamak için).
+ * Python yoksa veya denetleyici script yoksa sessizce geçilir (soft guard).
+ */
+function runDtaSyncGuard() {
+  const checker = join(ROOT, "scripts", "dta_sync_check.py");
+  if (!existsSync(checker)) return true; // script yok — engel değil
+  let python = "python";
+  try {
+    execSync("python --version", { cwd: ROOT, stdio: "ignore", timeout: 15_000 });
+  } catch {
+    const venvPy = "C:\\votex\\Derin_Tarama_Asistan\\.venv_jarvis\\Scripts\\python.exe";
+    if (existsSync(venvPy)) python = venvPy;
+    else {
+      console.log("\n⚠️  dta:sync-check atlandı — python bulunamadı (soft guard)");
+      return true;
+    }
+  }
+  try {
+    process.stdout.write("\n🔵 DTA üç kopya senkron guard...");
+    execSync(`"${python}" "${checker}"`, { cwd: ROOT, stdio: "pipe", timeout: 120_000 });
+    process.stdout.write(" ✅ senkron\n");
+    return true;
+  } catch (e) {
+    process.stdout.write(" ❌\n");
+    const out = String(e.stdout || "") + String(e.stderr || "");
+    console.error(out.trim() || e.message);
+    console.error(
+      "\n❌ DTA kopyaları senkron değil — release durduruldu.\n" +
+        "   Düzeltmek için: python scripts/dta_sync_check.py --sync\n" +
+        "   (Gerçekten atlamak için: --skip-sync-check)"
+    );
+    return false;
+  }
 }
 
 /* ── CLI ─────────────────────────────────────────────────── */
@@ -128,6 +166,7 @@ function main() {
   let mode = "patch";
   let skipTests = false;
   let skipBuild = false;
+  let skipSyncCheck = false;
   let dryRun = false;
 
   for (let i = 0; i < argv.length; i++) {
@@ -136,6 +175,7 @@ function main() {
     else if (a === "--title") title = argv[++i];
     else if (a === "--skip-tests") skipTests = true;
     else if (a === "--skip-build") skipBuild = true;
+    else if (a === "--skip-sync-check") skipSyncCheck = true;
     else if (a === "--dry-run") dryRun = true;
     else if (a === "-h" || a === "--help") return printHelp();
     else if (/^(patch|minor|major|\d+\.\d+\.\d+)$/.test(a)) mode = a;
@@ -158,6 +198,12 @@ function main() {
   console.log("╔══════════════════════════════════════════════════╗");
   console.log(`║  VOTEX RELEASE — ${current} → ${version}${" ".repeat(Math.max(0, 27 - current.length - version.length))}║`);
   console.log("╚══════════════════════════════════════════════════╝");
+
+  // 0. DTA kopya senkron guard (sürüm bump'ından ÖNCE — bayat kopyaya
+  //    sürüm bulaştırmamak için; dry-run'da da çalışır)
+  if (!skipSyncCheck && !runDtaSyncGuard()) {
+    process.exit(1);
+  }
 
   // 1–2. Senkronizasyon
   process.stdout.write(`\n📝 Sürüm senkronizasyonu (${dryRun ? "dry-run" : "yazılıyor"}):\n`);

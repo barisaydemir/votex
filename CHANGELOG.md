@@ -1,3 +1,9 @@
+## 0.4.164 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Guard: release.mjs basina DTA uc kopya senkron kontrolu (bump'tan once durur; --skip-sync-check ile atlanir)
+
 ## 0.4.163 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri
