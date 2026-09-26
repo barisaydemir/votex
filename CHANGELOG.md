@@ -1,3 +1,9 @@
+## 0.4.165 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Gate: hash uyuşmazlığında staging otomatik tazelensin + NSIS yeniden paketlensin (çift bump giderildi)
+
 ## 0.4.164 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

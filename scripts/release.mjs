@@ -21,7 +21,7 @@
 
 import { execSync } from "child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "path";
 import { pathToFileURL } from "node:url";
 
@@ -251,8 +251,36 @@ function main() {
     const b = sha256(staged);
     console.log(`\n🔑 votex.exe hash:      ${a.slice(0, 16)}…`);
     console.log(`🔑 staging Votex.exe:  ${b.slice(0, 16)}…`);
-    console.log(a === b ? "✅ Hash'ler birebir aynı — paket taze derleme içeriyor." : "❌ HASH UYUŞMAZLIĞI — paket bayat olabilir!");
-    if (a !== b) process.exit(1);
+    if (a !== b) {
+      // Staging bayat olabilir (önceki turda kopyalanmamış) — votex.exe bu
+      // turun sürümüyle derlendiğine göre staging'i tazeleyip NSIS setup'ı
+      // yeniden paketliyoruz; böylece kullanıcı çift bump'a düşmez.
+      const nsisSetup = join(ROOT, "target", "release", "bundle", "nsis", `Votex_${version}_x64-setup.exe`);
+      if (!skipBuild && existsSync(nsisSetup)) {
+        console.log("♻️  Staging bayat — otomatik tazeleniyor ve NSIS setup yeniden paketleniyor...");
+        copyFileSync(join(ROOT, exe), join(ROOT, staged));
+        run("NSIS Setup yeniden paketleme (tauri build --bundles nsis)", "npm run build:installer");
+        const a2 = sha256(exe);
+        const b2 = sha256(staged);
+        console.log(`🔑 votex.exe hash:      ${a2.slice(0, 16)}…`);
+        console.log(`🔑 staging Votex.exe:  ${b2.slice(0, 16)}…`);
+        if (a2 !== b2) {
+          console.error("❌ Otomatik tazeleme sonrası hash hâlâ uyuşmuyor — manuel müdahale gerekli!");
+          process.exit(1);
+        }
+        console.log("✅ Staging tazelendi — paket bu turun binary'sini içeriyor (çift bump yok).");
+      } else {
+        console.error("❌ HASH UYUŞMAZLIĞI — paket bayat olabilir!");
+        console.error(
+          skipBuild
+            ? "   (--skip-build modunda otomatik tazeleme yapılmaz; binary'yi staging'e kopyalayıp tekrar deneyin)"
+            : "   NSIS setup bulunamadı — manuel müdahale gerekli."
+        );
+        process.exit(1);
+      }
+    } else {
+      console.log("✅ Hash'ler birebir aynı — paket taze derleme içeriyor.");
+    }
   }
 
   const artifacts = [
