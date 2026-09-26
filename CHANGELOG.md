@@ -1,3 +1,9 @@
+## 0.4.153 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- README eklendi: broşür (votex.pdf) bağlantısı, ürün tanıtımı, kurulum ve geliştirici notları.
+
 ## 0.4.152 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri
