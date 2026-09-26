@@ -1,3 +1,9 @@
+## 0.4.161 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Araclar: scripts/dta_sync_check.py - DTA uc kopya hash senkron denetleyici + npm run dta:sync-check
+
 ## 0.4.160 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri
