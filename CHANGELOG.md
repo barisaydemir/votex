@@ -1,3 +1,13 @@
+## 0.4.159 — 26 Eylül 2026
+
+### Eklendi
+
+- Köprü birim testleri (18 yeni): erken istemci kopması, parçalı TCP segmentleri, Content-Length tamamlama, GET'siz gövde, OPTIONS preflight (204), bilinmeyen yol → 404 fallback, text→turns dönüşümü, outbox pending/ack, dtaOnline/windowHidden bayrak yansıması, 8 iş parçacıklı eşzamanlı POST güvenliği, Content-Length bayt/karakur doğrulaması.
+
+### Değişti
+
+- `dta_bridge.rs` test edilebilirliğe açıldı: socket I/O `read_request`'e, sohbet uçları saf `dispatch_chat_routes`'a, gövde dönüşümü `chat_body_to_effective`'e ayrıştırıldı (davranış koruyan refactor).
+
 ## 0.4.157 — 26 Eylül 2026
 
 ### Eklendi
