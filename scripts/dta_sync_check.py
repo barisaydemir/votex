@@ -182,6 +182,8 @@ def main() -> int:
     ap.add_argument("--sync", action="store_true", help="farklı dosyaları referanstan kopyala")
     ap.add_argument("--yes", action="store_true", help="onay sorma (sync ile)")
     ap.add_argument("--json", action="store_true", help="makine-okur çıktı")
+    ap.add_argument("--allow-missing", action="store_true",
+                    help="eksik kopya FAIL değil SKIP sayılır (CI'da yalnız repo varken)")
     args = ap.parse_args()
 
     copies = {
@@ -205,7 +207,19 @@ def main() -> int:
             "diffs": diffs,
         }, ensure_ascii=False, indent=2))
         problems = sum(len(x["changed"]) + len(x["missing"]) + len(x["extra"]) for x in diffs.values())
+        if missing and args.allow_missing:
+            return 0 if problems == 0 else 1
         return 0 if problems == 0 and not missing else 1
+
+    if missing and args.allow_missing:
+        print("DTA üç kopya senkron denetimi — CI modu (--allow-missing)")
+        for name in COPY_NAMES:
+            root = copies[name]
+            durum = "[SKIP]   " if name in missing else f"[{len(maps[name])} dosya]"
+            print(f"  {durum} {name}: {root}")
+        if len(maps) < 2:
+            print("SONUÇ: karşılaştırılacak ikinci kopya yok — SKIP")
+            return 0
 
     code = print_report(args.reference, copies, maps, diffs, missing)
     if args.sync and code != 0:

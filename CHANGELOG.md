@@ -1,3 +1,9 @@
+## 0.4.167 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- CI: dta-bridge.yml is akisi - push sonrasi sync-check (allow-missing CI modu) + Rust kopru testleri + bridge-only E2E smoke + UI testleri
+
 ## 0.4.166 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri
