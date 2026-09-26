@@ -221,8 +221,101 @@ export function extractMagneticGrid(source, options = {}) {
 
   console.log(`[ImageProc] Grid: ${gridRes}×${gridRes}, ${grid.length} hücre, nT: ${stats.nTMin.toFixed(0)}..${stats.nTMax.toFixed(0)}`);
 
-  return { grid, lut, stats, canvas };
+  return { grid, lut, stats, canvas, gradient: computeImageGradientField(grid, gridRes) };
 }
+
+/**
+ * Görsel manyetik gridinden fiziksel olmayan ama yönü korunmuş sonlu fark
+ * gradyanı çıkarır. Boş hücreler çizgi üretmez; sınırlar tek taraflı farktır.
+ * @returns {{gradientX: Float32Array, gradientY: Float32Array, magnitude: Float32Array, maxMagnitude:number, meanMagnitude:number}}
+ */
+export function computeImageGradientField(grid, gridRes) {
+  const n = Math.max(0, gridRes * gridRes);
+  const values = new Float32Array(n);
+  values.fill(NaN);
+  for (const cell of grid || []) {
+    const gx = Number(cell.gx), gy = Number(cell.gy);
+    if (gx >= 0 && gy >= 0 && gx < gridRes && gy < gridRes) {
+      values[gy * gridRes + gx] = Number(cell.nT);
+    }
+  }
+  const gradientX = new Float32Array(n);
+  const gradientY = new Float32Array(n);
+  const magnitude = new Float32Array(n);
+  gradientX.fill(NaN); gradientY.fill(NaN); magnitude.fill(NaN);
+  let maxMagnitude = 0, sum = 0, count = 0;
+  const sample = (x, y) => x < 0 || y < 0 || x >= gridRes || y >= gridRes ? NaN : values[y * gridRes + x];
+  const derivative = (x, y, axis) => {
+    const current = sample(x, y);
+    const before = axis === 'x' ? sample(x - 1, y) : sample(x, y - 1);
+    const after = axis === 'x' ? sample(x + 1, y) : sample(x, y + 1);
+    if (Number.isFinite(before) && Number.isFinite(after)) return (after - before) / 2;
+    if (Number.isFinite(after) && Number.isFinite(current)) return after - current;
+    if (Number.isFinite(before) && Number.isFinite(current)) return current - before;
+    return 0;
+  };
+  for (let y = 0; y < gridRes; y++) for (let x = 0; x < gridRes; x++) {
+    const i = y * gridRes + x;
+    if (!Number.isFinite(values[i])) continue;
+    const dx = derivative(x, y, 'x');
+    const dy = derivative(x, y, 'y');
+    const mag = Math.hypot(dx, dy);
+    gradientX[i] = dx; gradientY[i] = dy; magnitude[i] = mag;
+    maxMagnitude = Math.max(maxMagnitude, mag); sum += mag; count++;
+  }
+  return { gradientX, gradientY, magnitude, maxMagnitude, meanMagnitude: count ? sum / count : 0 };
+}
+
+function contourPoint(edge, values, level, x, y) {
+  const edges = [[0, 1], [1, 2], [2, 3], [3, 0]];
+  const points = [[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1]];
+  const [a, b] = edges[edge];
+  const d = values[b] - values[a];
+  const t = Math.abs(d) > Number.EPSILON ? Math.max(0, Math.min(1, (level - values[a]) / d)) : 0.5;
+  return [points[a][0] + (points[b][0] - points[a][0]) * t, points[a][1] + (points[b][1] - points[a][1]) * t];
+}
+
+const IMAGE_CONTOUR_PAIRS = [
+  [], [[3, 0]], [[0, 1]], [[3, 1]], [[1, 2]], [[3, 0], [1, 2]], [[0, 2]], [[3, 2]],
+  [[2, 3]], [[0, 2]], [[0, 1], [2, 3]], [[1, 2]], [[1, 3]], [[0, 1]], [[3, 0]], [],
+];
+
+/** Görsel manyetik alan için normalize grid koordinatlarında iso-nT segmentleri. */
+export function computeImageContourSegments(grid, gridRes, contourCount = 8) {
+  const values = new Float32Array(gridRes * gridRes); values.fill(NaN);
+  let min = Infinity, max = -Infinity;
+  for (const cell of grid || []) {
+    const i = Number(cell.gy) * gridRes + Number(cell.gx);
+    if (i < 0 || i >= values.length || !Number.isFinite(cell.nT)) continue;
+    values[i] = Number(cell.nT); min = Math.min(min, values[i]); max = Math.max(max, values[i]);
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return { levels: [], segments: [] };
+  const count = Math.max(1, Math.floor(contourCount));
+  const levels = Array.from({ length: count }, (_, i) => min + ((max - min) * (i + 1)) / (count + 1));
+  const segments = [];
+  for (let y = 0; y < gridRes - 1; y++) for (let x = 0; x < gridRes - 1; x++) {
+    const ids = [y * gridRes + x, y * gridRes + x + 1, (y + 1) * gridRes + x + 1, (y + 1) * gridRes + x];
+    if (ids.some(i => !Number.isFinite(values[i]))) continue;
+    const cell = ids.map(i => values[i]);
+    for (const level of levels) {
+      let mask = 0; for (let i = 0; i < 4; i++) if (cell[i] >= level) mask |= 1 << i;
+      for (const [a, b] of IMAGE_CONTOUR_PAIRS[mask]) segments.push([contourPoint(a, cell, level, x, y), contourPoint(b, cell, level, x, y), level]);
+    }
+  }
+  return { levels, segments };
+}
+
+/** Gradient ve kontur bulgularını Türkçe rapor/UI için özetler. */
+export function summarizeImageEdges(grid, gridRes, contourCount = 8) {
+  const gradient = computeImageGradientField(grid, gridRes);
+  const contours = computeImageContourSegments(grid, gridRes, contourCount);
+  const edgeThreshold = gradient.maxMagnitude * 0.35;
+  let edgeCellCount = 0;
+  for (const v of gradient.magnitude) if (Number.isFinite(v) && v >= edgeThreshold && edgeThreshold > 0) edgeCellCount++;
+  return { gradient, contours, edgeCellCount, edgeThreshold };
+}
+
+
 
 // ── Görüntü Yükleme ──
 

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { state } from "../../app/state.js";
 import { colorByDepth, edgeColorByDepth, formatDepthM } from "../colors.js";
 import { makeBadgeSprite, makeDetailSprite } from "../labels.js";
-import { mapToWorld } from "../coords.js";
+import { recordPointToWorld } from "../coords.js";
 import { t } from "../../i18n/index.js";
 
 /** Dikey şaft — konum blob (cx,cy); gövde −Y. */
@@ -13,7 +13,7 @@ export function makeShaft(ch, mapW, mapD, vertExag, wireframe, id, num, sideView
   const wM = ch.widthM ?? ch.width_m ?? 1.5;
   const lM = ch.lengthM ?? ch.length_m ?? wM;
   const diam = Math.max(Math.min(wM, lM), 0.45);
-  const { x, z } = mapToWorld(Math.max(0, Math.min(1, ch.cx)), Math.max(0, Math.min(1, ch.cy)), mapW, mapD, sideView);
+  const { x, z } = recordPointToWorld(ch, "cx", "cy", mapW, mapD, sideView);
   const rTop = diam * 0.52;
   const rBot = diam * 0.45;
   const sy = hM * vertExag;
@@ -150,6 +150,35 @@ export function makeShaft(ch, mapW, mapD, vertExag, wireframe, id, num, sideView
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -sy + 0.02;
   group.add(floor);
+
+  // —— Su yansıma diski (su taşıyan şaftlar için) ——
+  const isWaterBearing = (ch.kind === "shaft") && (hM > 3);
+  if (isWaterBearing) {
+    const waterGeo = new THREE.CircleGeometry(rBot * 0.75, 28);
+    const waterMesh = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
+      color: 0x2288aa, emissive: 0x115566, emissiveIntensity: 0.3,
+      transparent: true, opacity: 0.35, roughness: 0.1, metalness: 0.4,
+      side: THREE.DoubleSide, depthWrite: false,
+    }));
+    waterMesh.rotation.x = -Math.PI / 2;
+    waterMesh.position.y = -sy + 0.08;
+    waterMesh.userData.isWaterSurface = true;
+    group.add(waterMesh);
+    // Su damlacıkları — üstte parıltı
+    const dropGeo = new THREE.BufferGeometry();
+    const dropN = 6;
+    const dropPos = new Float32Array(dropN * 3);
+    for (let di = 0; di < dropN; di++) {
+      dropPos[di * 3] = (Math.random() - 0.5) * rBot * 1.2;
+      dropPos[di * 3 + 1] = -sy * 0.3 - Math.random() * sy * 0.5;
+      dropPos[di * 3 + 2] = (Math.random() - 0.5) * rBot * 1.2;
+    }
+    dropGeo.setAttribute('position', new THREE.Float32BufferAttribute(dropPos, 3));
+    group.add(new THREE.Points(dropGeo, new THREE.PointsMaterial({
+      color: 0x88ccee, size: 0.04, transparent: true, opacity: 0.5,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    })));
+  }
 
   // Siluet kenarları
   const outline = new THREE.LineSegments(

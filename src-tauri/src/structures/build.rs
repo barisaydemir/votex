@@ -424,7 +424,8 @@ pub fn build_tunnel_from_green_line(
 ) -> Option<Tunnel> {
     let conf = (0.42 + seg.strength * 0.35 + (seg.length - 0.07).min(0.25) * 0.8)
         .clamp(0.4, 0.92);
-    if conf < (min_confidence - 0.08).max(0.28) {
+    // ONAYLI (yüksek oranlı) tüneller hassasiyet eşiğinden muaftır (hysteresis).
+    if conf < (min_confidence - 0.08).max(0.28) && !crate::sensitivity::is_confirmed(conf) {
         return None;
     }
 

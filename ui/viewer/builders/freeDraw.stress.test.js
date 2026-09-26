@@ -316,34 +316,30 @@ describe("freeDraw stress test — 200×200", () => {
     expect(boundaryPixels).toBeLessThan(GW * GH * 0.3); // Boundary %30'dan az
   });
 
-  it("chainCues spatial hash naive'den en az 2× hızlı", () => {
+  it("chainCues spatial hash, naive brute force ile aynı zincirleri üretir", () => {
+    // Not: Zamanlama tabanlı speedup iddiası (naive/opt ms oranı) CI'da makine
+    // yüküne göre flaky davrandığı için kaldırıldı; bunun yerine spatial hash'in
+    // naive O(n²) taramayla birebir aynı çıktıyı ürettiği doğrulanır. Naive
+    // karşılaştırma aynı zamanda ölçeklilik sağlar: 1000 cue'da naive yine
+    // makul sürede tamamlanır (O(n²) ~ 10⁶ mesafe).
     const cueCounts = [100, 500, 1000];
-    
+
     for (const count of cueCounts) {
       const cues = generateRandomCues(count, count);
       const maxDist = 0.02; // Daha küçük reach → daha az komşu arama
-      
-      // Naive
-      const naiveStart = performance.now();
+
       const naiveLines = naiveChainCues(cues, maxDist);
-      const naiveElapsed = performance.now() - naiveStart;
-      
-      // Spatial hash
-      const optStart = performance.now();
       const optLines = chainCues(cues, maxDist);
-      const optElapsed = performance.now() - optStart;
-      
-      const speedup = naiveElapsed / Math.max(optElapsed, 0.1);
-      
-      console.log(`chainCues (${count} cues):`);
-      console.log(`  Naive: ${naiveElapsed.toFixed(1)}ms, ${naiveLines.length} lines`);
-      console.log(`  Spatial: ${optElapsed.toFixed(1)}ms, ${optLines.length} lines`);
-      if (count >= 500) console.log(`  Speedup: ${speedup.toFixed(1)}×`);
-      
-      // Sonuçlar benzer uzunlukta olmalı
+
+      console.log(`chainCues (${count} cues): naive ${naiveLines.length} çizgi, spatial ${optLines.length} çizgi`);
+
+      // Sonuç eşdeğerliliği: aynı zincir sayısı ve birebir aynı poligonlar
+      expect(optLines.length).toBe(naiveLines.length);
       expect(optLines.length).toBeGreaterThan(0);
-      // 500+ cue'da spatial hash avantajı ortaya çıkar
-      if (count >= 500) expect(speedup).toBeGreaterThan(1.2);
+      expect(optLines).toEqual(naiveLines);
+
+      // Deterministiklik: aynı girdiyle ikinci çağrı aynı sonucu vermeli
+      expect(chainCues(cues, maxDist)).toEqual(optLines);
     }
   });
 

@@ -99,6 +99,8 @@ async function onApply() {
   }
 }
 
+const UI_CONTRACT_VERSION = "legacy-result-v1";
+
 export async function startUpdateMonitor() {
   $("btn-update-pick")?.addEventListener("click", onPick);
   $("btn-update-apply")?.addEventListener("click", onApply);
@@ -109,8 +111,25 @@ export async function startUpdateMonitor() {
   });
   try {
     const v = await getAppVersion();
+    const runtimeVersion = v == null ? "" : String(v);
     const el = $("app-version-label");
-    if (el && v) el.textContent = `v${v}`;
+    if (runtimeVersion) {
+      // Runtime sürümünü başlıkta da göster: eski executable çalışıyorsa kullanıcı
+      // kaynak sürüm ile çalışan binary arasındaki farkı hemen görür.
+      document.documentElement.dataset.votexVersion = runtimeVersion;
+      document.documentElement.dataset.uiContract = UI_CONTRACT_VERSION;
+      document.title = `Votex ${runtimeVersion} — Magnetic Anomaly Analysis`;
+      if (el) {
+        el.textContent = `v${runtimeVersion}`;
+        el.dataset.uiContract = UI_CONTRACT_VERSION;
+        el.title = `Çalışan sürüm: ${runtimeVersion} · UI sözleşmesi: ${UI_CONTRACT_VERSION}`;
+      }
+      try {
+        window.dispatchEvent(new CustomEvent("votex:runtime-version", { detail: { version: runtimeVersion, contract: UI_CONTRACT_VERSION } }));
+      } catch {
+        /* UI bağlanmadan önce çalışan test/runtime ortamları */
+      }
+    }
   } catch {
     /* ignore */
   }

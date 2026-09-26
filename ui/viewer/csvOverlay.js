@@ -986,6 +986,12 @@ export function buildCsvOverlay(csvData, options = {}) {
   group.userData.csvBounds = bounds;
   group.userData.normCenter = center;
   group.userData.pointsMesh = pointsMesh;
+  group.userData.depthSlice = {
+    slice: Number(options.slice) || 0,
+    sliceCount: Math.max(1, Number(options.sliceCount) || 1),
+    band: bandBox,
+    enabled: !!bandBox,
+  };
 
   console.log(`[CSV] Overlay hazır: ${n} nokta, hacim=${dims.w.toFixed(1)}×${dims.h.toFixed(1)}×${dims.d.toFixed(1)}m (${elapsed}ms)`);
   return group;
@@ -1222,8 +1228,10 @@ export function renderCsvHeatmap(csvData, options = {}) {
     canvas.parentElement.style.display = 'none';
     return;
   }
-  // Bounds: filtrelenmiş noktaların sınırlarını kullan — böylece heatmap veriyi tam kaplar
-  const b = computeBounds(points);
+  // Bounds: filtrelenmiş noktaların sınırları — canlı taramada tüm alanı (kapsama
+  // gridini) göstermek için options.bounds ile ezilebilir; atlanan kenar kareler
+  // ancak alan sınırlarıyla birlikte çizilirse görünür.
+  const b = options.bounds ?? computeBounds(points);
   const xMin = b.xMin, xMax = b.xMax, yMin = b.yMin, yMax = b.yMax;
   const mMin = Math.min(...points.map(p => p.magnetic));
   const mMax = Math.max(...points.map(p => p.magnetic));
@@ -1246,11 +1254,13 @@ export function renderCsvHeatmap(csvData, options = {}) {
     magneticMax: mMax,
     low,
     high,
+    palette: options.palette,
+    thresholdContour: !!options.thresholdContour,
   });
 
   // Legend — split-view ve panel canvas'ını güncelle
   const legend = document.getElementById('split-heatmap-legend') || document.getElementById('csv-heatmap-legend');
-  if (legend) renderLegend(legend, mMin, mMax, 16, 120);
+  if (legend) renderLegend(legend, mMin, mMax, 16, 120, options.palette);
 
   // Piksel→metre dönüşüm bilgisi (her iki blokta da kullanılır)
   const xRangeM = (xMax - xMin) / 1e7;

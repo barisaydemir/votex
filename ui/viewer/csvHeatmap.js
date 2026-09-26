@@ -97,9 +97,6 @@ export function renderHeatmapCanvas(canvas, grid, counts, gridW, gridH, opts = {
     if (mMin === Infinity) { mMin = -100; mMax = 100; }
   }
 
-  const mRange = (mMax - mMin) || 1;
-  const mMid = (mMax + mMin) / 2;
-  const mHalf = Math.max(Math.abs(mMax - mMid), Math.abs(mMid - mMin), 1);
 
   for (let y = 0; y < displayH; y++) {
     const gy = Math.min(gridH - 1, Math.floor(y * gridH / displayH));
@@ -118,7 +115,7 @@ export function renderHeatmapCanvas(canvas, grid, counts, gridW, gridH, opts = {
       }
 
       const val = grid[idx];
-      const color = magneticToRgb(val, mMid, mHalf);
+      const color = valueToPaletteColor(val, mMin, mMax, opts.palette);
       pixels[pixIdx] = color[0];
       pixels[pixIdx + 1] = color[1];
       pixels[pixIdx + 2] = color[2];
@@ -128,68 +125,112 @@ export function renderHeatmapCanvas(canvas, grid, counts, gridW, gridH, opts = {
 
   ctx.putImageData(imageData, 0, 0);
 
-  // Anomali eşiği çizgileri çiz
-  if (opts.low !== undefined && opts.high !== undefined) {
-    drawThresholdOverlay(ctx, grid, counts, gridW, gridH, displayW, displayH, opts.low, opts.high, mMin, mMax);
+  // Eşik konturu — yalnızca istenirse (cihaz eşik görünümü)
+  if (opts.thresholdContour && opts.high !== undefined) {
+    drawThresholdOverlay(ctx, grid, counts, gridW, gridH, displayW, displayH, opts.high);
   }
 }
 
 /**
- * Anomali eşiği çizgilerini canvas üzerine çiz.
+ * Eşik üstü bölgelerin hücre kenarı konturlarını hesaplar (saf, canvas'sız).
+ * `mask[i]` dolu hücrelerin, maskesiz komşuya (veya ızgara kenarına) bakan
+ * kenarları segment olarak döner. Uydurma kontur üretilmez: yalnızca gerçekten
+ * eşiği aşan hücrelerin çevresi çizilir.
+ *
+ * @param {Uint8Array|boolean[]} mask gridW * gridH boyutunda bölge maskesi
+ * @returns {Array<[number, number, number, number]>} [x0, y0, x1, y1] — ızgara birimi
  */
-function drawThresholdOverlay(ctx, grid, counts, gridW, gridH, displayW, displayH, low, high, mMin, mMax) {
-  ctx.strokeStyle = 'rgba(226, 58, 58, 0.6)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-
-  const mRange = (mMax - mMin) || 1;
-
-  // Anomali piksel sayısını say
-  let anomCount = 0;
-  for (let y = 0; y < displayH; y++) {
-    for (let x = 0; x < displayW; x++) {
-      const gx = Math.min(gridW - 1, Math.floor(x * gridW / displayW));
-      const gy = Math.min(gridH - 1, Math.floor(y * gridH / displayH));
-      const idx = gy * gridW + gx;
-      if (counts[idx] > 0 && (grid[idx] < low || grid[idx] > high)) {
-        anomCount++;
-      }
+export function computeContourSegments(mask, gridW, gridH) {
+  const segments = [];
+  const on = (x, y) => x >= 0 && y >= 0 && x < gridW && y < gridH && !!mask[y * gridW + x];
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      if (!on(x, y)) continue;
+      if (!on(x, y - 1)) segments.push([x, y, x + 1, y]);
+      if (!on(x, y + 1)) segments.push([x, y + 1, x + 1, y + 1]);
+      if (!on(x - 1, y)) segments.push([x, y, x, y + 1]);
+      if (!on(x + 1, y)) segments.push([x + 1, y, x + 1, y + 1]);
     }
   }
-
-  ctx.setLineDash([]);
+  return segments;
 }
 
 /**
- * Manyetik değeri RGB renge dönüştür (Proton ELIC uyumlu).
+ * Cihaz eşik görünümü: eşik üstü bölgenin çevresine net kontur çizer.
+ * İki geçiş — koyu gölge + beyaz çekirdek — her zemin renginde okunur.
  */
-function magneticToRgb(value, mid, half) {
-  // Jet colormap: Mavi → Cyan → Yeşil → Sarı → Kırmızı
-  const t = Math.max(-1, Math.min(1, (value - mid) / (half || 1)));
-  const n = (t + 1) / 2; // 0..1
+function drawThresholdOverlay(ctx, grid, counts, gridW, gridH, displayW, displayH, high) {
+  const mask = new Uint8Array(gridW * gridH);
+  for (let i = 0; i < mask.length; i++) {
+    mask[i] = counts[i] > 0 && grid[i] > high ? 1 : 0;
+  }
+  const segments = computeContourSegments(mask, gridW, gridH);
+  if (!segments.length) return;
+  const sx = displayW / gridW;
+  const sy = displayH / gridH;
+  const stroke = (color, width) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    for (const [x0, y0, x1, y1] of segments) {
+      ctx.moveTo(x0 * sx, y0 * sy);
+      ctx.lineTo(x1 * sx, y1 * sy);
+    }
+    ctx.stroke();
+  };
+  stroke('rgba(10, 14, 20, 0.85)', 3);
+  stroke('rgba(255, 255, 255, 0.95)', 1.5);
+}
 
-  const stops = [
-    { t: 0.00, r: 0, g: 0, b: 128 },
-    { t: 0.15, r: 0, g: 0, b: 255 },
-    { t: 0.30, r: 0, g: 255, b: 255 },
-    { t: 0.45, r: 0, g: 255, b: 0 },
-    { t: 0.55, r: 255, g: 255, b: 0 },
-    { t: 0.75, r: 255, g: 128, b: 0 },
-    { t: 1.00, r: 255, g: 0, b: 0 },
-  ];
+// Jet colormap durakları — Proton ELIC uyumlu: Mavi → Cyan → Yeşil → Sarı → Kırmızı
+const JET_STOPS = [
+  { t: 0.00, r: 0, g: 0, b: 128 },
+  { t: 0.15, r: 0, g: 0, b: 255 },
+  { t: 0.30, r: 0, g: 255, b: 255 },
+  { t: 0.45, r: 0, g: 255, b: 0 },
+  { t: 0.55, r: 255, g: 255, b: 0 },
+  { t: 0.75, r: 255, g: 128, b: 0 },
+  { t: 1.00, r: 255, g: 0, b: 0 },
+];
 
-  let lo = stops[0], hi = stops[stops.length - 1];
-  for (let i = 0; i < stops.length - 1; i++) {
-    if (n >= stops[i].t && n <= stops[i + 1].t) {
-      lo = stops[i]; hi = stops[i + 1]; break;
+/** Jet renk haritası — n: 0..1 → [r, g, b]. */
+export function jetColor(n) {
+  const t = Math.max(0, Math.min(1, n));
+  let lo = JET_STOPS[0], hi = JET_STOPS[JET_STOPS.length - 1];
+  for (let i = 0; i < JET_STOPS.length - 1; i++) {
+    if (t >= JET_STOPS[i].t && t <= JET_STOPS[i + 1].t) {
+      lo = JET_STOPS[i]; hi = JET_STOPS[i + 1]; break;
     }
   }
-  const f = (hi.t - lo.t) > 0 ? (n - lo.t) / (hi.t - lo.t) : 0;
+  const f = (hi.t - lo.t) > 0 ? (t - lo.t) / (hi.t - lo.t) : 0;
   return [
     Math.round(lo.r + (hi.r - lo.r) * f),
     Math.round(lo.g + (hi.g - lo.g) * f),
     Math.round(lo.b + (hi.b - lo.b) * f),
   ];
+}
+
+/**
+ * Manyetik değeri RGB renge dönüştürür.
+ * - "device": cihazın kendi programı gibi doğrusal gökkuşağı — min mavi →
+ *   yeşil → sarı → max kırmızı (cihaz ekranıyla yan yana karşılaştırma için).
+ * - "votex" (varsayılan): simetrik — orta değer yeşil, iki uç mavi/kırmızı.
+ */
+export function valueToPaletteColor(value, mMin, mMax, palette = 'votex') {
+  const mRange = (mMax - mMin) || 1;
+  if (palette === 'device') {
+    return jetColor((value - mMin) / mRange);
+  }
+  const mMid = (mMax + mMin) / 2;
+  const mHalf = Math.max(Math.abs(mMax - mMid), Math.abs(mMid - mMin), 1);
+  return magneticToRgb(value, mMid, mHalf);
+}
+
+/** Simetrik manyetik eşleme (yeşil zeminli Votex görünümü). */
+function magneticToRgb(value, mid, half) {
+  const t = Math.max(-1, Math.min(1, (value - mid) / (half || 1)));
+  return jetColor((t + 1) / 2);
 }
 
 /**
@@ -420,19 +461,17 @@ export function bindHeatmapPick(canvas, points, bounds, tooltip, opts = {}) {
 /**
  * Binned grid'i canvas'a legend (renk çubuğu) çizer.
  */
-export function renderLegend(canvas, mMin, mMax, width, height) {
+export function renderLegend(canvas, mMin, mMax, width, height, palette = 'votex') {
   if (!canvas) return;
   canvas.width = width || 20;
   canvas.height = height || 200;
   const ctx = canvas.getContext('2d');
   const h = canvas.height;
-  const mMid = (mMax + mMin) / 2;
-  const mHalf = Math.max(Math.abs(mMax - mMid), Math.abs(mMid - mMin), 1);
 
   for (let y = 0; y < h; y++) {
     const t = 1 - y / h;
     const val = mMin + t * (mMax - mMin);
-    const color = magneticToRgb(val, mMid, mHalf);
+    const color = valueToPaletteColor(val, mMin, mMax, palette);
     ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
     ctx.fillRect(0, y, canvas.width, 1);
   }

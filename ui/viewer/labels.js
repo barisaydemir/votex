@@ -72,7 +72,7 @@ export function makeBadgeSprite(num, accentHex = "#7ec8e8") {
   return sprite;
 }
 
-export function makeDetailSprite(title, lines) {
+export function makeDetailSprite(title, lines, options = {}) {
   const lineArr = (Array.isArray(lines) ? lines : [String(lines || "")]).filter(Boolean);
   const canvas = document.createElement("canvas");
   const nLines = Math.min(lineArr.length, 3);
@@ -84,10 +84,15 @@ export function makeDetailSprite(title, lines) {
   const pad = 10;
   const boxW = 520 - pad * 2;
   const boxH = cH - pad * 2;
-  // Çerçevesiz yumuşak balon
-  ctx.fillStyle = "rgba(8, 16, 20, 0.78)";
+  // Yumuşak bilgi balonu; accent yalnız durum/uyarı rengini anlatır.
+  ctx.fillStyle = "rgba(8, 16, 20, 0.86)";
   roundRect(ctx, pad, pad, boxW, boxH, 14);
   ctx.fill();
+  const accentHex = String(options?.accentHex || "#7ec8e8");
+  ctx.strokeStyle = accentHex;
+  ctx.lineWidth = 4;
+  roundRect(ctx, pad + 2, pad + 2, boxW - 4, boxH - 4, 12);
+  ctx.stroke();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#fff6e8";
@@ -198,10 +203,19 @@ export function focusStructure(id) {
   document.querySelectorAll(".fd-item").forEach((el) => el.classList.remove("active"));
 
   Object.entries(state.structureTargets).forEach(([key, t]) => {
-    if (t.detailLabel) t.detailLabel.visible = key === id;
+    if (!t.detailLabel) return;
+    // Legacy: yalnız kanonik rank kartı ve etiket modu rozet/tam iken
+    if (String(key).startsWith("legacy-dik-")) {
+      const mode = String(state.legacyLabelMode || "badge").toLowerCase();
+      const canonical = !!(t.detailLabel.userData?.legacyDetailCard && t.detailLabel.userData?.legacyRankLabel);
+      t.detailLabel.visible = canonical && mode !== "off" && key === id;
+      return;
+    }
+    t.detailLabel.visible = key === id;
   });
 
   flyCameraTo(entry.position, entry.radius, entry.title || id);
+  window.dispatchEvent(new CustomEvent("votex:selection-change", { detail: { id } }));
 }
 
 export function focusBestValuableMetal(surface) {
@@ -252,4 +266,5 @@ export function focusFreeDraw(id) {
 
   const pos = worldPosOf(entry.object, entry.position);
   flyCameraTo(pos, entry.radius, entry.title || id);
+  window.dispatchEvent(new CustomEvent("votex:selection-change", { detail: { id } }));
 }

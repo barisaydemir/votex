@@ -20,7 +20,7 @@ import { PALETTES } from "../viewer/colorizer.js";
  * @param {number} quality — JPEG kalitesi (0-1, sadece JPEG için)
  * @returns {string|null} base64 data URL
  */
-function captureSceneImage(format = "image/png", quality = 0.92) {
+export function captureSceneImage(format = "image/png", quality = 0.92) {
   const renderer = state.renderer;
   if (!renderer || !renderer.domElement) return null;
   // Bir render tetikle (tampon taze olsun)
@@ -119,6 +119,7 @@ function extractStats(surface) {
     soilProfile,
     soilLabel,
     vpeUsed,
+    edgeAnalysis: surface.edgeAnalysis ?? surface.edge_analysis ?? null,
     // Arrays (for card generation)
     chambers,
     tunnels,
@@ -377,7 +378,7 @@ function generateReportHTML(stats, scenePNG) {
       <div style="background:#0e1520;border:1px solid #1e2d3d;border-left:4px solid ${confColor};border-radius:8px;padding:12px 16px;margin:8px 0;page-break-inside:avoid">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-weight:700;font-size:14px">${i + 1}. ${kindLabel(ch.kind)}</span>
-          <span style="background:${confColor};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">${conf}% güven</span>
+          <span style="background:${confColor};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">${conf}% güven skoru</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;color:#8ea8b8">
           <div>SNR: <strong style="color:#e8f0f4">${fmtSNR(snr)}</strong></div>
@@ -403,7 +404,7 @@ function generateReportHTML(stats, scenePNG) {
       <div style="background:#0e1520;border:1px solid #1e2d3d;border-left:4px solid ${confColor};border-radius:8px;padding:12px 16px;margin:8px 0;page-break-inside:avoid">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-weight:700;font-size:14px">🚇 Tünel #${i + 1}</span>
-          <span style="background:${confColor};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">${conf}% güven</span>
+          <span style="background:${confColor};color:#000;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">${conf}% güven skoru</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;color:#8ea8b8">
           <div>SNR: <strong style="color:#e8f0f4">${fmtSNR(snr)}</strong></div>
@@ -530,6 +531,22 @@ function generateReportHTML(stats, scenePNG) {
       <div>🌍 Toprak: <strong style="color:var(--text)">${stats?.soilLabel || stats?.soilProfile || "Kapalı"}</strong></div>
     </div>
   </div>
+
+  <!-- İŞLEM TARAFLI RESİM ANALİZİ -->
+  ${stats?.edgeAnalysis ? `
+  <div class="section print-break">
+    <div class="section-title">🧭 Resim İşleme: Kenar / Gradyan Analizi</div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.7">
+      Resimden hesaplanan sonlu fark gradyanı <strong>|∇B|</strong> kenar tespitinde kullanıldı.
+      ${Number(stats.edgeAnalysis.edgeCellCount || 0)} güçlü kenar hücresi ve ${(stats.edgeAnalysis.contourLevels || stats.edgeAnalysis.contour_levels || []).length} iso-seviye üretildi.
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-top:10px">
+      <div class="stat-box"><div class="stat-val">${Number(stats.edgeAnalysis.meanMagnitude ?? stats.edgeAnalysis.mean_magnitude ?? 0).toFixed(3)}</div><div class="stat-label">Ortalama |∇B|</div></div>
+      <div class="stat-box"><div class="stat-val">${Number(stats.edgeAnalysis.maxMagnitude ?? stats.edgeAnalysis.max_magnitude ?? 0).toFixed(3)}</div><div class="stat-label">Maksimum |∇B|</div></div>
+      <div class="stat-box"><div class="stat-val">${Number(stats.edgeAnalysis.edgeCellCount ?? stats.edgeAnalysis.edge_cell_count ?? 0)}</div><div class="stat-label">Kenar Hücresi</div></div>
+    </div>
+    <p style="font-size:10px;color:var(--text3);margin-top:8px">Kontur çizgileri işlem çıktısını gösterir; tek başına yapı/metal kanıtı değildir ve saha doğrulaması gerektirir.</p>
+  </div>` : ""}
 
   <!-- ÖNCELİK SIRASI -->
   <div class="section print-break">

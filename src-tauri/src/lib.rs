@@ -1,16 +1,19 @@
-//! Votex Tauri backend — manyetik anomali + ekran yakalama.
+﻿//! Votex Tauri backend â€” manyetik anomali + ekran yakalama.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![allow(dead_code)] // Kullanılmayan fonksiyonlar API/gelecek kullanımı için korunuyor
+#![allow(dead_code)] // KullanÄ±lmayan fonksiyonlar API/gelecek kullanÄ±mÄ± iÃ§in korunuyor
 
 mod analysis;
 mod app_settings;
 mod archive;
+mod bt_link;
 mod capture;
 mod commands;
 mod csv_import;
 mod dta_bridge;
+mod dta_chat;
 mod license;
+mod legacy_mag_json;
 mod magnetic;
 mod preprocess;
 mod prob_client;
@@ -18,6 +21,8 @@ mod hint_store;
 mod session_persist;
 mod sdc_model;
 mod sdc_reader_mod;
+mod sensitivity;
+mod shape_templates;
 mod soil_profile;
 mod structures;
 mod surface;
@@ -31,9 +36,10 @@ use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
+        .manage(crate::dta_chat::new_ring())
         .setup(|app| {
             dta_bridge::start_bridge(app.handle().clone());
-            // Son kayıtlı 3D oturum + DTA ipuçlarını yükle
+            // Son kayÄ±tlÄ± 3D oturum + DTA ipuÃ§larÄ±nÄ± yÃ¼kle
             if let Some(work) = session_persist::load_work() {
                 let state = app.state::<AppState>();
                 if let Some(session) = work.session {
@@ -76,7 +82,7 @@ pub fn run() {
                         serde_json::json!({
                             "ok": true,
                             "hintCount": state.dta_last_hint_count.load(std::sync::atomic::Ordering::Relaxed),
-                            "message": "Son kayıtlı 3D yüklendi",
+                            "message": "Son kayÄ±tlÄ± 3D yÃ¼klendi",
                             "surface": surface,
                             "restored": true,
                         }),
@@ -89,7 +95,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event {
-                // Ana pencere kapanırken DTA'yı da kapat
+                // Ana pencere kapanÄ±rken DTA'yÄ± da kapat
                 if window.label() == "main" {
                     app_settings::shutdown_owned_dta();
                 }
@@ -108,6 +114,13 @@ pub fn run() {
             commands::csv_cmds::build_surface_from_csv,
             commands::csv_cmds::pick_csv_file,
             commands::csv_cmds::parse_excel_data,
+            commands::csv_cmds::analyze_legacy_dik_json,
+            commands::csv_cmds::level_legacy_mag_json,
+            commands::csv_cmds::pick_legacy_dik_json,
+            commands::bt_cmds::bt_scan,
+            commands::bt_cmds::bt_connect,
+            commands::bt_cmds::bt_disconnect,
+            commands::bt_cmds::bt_link_status,
             commands::get_dta_link_status,
             commands::dta_cmds::get_app_settings,
             commands::dta_cmds::set_dta_launch_path,
@@ -116,6 +129,12 @@ pub fn run() {
             commands::dta_cmds::set_soil_correction_enabled,
             commands::dta_cmds::set_structures_through_red,
             commands::dta_cmds::set_hints_3d_visible,
+            commands::dta_cmds::set_legacy_depth_params,
+            commands::dta_cmds::set_dta_panel_auto_collapse,
+            commands::dta_cmds::request_dta_window,
+            commands::dta_cmds::set_legacy_depth_calib_notes,
+            commands::dta_cmds::set_legacy_learned_thresholds,
+            commands::dta_cmds::set_legacy_field_sessions,
             commands::dta_cmds::set_csv_filter_prefs,
             commands::dta_cmds::deep_structure_scan,
             commands::dta_cmds::staged_depth_scan,
@@ -124,6 +143,9 @@ pub fn run() {
             commands::dta_cmds::pick_dta_launch_path,
             commands::dta_cmds::launch_dta,
             commands::dta_cmds::interpret_votex_screen,
+            commands::dta_cmds::send_dta_panel_message,
+            commands::dta_cmds::get_dta_chat_since,
+            commands::dta_cmds::get_dta_chat_pending,
             commands::dta_cmds::get_map_dta_hints,
             commands::dta_cmds::set_map_dta_hints_enabled,
             commands::dta_cmds::add_contact_hints,
@@ -139,6 +161,9 @@ pub fn run() {
             commands::license_cmds::activate_license,
             commands::archive_cmds::list_archive,
             commands::archive_cmds::load_archive,
+            commands::archive_cmds::save_legacy_archive,
+            commands::archive_cmds::load_legacy_archive,
+            commands::archive_cmds::attach_field_report,
             commands::archive_cmds::delete_archive,
             commands::update_cmds::get_app_version,
             commands::update_cmds::get_update_status,
@@ -147,7 +172,7 @@ pub fn run() {
             commands::update_cmds::apply_suite_update,
         ])
         .build(tauri::generate_context!())
-        .expect("Votex başlatılamadı")
+        .expect("Votex baÅŸlatÄ±lamadÄ±")
         .run(|_app, event| {
             match event {
                 RunEvent::ExitRequested { .. } | RunEvent::Exit => {
@@ -157,3 +182,4 @@ pub fn run() {
             }
         });
 }
+

@@ -1,8 +1,10 @@
 //! Votex WASM — magnetic colormap analysis core for the mobile PWA.
 //!
-//! Ported from `src-tauri/src/vision.rs` (desktop Tauri backend) as a
-//! dependency-free core that accepts raw RGBA pixels from JS `getImageData()`
-//! and returns detected anomalies as JSON. Runs fully offline on the phone.
+//! Ported from `src-tauri/src/vision.rs` + `surface/field.rs` (desktop Tauri
+//! backend) as a dependency-free core that accepts raw RGBA pixels from JS
+//! `getImageData()` and returns results as JSON. Runs fully offline.
+
+mod surface;
 
 use wasm_bindgen::prelude::*;
 
@@ -357,4 +359,149 @@ pub fn image_stats(rgba: &[u8]) -> String {
 #[wasm_bindgen]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+// ── 3D Surface pipeline (surface/field.rs port) ───────────
+
+/// Surface building result as JSON string.
+/// Contains the heights grid (−1..+1) + RGB color grid — enough for the
+/// phone to render a 3D terrain without any backend.
+#[wasm_bindgen]
+pub struct SurfaceResult {
+    json: String,
+}
+
+#[wasm_bindgen]
+impl SurfaceResult {
+    #[wasm_bindgen(getter)]
+    pub fn json(&self) -> String {
+        self.json.clone()
+    }
+}
+
+/// Build the 3D surface field from a colormap image.
+///
+/// * `rgba` — raw RGBA pixels (cleaned image, no LUT strip needed)
+/// * `width`, `height` — source image dimensions
+/// * `grid_w`, `grid_h` — output grid resolution (clamped 16..256)
+///
+/// Returns JSON: { gridW, gridH, heights: [...], colors: [...], zMin, zMax }
+/// Heights are float array serialized compactly (3 decimal places).
+#[wasm_bindgen]
+pub fn build_surface_field(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    grid_w: u32,
+    grid_h: u32,
+) -> Result<SurfaceResult, JsValue> {
+    if width < 16 || height < 16 {
+        return Err("Görüntü çok küçük".into());
+    }
+    if (rgba.len() as u64) < (width as u64) * (height as u64) * 4 {
+        return Err("RGBA buffer too small".into());
+    }
+    let grid_w = grid_w.clamp(16, 256);
+    let grid_h = grid_h.clamp(16, 256);
+
+    let (signed, colors) =
+        surface::build_signed_field(rgba, width, height, grid_w, grid_h);
+    let heights = surface::synthesize_symmetric_bodies(&signed, grid_w, grid_h);
+    let (z_min, z_max) = surface::min_max(&heights);
+
+    // Compact JSON: heights with 3 decimals, colors as 0-255 ints
+    let mut json = String::with_capacity(64 + heights.len() * 7 + colors.len() * 4);
+    json.push_str("{\"gridW\":");
+    json.push_str(&grid_w.to_string());
+    json.push_str(",\"gridH\":");
+    json.push_str(&grid_h.to_string());
+    json.push_str(",\"zMin\":");
+    json.push_str(&format!("{:.4}", z_min));
+    json.push_str(",\"zMax\":");
+    json.push_str(&format!("{:.4}", z_max));
+    json.push_str(",\"heights\":[");
+    for (i, v) in heights.iter().enumerate() {
+        if i > 0 {
+            json.push(',');
+        }
+        json.push_str(&format!("{:.3}", v));
+    }
+    json.push_str("],\"colors\":[");
+    for (i, c) in colors.iter().enumerate() {
+        if i > 0 {
+            json.push(',');
+        }
+        json.push_str(&c.to_string());
+    }
+    json.push_str("]}");
+
+    Ok(SurfaceResult { json })
+}
+
+// ── Wall cue detection (preprocess.rs port) ──────────────
+
+/// Wall cue detection result as JSON string.
+/// Contains wall cues (near-void white pixels) + green line segments (tunnels).
+#[wasm_bindgen]
+pub struct WallCueResult {
+    json: String,
+}
+
+#[wasm_bindgen]
+impl WallCueResult {
+    #[wasm_bindgen(getter)]
+    pub fn json(&self) -> String {
+        self.json.clone()
+    }
+}
+
+/// Detect wall cues and extract tunnel line segments from a colormap image.
+///
+/// * `rgba` — raw RGBA pixels (cleaned image)
+/// * `width`, `height` — source image dimensions
+///
+/// Returns JSON: { cues: [...], segments: [...] }
+/// cues:     { x, y, strength, nearVoid, greenLine }
+/// segments: { x0, y0, x1, y1, strength, length }
+#[wasm_bindgen]
+pub fn detect_wall_cues(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+) -> Result<WallCueResult, JsValue> {
+    if width < 16 || height < 16 {
+        return Err("Görüntü çok küçük".into());
+    }
+    if (rgba.len() as u64) < (width as u64) * (height as u64) * 4 {
+        return Err("RGBA buffer too small".into());
+    }
+
+    let cues = surface::detect_wall_cues(rgba, width, height);
+    let segs = surface::extract_green_line_segments(&cues);
+
+    // Build JSON manually
+    let mut json = String::with_capacity(128 + cues.len() * 64 + segs.len() * 80);
+    json.push_str("{\"cues\":[");
+    for (i, c) in cues.iter().enumerate() {
+        if i > 0 {
+            json.push(',');
+        }
+        json.push_str(&format!(
+            "{{\"x\":{:.4},\"y\":{:.4},\"strength\":{:.4},\"nearVoid\":{},\"greenLine\":{}}}",
+            c.x, c.y, c.strength, c.near_void, c.green_line
+        ));
+    }
+    json.push_str("],\"segments\":[");
+    for (i, s) in segs.iter().enumerate() {
+        if i > 0 {
+            json.push(',');
+        }
+        json.push_str(&format!(
+            "{{\"x0\":{:.4},\"y0\":{:.4},\"x1\":{:.4},\"y1\":{:.4},\"strength\":{:.4},\"length\":{:.4}}}",
+            s.x0, s.y0, s.x1, s.y1, s.strength, s.length
+        ));
+    }
+    json.push_str("]}");
+
+    Ok(WallCueResult { json })
 }

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Votex 3D Spatial & Anomaly Visualizer</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-logo">3D</div>
+          <div class="brand-info">
+            <span class="brand-title">VOTEX 3D VISUALIZER</span>
+            <span class="brand-subtitle">Spatial XYZ & Magnetic Anomaly Rendering Engine</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" id="btn-load-sample" class="btn primary">Örnek Veri Yükle</button>
+          <button type="button" id="btn-open-file" class="btn accent">Dosya Seç (XYZ / CSV)</button>
+          <input type="file" id="file-input-fallback" accept=".csv,.txt,.dat,.tsv,.asc,*" style="display:none;" />
+          <span class="status-badge" id="status-badge">Hazır</span>
+        </div>
+      </header>
+
+      <!-- Main Workspace Grid -->
+      <main class="main-layout">
+        <!-- Left Panel: Controls & Options -->
+        <aside class="panel panel-left">
+          <div class="panel-header">
+            <span class="tag">CTRL</span>
+            <h2>Görselleştirme Ayarları</h2>
+          </div>
+
+          <div class="form-group">
+            <label>Görünüm Modu</label>
+            <div class="toggle-group">
+              <button type="button" id="btn-mode-mesh" class="toggle-btn active">3D Yüzey (Mesh)</button>
+              <button type="button" id="btn-mode-points" class="toggle-btn">Nokta Bulutu</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Renk Paleti (Anomali Haritası)</label>
+            <select id="select-colormap" class="select-input">
+              <option value="geophysics" selected>Jeofizik (Mavi [Boşluk] → Beyaz [Ort.] → Kırmızı [Metal])</option>
+              <option value="jet">Jet / Termal (Mavi → Yeşil → Sarı → Kırmızı)</option>
+              <option value="rainbow">Rainbow (Gökkuşağı)</option>
+              <option value="viridis">Viridis</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Birim & Kalibrasyon Çarpanı</label>
+            <select id="select-unit-multiplier" class="select-input">
+              <option value="dm" selected>Desimetre (dm → m, ÷10)</option>
+              <option value="cm">Santimetre (cm → m, ÷100)</option>
+              <option value="m">Metre (Birebir 1×)</option>
+              <option value="mm">Milimetre (mm → m, ÷1000)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Saha Görünümü & Eksen Düzeni</label>
+            <select id="select-axis-orientation" class="select-input">
+              <option value="horizontal" selected>Yatay Saha Haritası (X: Genişlik, Y: İlerleme)</option>
+              <option value="swap_xy">X & Y Eksenlerini Yer Değiştir (Yatay Döndür)</option>
+              <option value="profile">Dikey Profil Kesit Görünümü (Ön Kesit)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Dikey Abartı (Z-Scale): <strong id="val-z-scale">1.0×</strong></label>
+            <input type="range" id="slider-z-scale" min="0.1" max="5.0" step="0.1" value="1.0" class="slider" />
+          </div>
+
+          <div class="form-group">
+            <label>Nokta Boyutu (Nokta Modu): <strong id="val-point-size">0.35</strong></label>
+            <input type="range" id="slider-point-size" min="0.05" max="1.5" step="0.05" value="0.35" class="slider" />
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="chk-wireframe" />
+              <span>Tel Kafes (Wireframe) Göster</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="chk-grid-floor" checked />
+              <span>Taban Izgarasını (Grid) Göster</span>
+            </label>
+          </div>
+
+          <div class="panel-header compact">
+            <span class="tag">FILTER</span>
+            <h2>Anomali Eşik Filtresi</h2>
+          </div>
+          <div class="form-group">
+            <label>Min. Anomali Sınırı: <strong id="val-min-cutoff">—</strong></label>
+            <input type="range" id="slider-min-cutoff" min="0" max="100" step="1" value="0" class="slider" />
+          </div>
+
+          <div class="panel-header compact">
+            <span class="tag">META</span>
+            <h2>Dosya Bilgileri</h2>
+          </div>
+          <div class="info-card" id="file-info-card">
+            <p>Henüz veri dosyası yüklenmedi.</p>
+          </div>
+        </aside>
+
+        <!-- Center Panel: 3D Stage Viewport -->
+        <section class="panel panel-center">
+          <div class="viewport-header">
+            <span class="view-tag">TACTICAL VIEW 3D</span>
+            <span class="view-hint">Sol tık: Döndür · Sağ tık: Kaydır · Tekerlek: Zoom · Üstüne gel: İncele</span>
+          </div>
+          <div class="viewport-container" id="viewport">
+            <div id="viewport-placeholder" class="placeholder">
+              <p class="ph-title">3D XYZ & ANOMALİ GÖRSELLEŞTİRİCİ</p>
+              <p class="ph-sub">CSV, TXT veya DAT dosyası yükleyin ya da <strong>Örnek Veri Yükle</strong> butonuna tıklayın.</p>
+            </div>
+            <!-- Tooltip Hover Card -->
+            <div id="hover-card" class="hover-card" hidden>
+              <div class="hc-title">Nokta Detayı</div>
+              <div class="hc-row"><span>X:</span><strong id="hc-x">—</strong></div>
+              <div class="hc-row"><span>Y:</span><strong id="hc-y">—</strong></div>
+              <div class="hc-row"><span>Z:</span><strong id="hc-z">—</strong></div>
+              <div class="hc-row"><span>Anomali:</span><strong id="hc-anom" class="anom-val">—</strong></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right Panel: Statistics & Telemetry -->
+        <aside class="panel panel-right">
+          <div class="panel-header">
+            <span class="tag">STATS</span>
+            <h2>Veri İstatistikleri</h2>
+          </div>
+          <div class="stats-grid" id="stats-grid">
+            <div class="stat-box">
+              <span>Toplam Nokta</span>
+              <strong id="st-count">0</strong>
+            </div>
+            <div class="stat-box">
+              <span>X Genişlik</span>
+              <strong id="st-x-range">—</strong>
+            </div>
+            <div class="stat-box">
+              <span>Y Derinlik</span>
+              <strong id="st-y-range">—</strong>
+            </div>
+            <div class="stat-box">
+              <span>Z Yükseklik</span>
+              <strong id="st-z-range">—</strong>
+            </div>
+            <div class="stat-box highlight">
+              <span>Min Anomali</span>
+              <strong id="st-min-anom">—</strong>
+            </div>
+            <div class="stat-box highlight">
+              <span>Max Anomali</span>
+              <strong id="st-max-anom">—</strong>
+            </div>
+          </div>
+
+          <div class="panel-header compact">
+            <span class="tag">LEGEND</span>
+            <h2>Renk Skalası (Lejant)</h2>
+          </div>
+          <div class="legend-container">
+            <div class="legend-bar" id="legend-bar"></div>
+            <div class="legend-labels">
+              <span id="leg-min">Min</span>
+              <span id="leg-mid">Ort</span>
+              <span id="leg-max">Max</span>
+            </div>
+          </div>
+
+          <div class="panel-header compact">
+            <span class="tag">STRUCTURES</span>
+            <h2>Tespit Edilen Yapılar & Metraj</h2>
+          </div>
+          <div class="structure-list" id="structure-list-container">
+            <p class="struct-empty">Henüz tespit edilen yapı yok.</p>
+          </div>
+
+          <div class="panel-header compact">
+            <span class="tag">LOG</span>
+            <h2>İşlem Günlüğü</h2>
+          </div>
+          <div class="telemetry-log" id="telemetry-log"></div>
+        </aside>
+      </main>
+    </div>
+
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>

@@ -245,6 +245,7 @@ export function detectStructuresFromTerrain(yGrid, mGrid, counts, gridRes, poolS
       // Tünel: uzun ve dar
       const hw = wM / 2, hd = dM / 2;
       tunnels.push({
+        coordinateSpace: "meters",
         x0: cxVal - hw, y0: czVal,
         x1: cxVal + hw, y1: czVal,
         floorFromSurfaceM: depthM,
@@ -255,6 +256,7 @@ export function detectStructuresFromTerrain(yGrid, mGrid, counts, gridRes, poolS
     } else if (regionM > 0) {
       // Metal: güçlü pozitif anomali
       metals.push({
+        coordinateSpace: "meters",
         cx: cxVal, cy: czVal,
         depthFromSurfaceM: depthM,
         widthM: wM,
@@ -265,6 +267,7 @@ export function detectStructuresFromTerrain(yGrid, mGrid, counts, gridRes, poolS
     } else {
       // Oda: güçlü negatif anomali (manyetik zayıflama = boşluk)
       chambers.push({
+        coordinateSpace: "meters",
         cx: cxVal, cy: czVal,
         topFromSurfaceM: depthM - 1,
         bottomFromSurfaceM: depthM + 1,

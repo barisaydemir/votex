@@ -10,7 +10,8 @@ Manyetik anomali analiz uygulamasının mobil versiyonu. Sadece dik çekim (vert
 - 💾 **Dışa Aktarma**: Renklendirilmiş haritayı PNG olarak indirme
 - 📱 **Duyarlı Tasarım**: Mobil ve masaüstü uyumlu
 - 🔌 **Çevrimdışı Çalışma**: Service Worker ile offline destek
-- ⚡ **WASM Analiz Çekirdeği**: Rust vision.rs portunda anomali tespiti (sunucusuz)
+- ⚡ **WASM Analiz Çekirdeği**: Rust vision.rs + surface/field.rs portu — anomali tespiti + 3D yüzey alanı (sunucusuz)
+- 🧊 **3D Yüzey Önizleme**: Yükseklik grid'i canvas'ta döndürülebilir terrain (sürükle/zoom)
 - 📍 **GPS Konumlandırma**: Harita yüklerken konum otomatik kaydedilir
 - 🤖 **AI Sunucu Desteği**: Opsiyonel — yerel AI sunucusuna bağlanabilir
 

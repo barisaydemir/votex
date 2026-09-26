@@ -55,6 +55,72 @@ use validate::{
 };
 use crate::preprocess::extract_green_line_segments;
 
+/// Kullanıcıya gösterilen güveni teknik kabul skorundan ayırır.
+/// `raw_conf` karar kapılarında kalır; bu skor yalnızca bağımsız kanıtları
+/// ve kurtarma/bulanıklık cezalarını kullanıcıya yansıtır.
+fn calibrated_display_confidence(
+    raw_conf: f32,
+    snr: f32,
+    margin: f32,
+    wall_support: f32,
+    wall_clarity: f32,
+    path_support: f32,
+    reasons: &[String],
+) -> f32 {
+    let signal = ((snr - 1.2) / 2.8).clamp(0.0, 1.0);
+    let geometry = ((margin - 0.05) / 0.30).clamp(0.0, 1.0);
+    let wall = (wall_support * wall_clarity).clamp(0.0, 1.0);
+    let path = path_support.clamp(0.0, 1.0);
+    let evidence = 0.40 * signal + 0.25 * geometry + 0.20 * wall + 0.15 * path;
+    let mut calibrated = (0.55 * raw_conf.clamp(0.0, 1.0) + 0.45 * evidence).clamp(0.0, 0.98);
+
+    if reasons.iter().any(|r| r.contains("rescue")) {
+        calibrated = calibrated.min(0.68);
+    }
+    if reasons.iter().any(|r| r.contains("blurry_walls")) || wall_clarity < 0.3 {
+        calibrated = calibrated.min(0.60);
+    }
+    if snr < 1.5 {
+        calibrated = calibrated.min(0.55);
+    } else if snr < 2.0 {
+        calibrated = calibrated.min(0.72);
+    }
+    calibrated
+}
+
+#[cfg(test)]
+mod confidence_calibration_tests {
+    use super::calibrated_display_confidence;
+
+    fn reasons(items: &[&str]) -> Vec<String> {
+        items.iter().map(|item| (*item).to_string()).collect()
+    }
+
+    #[test]
+    fn clean_evidence_can_reach_high_but_not_perfect_confidence() {
+        let score = calibrated_display_confidence(
+            0.96, 4.0, 0.30, 0.8, 0.9, 0.8, &reasons(&[]),
+        );
+        assert!(score >= 0.8 && score < 0.98, "score={score}");
+    }
+
+    #[test]
+    fn rescue_and_weak_signal_are_capped() {
+        let score = calibrated_display_confidence(
+            0.96, 1.4, 0.30, 0.8, 0.9, 0.8, &reasons(&["rewrite:through_red_rescue"]),
+        );
+        assert!(score <= 0.55, "weak rescue score={score}");
+    }
+
+    #[test]
+    fn blurry_wall_does_not_create_high_confidence() {
+        let score = calibrated_display_confidence(
+            0.92, 3.0, 0.25, 0.2, 0.2, 0.3, &reasons(&["uncertain:blurry_walls"]),
+        );
+        assert!(score <= 0.60, "blurry wall score={score}");
+    }
+}
+
 /// Dik ve yan çekimde hedef tipi (kuyu / oda / tünel / yapı / otomatik).
 fn normalize_target(_view_mode: &str, target_kind: &str) -> &'static str {
     match target_kind.trim().to_ascii_lowercase().as_str() {
@@ -533,6 +599,7 @@ pub fn extract_validated(
     dta_hints: &[StructureHint],
     deep: bool,
     staged: bool,
+    tuning: crate::surface::SurfaceAnalysisTuning,
 ) -> Result<UndergroundStructures, String> {
     // Derin yapı analizi: kırmızı köprü zorunlu + eşikler gevşetilir (kalan yapılar da çıksın)
     let through_red = deep || crate::app_settings::load_settings().structures_through_red;
@@ -575,6 +642,7 @@ pub fn extract_validated(
         deep,
         staged,
         through_red,
+        tuning,
         &calib,
         &void_blobs,
         &metal_blobs,
@@ -780,6 +848,7 @@ fn extract_validated_inner(
     deep: bool,
     staged: bool,
     through_red: bool,
+    tuning: crate::surface::SurfaceAnalysisTuning,
     calib: &FieldCalib,
     void_blobs: &[Blob],
     metal_blobs: &[Blob],
@@ -795,7 +864,8 @@ fn extract_validated_inner(
     let vpe_voids = vpe.map(prob_apply::void_decision_map);
     let use_vpe = vpe.map(|d| !d.stub).unwrap_or(false);
 
-    let snr_gate = if deep { 1.05 } else { 1.35 };
+    let signal_ratio = tuning.signal_ratio.clamp(0.0, 1.0);
+    let snr_gate = if deep { 0.85 } else { 0.8 + signal_ratio * 1.1 };
     for (vi, b) in void_blobs.iter().enumerate() {
         let snr = b.intensity / calib.noise_std.max(0.04);
         if snr < snr_gate {
@@ -1082,7 +1152,8 @@ fn extract_validated_inner(
         // decide() kapı öncesi uyguladı — burada tekrar uygulamak çift boost olur.
         let (wall_s, wall_clarity) = wall_ring_support_with_clarity(b, wall_cues);
         let line_s = green_line_tunnel_support(b, wall_cues);
-        let zarf = wall_s.max(line_s * 0.9);
+        let wall_weight = (tuning.wall_support.clamp(0.0, 1.0) * 2.0).clamp(0.0, 2.0);
+        let zarf = (wall_s * wall_weight).max(line_s * 0.9);
         if zarf >= 0.1 && (!use_vpe || reclassified) {
             conf = (conf + zarf * 0.32 + 0.05).min(0.98);
         }
@@ -1384,6 +1455,7 @@ fn extract_validated_inner(
             continue;
         }
         let wall_s = wall_ring_support(b, wall_cues);
+        let (_, wall_clarity) = wall_ring_support_with_clarity(b, wall_cues);
         let line_s = green_line_tunnel_support(b, wall_cues);
         let structure_cue = wall_s.max(line_s);
         // Geometri kaynağı = anomali blob'u; duvar yalnızca kenarı hafifçe netleştirir
@@ -1439,6 +1511,15 @@ fn extract_validated_inner(
             wall_support: structure_cue,
             reasons,
         };
+        let display_conf = calibrated_display_confidence(
+            *conf,
+            *snr,
+            *margin,
+            wall_s,
+            wall_clarity,
+            path_s,
+            &evidence.reasons,
+        );
 
         match class {
             VoidClass::Tunnel => {
@@ -1448,7 +1529,7 @@ fn extract_validated_inner(
                     map_width_m,
                     map_depth_m,
                     depth_range_m,
-                    *conf,
+                    display_conf,
                     evidence.clone(),
                     wall_cues,
                     signed,
@@ -1469,7 +1550,7 @@ fn extract_validated_inner(
                     map_width_m,
                     map_depth_m,
                     depth_range_m,
-                    *conf,
+                    display_conf,
                     evidence,
                 ) {
                     chambers.push(c);
@@ -1629,7 +1710,10 @@ fn extract_validated_inner(
         }
         let aspect = (b.rx / b.ry.max(1e-3)).max(b.ry / b.rx.max(1e-3));
         let (score_metal, margin) = metal_gate_components(b.intensity, b.fill_ratio, aspect);
-        if margin < 0.12 || score_metal < min_confidence {
+        // ONAYLI (yüksek oranlı) metaller hassasiyet eşiğinden muaftır (hysteresis).
+        if margin < 0.12
+            || (score_metal < min_confidence && !crate::sensitivity::is_confirmed(score_metal))
+        {
             rejected += 1;
             continue;
         }
@@ -2549,6 +2633,7 @@ mod pipeline_parity_tests {
             deep,
             staged,
             through_red,
+            crate::surface::SurfaceAnalysisTuning::default(),
             calib,
             void_blobs,
             metal_blobs,
@@ -2616,6 +2701,7 @@ mod pipeline_parity_tests {
             deep,
             staged,
             through_red,
+            crate::surface::SurfaceAnalysisTuning::default(),
             calib,
             void_blobs,
             metal_blobs,
@@ -3813,7 +3899,7 @@ mod pipeline_parity_tests {
                 .map(|(k, _)| {
                     // Tünel anahtarını oda anahtarı türüne sığdır: (p,q)->(kind=0,
                     // cx,cy, crown,floor,height,width,bearing,tier)
-                    let ((x0, y0), (x1, y1), crown, floor, height, width, bearing, tier) = k;
+                    let ((x0, y0), (x1, _y1), crown, floor, height, width, bearing, tier) = k;
                     (
                         String::from("tunnel"),
                         x0,
@@ -3863,7 +3949,7 @@ mod pipeline_parity_tests {
                         .any(|r| r == "rewrite:red_interior_host")
                 })
                 .map(|(k, _)| {
-                    let ((x0, y0), (x1, y1), crown, floor, height, width, bearing, tier) = k;
+                    let ((x0, y0), (x1, _y1), crown, floor, height, width, bearing, tier) = k;
                     (
                         String::from("tunnel"),
                         x0,
@@ -4404,7 +4490,7 @@ mod pipeline_parity_tests {
             });
         }
         let (sup_blurry, clr_blurry) = wall_ring_support_with_clarity(&b, &blurry_walls);
-        assert!(sup_blurry < sup_clear, "bulanık duvar desteği daha düşük olmalı");
+        assert_eq!(sup_blurry, 0.0, "bulanık duvar yapı kanıtı sayılmamalı");
         assert!(clr_blurry < 0.3, "bulanık duvar netliği düşük olmalı: {clr_blurry}");
     }
 }

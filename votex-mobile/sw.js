@@ -1,4 +1,4 @@
-const CACHE_NAME = 'votex-mobile-v6';
+const CACHE_NAME = 'votex-mobile-v8';
 // Relative paths so the PWA works under any subpath (e.g. GitHub Pages /votex/)
 const ASSETS = [
   './',
@@ -11,6 +11,8 @@ const ASSETS = [
   './js/geo.js',
   './js/wasm-bridge.js',
   './js/overlay.js',
+  './js/benchmark.js',
+  './js/surface3d.js',
   './wasm/votex_wasm.js',
   './wasm/votex_wasm_bg.wasm',
   './manifest.json'

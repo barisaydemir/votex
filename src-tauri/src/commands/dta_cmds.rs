@@ -1,6 +1,7 @@
 //! DTA başlat / ayar komutları.
 
 use crate::app_settings::{self, AppSettings, AutoLaunchOutcome};
+use crate::commands::AppState;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
@@ -71,6 +72,167 @@ pub fn set_soil_correction_enabled(enabled: bool) -> Result<AppSettings, String>
 pub fn set_hints_3d_visible(enabled: bool) -> Result<AppSettings, String> {
     let mut s = app_settings::load_settings();
     s.hints_3d_visible = enabled;
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
+/// Legacy JSON derinlik proxy çarpanlarını kaydet (Parametre çekmecesi).
+#[tauri::command]
+pub fn set_legacy_depth_params(
+    sensor_height_m: Option<f32>,
+    bipolar_sep_factor: Option<f32>,
+    dipole_blend: Option<f32>,
+) -> Result<AppSettings, String> {
+    let mut s = app_settings::load_settings();
+    let mut p = s.legacy_depth_params;
+    if let Some(v) = sensor_height_m {
+        if !v.is_finite() {
+            return Err("Cihaz–yüzey yüksekliği sayı olmalıdır".into());
+        }
+        p.sensor_height_m = v;
+    }
+    if let Some(v) = bipolar_sep_factor {
+        if !v.is_finite() {
+            return Err("Bipolar çarpan sayı olmalıdır".into());
+        }
+        p.bipolar_sep_factor = v;
+    }
+    if let Some(v) = dipole_blend {
+        if !v.is_finite() {
+            return Err("Dipol karışım sayı olmalıdır".into());
+        }
+        p.dipole_blend = v;
+    }
+    s.legacy_depth_params = p.clamped();
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
+/// DTA penceresini tray'e küçült / geri getir isteği (panel → köprü → DTA poller).
+#[tauri::command]
+pub fn request_dta_window(
+    state: tauri::State<'_, AppState>,
+    ring: tauri::State<'_, crate::dta_chat::ChatRing>,
+    action: String,
+) -> Result<serde_json::Value, String> {
+    let action = match action.as_str() {
+        "hide" => "hide",
+        "restore" => "restore",
+        _ => return Err("action 'hide' veya 'restore' olmalı".to_string()),
+    };
+    let id = ring.push_window_request(action);
+    state
+        .dta_window_hidden
+        .store(action == "hide", std::sync::atomic::Ordering::Relaxed);
+    Ok(serde_json::json!({
+        "ok": true,
+        "action": action,
+        "lastId": id,
+    }))
+}
+
+/// DTA paneli otomatik katlanma süresi (saniye). 0 = hiç katlama.
+#[tauri::command]
+pub fn set_dta_panel_auto_collapse(secs: u32) -> Result<AppSettings, String> {
+    if secs > 3600 {
+        return Err("Katlanma süresi en fazla 3600 saniye olabilir".into());
+    }
+    let mut s = app_settings::load_settings();
+    s.dta_panel_auto_collapse_secs = secs;
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
+/// Kalibrasyon defteri notlarını kaydet (en fazla 20).
+#[tauri::command]
+pub fn set_legacy_depth_calib_notes(
+    notes: Vec<crate::legacy_mag_json::LegacyDepthCalibNote>,
+) -> Result<AppSettings, String> {
+    let mut s = app_settings::load_settings();
+    let mut cleaned = Vec::new();
+    for note in notes.into_iter().take(20) {
+        if !note.label_depth_m.is_finite() || note.label_depth_m <= 0.0 || note.label_depth_m > 20.0 {
+            continue;
+        }
+        let params = crate::legacy_mag_json::LegacyDepthParams {
+            sensor_height_m: note.sensor_height_m,
+            bipolar_sep_factor: note.bipolar_sep_factor,
+            dipole_blend: note.dipole_blend,
+        }
+        .clamped();
+        cleaned.push(crate::legacy_mag_json::LegacyDepthCalibNote {
+            label_depth_m: note.label_depth_m.clamp(0.1, 20.0),
+            file_name: note.file_name.chars().take(120).collect(),
+            sensor_height_m: params.sensor_height_m,
+            bipolar_sep_factor: params.bipolar_sep_factor,
+            dipole_blend: params.dipole_blend,
+            saved_at: note.saved_at.chars().take(40).collect(),
+        });
+    }
+    s.legacy_depth_calib_notes = cleaned;
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
+/// Saha inceleme oturumlarını kaydet (fingerprint anahtarlı; en fazla 40 dosya).
+#[tauri::command]
+pub fn set_legacy_field_sessions(
+    sessions: std::collections::HashMap<String, crate::legacy_mag_json::LegacyFieldSession>,
+) -> Result<AppSettings, String> {
+    let mut s = app_settings::load_settings();
+    let mut cleaned: Vec<(String, crate::legacy_mag_json::LegacyFieldSession)> = Vec::new();
+    for (key, session) in sessions.into_iter() {
+        let key = key.trim().chars().take(120).collect::<String>();
+        if key.is_empty() {
+            continue;
+        }
+        let mut session = session;
+        session.key = key.clone();
+        session.updated_at = session.updated_at.chars().take(40).collect();
+        session.reviewed_targets.truncate(500);
+        session.report_targets.truncate(500);
+        cleaned.push((key, session));
+    }
+    // Settings şişmesin: en güncel 40 oturumu koru.
+    cleaned.sort_by(|a, b| b.1.updated_at.cmp(&a.1.updated_at));
+    cleaned.truncate(40);
+    s.legacy_field_sessions = cleaned.into_iter().collect();
+    app_settings::save_settings(&s)?;
+    Ok(s)
+}
+
+/// Doğrulanmış hedeflerden öğrenilen eşik modelini kaydet/güncelle (null = sıfırla).
+/// Model frontend'de (legacyThresholdLearning.js) üretilir; Rust yalnız kalıcı tutar
+/// ve boyutunu sınırlar — tek doğruluk kaynağı frontend'de kalır.
+#[tauri::command]
+pub fn set_legacy_learned_thresholds(
+    learned: Option<serde_json::Value>,
+) -> Result<AppSettings, String> {
+    let mut s = app_settings::load_settings();
+    match learned {
+        None => s.legacy_learned_thresholds = None,
+        Some(value) => {
+            // Kaba şema doğrulaması: beklenen alanlar sayısal olmalı.
+            let obj = value
+                .as_object()
+                .ok_or_else(|| "Öğrenilmiş eşik modeli nesne olmalıdır".to_string())?;
+            for field in ["confidenceStrong", "sigmaStrong"] {
+                let v = obj
+                    .get(field)
+                    .and_then(|v| v.as_f64())
+                    .ok_or_else(|| format!("{field} sayısal olmalıdır"))?;
+                if !v.is_finite() {
+                    return Err(format!("{field} sonlu bir sayı olmalıdır"));
+                }
+            }
+            // Serileştirilmiş model küçüktür; yine de settings şişmesini engelle.
+            let raw = serde_json::to_string(&value).map_err(|e| e.to_string())?;
+            if raw.len() > 64 * 1024 {
+                return Err("Öğrenilmiş eşik modeli çok büyük".into());
+            }
+            s.legacy_learned_thresholds = Some(value);
+        }
+    }
     app_settings::save_settings(&s)?;
     Ok(s)
 }
@@ -446,6 +608,58 @@ pub fn launch_dta() -> Result<LaunchResult, String> {
 pub fn interpret_votex_screen() -> Result<InterpretResult, String> {
     let (ok, via, message) = app_settings::request_votex_interpret()?;
     Ok(InterpretResult { ok, via, message })
+}
+
+/// VOTEX panelinden DTA'ya mesaj gönderir (outbox'a yazar; DTA poller çeker).
+#[tauri::command]
+pub fn send_dta_panel_message(
+    ring: tauri::State<'_, crate::dta_chat::ChatRing>,
+    text: String,
+) -> Result<crate::dta_chat::ChatPostResponse, String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err("Mesaj boş olamaz".to_string());
+    }
+    let id = ring.push_outbox(trimmed);
+    let pending = ring.pending();
+    Ok(crate::dta_chat::ChatPostResponse {
+        ok: true,
+        accepted: 1,
+        last_id: id,
+        pending,
+    })
+}
+
+/// Panelin yeni konuşma turlarını çekmesi (Rust içi; HTTP /dta/chat/since ile aynı halka).
+#[tauri::command]
+pub fn get_dta_chat_since(
+    ring: tauri::State<'_, crate::dta_chat::ChatRing>,
+    state: tauri::State<'_, AppState>,
+    cursor: u64,
+) -> Result<crate::dta_chat::ChatSinceResponse, String> {
+    let last_ms = state.dta_last_contact_ms.load(std::sync::atomic::Ordering::Relaxed);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let dta_online = last_ms > 0 && now_ms >= last_ms && (now_ms - last_ms) <= 180_000;
+    let window_hidden = state
+        .dta_window_hidden
+        .load(std::sync::atomic::Ordering::Relaxed);
+    Ok(crate::dta_chat::handle_chat_since(
+        &ring,
+        cursor,
+        dta_online,
+        window_hidden,
+    ))
+}
+
+/// Panelin bekleyen panel→DTA mesajlarını görmesi (ack durumu).
+#[tauri::command]
+pub fn get_dta_chat_pending(
+    ring: tauri::State<'_, crate::dta_chat::ChatRing>,
+) -> Result<Vec<crate::dta_chat::ChatTurn>, String> {
+    Ok(ring.pending())
 }
 
 /// Aktif haritanın kayıtlı DTA ipuçları (gösterim + açık/kapalı).

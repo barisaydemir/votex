@@ -585,7 +585,7 @@ pub struct FullReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::surface::models::{Evidence, GeometryAnalysis};
+    use crate::surface::models::Evidence;
 
     fn make_chamber(kind: &str, conf: f32, wall_s: f32, snr: f32, reasons: Vec<String>) -> Chamber {
         Chamber {

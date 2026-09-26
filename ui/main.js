@@ -1,4 +1,4 @@
-import { buildSurface3d, deepStructureScan, stagedDepthScan, waterBlueScan, getAppSettings, setHints3dVisible } from "./api/tauri.js";
+import { buildSurface3d, deepStructureScan, stagedDepthScan, waterBlueScan, getAppSettings, setHints3dVisible, isTauriRuntime } from "./api/tauri.js";
 import { enableDualAnalysis, setModuleEnabled, getPackStatus } from "./hybrid/dualAnalysisPack.js";
 import { setClipEnabled, setClipHeight } from "./viewer/scene.js";
 import { setXray } from "./viewer/xray.js";
@@ -18,6 +18,7 @@ import { buildMesh } from "./viewer/mesh.js";
 import { showHints, clearHints, setHintsVisible } from "./viewer/hintEngine.js";
 import { applyFreeDrawVisibility } from "./viewer/builders/freeDraw.js";
 import { updatePreviewMarks } from "./ui/previewMarks.js";
+import { calculateSensitivityParameters } from "./hybrid/sensitivity.js";
 import { bindMapRuler, redrawRuler } from "./ui/mapRuler.js";
 import { selectedShotType, selectedTargetKind, targetKindLabel, updateShotHint } from "./ui/shotType.js";
 import { formatSoilLine, selectedSoilProfile, startSoilMonitor, updateSoilHint } from "./ui/soilProfile.js";
@@ -40,6 +41,7 @@ import { bindModuleRail } from "./modules/rail.js";
 import { initHeartbeat, heartbeatSet } from "./ui/heartbeat.js";
 import { initTreeAnimations } from "./ui/treeAnimate.js";
 import { applyDtaLinkStatus, refreshDtaLink, startDtaLinkMonitor } from "./ui/dtaLink.js";
+import { bindDtaChatPanel } from "./ui/dtaChatPanel.js";
 import { logProbFromSurface, startProbEngineMonitor, refreshProbEngine } from "./ui/probEngine.js";
 import { syncStageHudFromSurface } from "./ui/stageHud.js";
 import { wireLicenseUi, refreshLicenseBadge } from "./ui/licenseBadge.js";
@@ -58,6 +60,8 @@ import { clusterStructures, formatClusterHTML, getClusterStats } from "./viewer/
 import { initBatchDta, batchState } from "./ui/batchDta.js";
 import { metalAlarm } from "./viewer/metalAlarm.js";
 import { bindAutoTune, hideCard as hideAutoTuneCard } from "./ui/autoTunePanel.js";
+import { init3DViewEnhancements, refreshSelectedGuides } from "./viewer/viewEnhancements.js";
+import { initDepthSliceAnimation } from "./viewer/depthSliceAnimator.js";
 
 await initI18n();
 initTheme();
@@ -120,8 +124,8 @@ function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false,
   // İpuçlarını göster (DTA/Image analizinden)
   try {
     showHints(state.scene, surface.structures, {
-      mapW: Number(surface.mapWidthM ?? surface.map_width_m ?? surface.mapSizeM ?? surface.map_size_m ?? 24),
-      mapD: Number(surface.mapDepthM ?? surface.map_depth_m ?? surface.mapWidthM ?? surface.map_width_m ?? 24),
+      mapW: Number(surface._computedMapW ?? surface.mapWidthM ?? surface.map_width_m ?? surface.mapSizeM ?? surface.map_size_m ?? 24),
+      mapD: Number(surface._computedMapD ?? surface.mapDepthM ?? surface.map_depth_m ?? surface.mapWidthM ?? surface.map_width_m ?? 24),
       vertExag,
       source: "dta",
     });
@@ -131,6 +135,7 @@ function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false,
   renderStructureList(surface);
   renderFreeDrawPanel();
   renderIntelSummary(surface);
+  window.dispatchEvent(new CustomEvent("votex:surface-applied"));
   // Kümeleme butonunu aktifleştir
   const clusterBtn2 = $("cluster-run");
   if (clusterBtn2) clusterBtn2.disabled = false;
@@ -138,6 +143,17 @@ function applySurface(surface, minConfidenceFallback = 0.45, { resetKot = false,
   logProbFromSurface(surface);
   refreshMapHintsPanel();
 
+  const edge = surface.edgeAnalysis || surface.edge_analysis;
+  const edgeStats = $("image-edge-stats");
+  if (edgeStats && edge) {
+    const edgeCells = Number(edge.edgeCellCount ?? edge.edge_cell_count ?? 0);
+    const edgeMean = Number(edge.meanMagnitude ?? edge.mean_magnitude ?? 0);
+    const edgeMax = Number(edge.maxMagnitude ?? edge.max_magnitude ?? 0);
+    const contours = (edge.contourLevels || edge.contour_levels || []).length;
+    edgeStats.textContent = `Resim işlem sonucu · Kenar hücresi: ${edgeCells} · |∇B| ort: ${edgeMean.toFixed(3)} · maksimum: ${edgeMax.toFixed(3)} · ${contours} iso-seviye`;
+  } else if (edgeStats) {
+    edgeStats.textContent = "—";
+  }
   const cleaned = surface.cleanedPreviewBase64 || surface.cleaned_preview_base64;
   if (cleaned) {
     const prev = $("preview");
@@ -461,7 +477,9 @@ async function build3D() {
     $("btn-build-3d").disabled = true;
     const viewMode = selectedShotType();
     const targetKind = selectedTargetKind();
-    const minConfidence = (Number($("min-confidence")?.value) || 45) / 100;
+    // Hassasiyet slider'ı → teknik eşikler (min güven 0.80 ↔ 0.15)
+    const sens = calculateSensitivityParameters(state.sensitivityPercent);
+    const minConfidence = state.confidencePercent / 100;
     const modeLabel = viewMode === "side" ? t("stats.side") : t("stats.top");
     const targetLabel = t("msg.targetBit", { label: targetKindLabel(targetKind) });
     logLine(t("msg.analyzeStart", { mode: modeLabel, target: targetLabel, thr: minConfidence.toFixed(2) }), "info");
@@ -471,7 +489,12 @@ async function build3D() {
       imageBase64: state.pendingFile.base64,
       fileName: state.pendingFile.name,
       lutStripPx: 24,
-      minArea: 80,
+      minArea: sens.minArea,
+      sensitivity: sens.normalized,
+      matchThreshold: sens.matchThreshold,
+      confidencePercent: state.confidencePercent,
+      signalRatioPercent: state.signalRatioPercent,
+      wallSupportPercent: state.wallSupportPercent,
       viewMode,
       minConfidence,
       targetKind,
@@ -525,6 +548,7 @@ async function build3D() {
       );
     }
     setStatus(t("msg.ready3d", { view: stats.viewLabel }));
+    refreshSelectedGuides();
     refreshDtaLink();
     if (focusBestValuableMetal(surface)) logLine(t("msg.metalFocus"), "ok");
   } catch (e) {
@@ -666,6 +690,7 @@ function refreshMeshSettings() {
 }
 
 async function bindDtaGuide() {
+  if (!isTauriRuntime()) return;
   try {
     const { listen } = await import("@tauri-apps/api/event");
     await listen("dta-guide", (event) => {
@@ -993,6 +1018,8 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
   });
   // Klavye kısayolları (K kesit · X X-Ray · ↑/↓ yükseklik)
   bindViewerKeys();
+  init3DViewEnhancements();
+  initDepthSliceAnimation();
 
   // ── Undo/Redo Kısayolları ──
   function updateUndoRedoUI() {
@@ -1117,14 +1144,84 @@ $("btn-analysis-report")?.addEventListener("click", toggleAnalysisPanel);
     heatOpEl.addEventListener('input', syncHeatmapOpacity);
     syncHeatmapOpacity();
   }
-const minConfEl = $("min-confidence");
-const minConfLabel = $("min-confidence-label");
-if (minConfEl && minConfLabel) {
+const minConfEl = $("main-sensitivity-slider");
+const mainSensBadge = $("main-sensitivity-badge");
+const mainSensDesc = $("main-sensitivity-desc");
+let mainSensDebounce = null;
+
+if (minConfEl) {
   const syncConf = () => {
-    minConfLabel.textContent = ((Number(minConfEl.value) || 45) / 100).toFixed(2);
+    const raw = Number(minConfEl.value);
+    const val = Number.isFinite(raw) ? raw : 50;
+    state.sensitivityPercent = val;
+    const params = calculateSensitivityParameters(val);
+    if (mainSensBadge) {
+      const cleanLabel = params.label.replace(/^[^a-zA-ZÇĞİÖŞÜçğıöşü]+/, '').trim();
+      mainSensBadge.textContent = `%${params.percent} (${cleanLabel})`;
+      mainSensBadge.style.color = params.badgeColor;
+      mainSensBadge.style.borderColor = `${params.badgeColor}44`;
+      mainSensBadge.style.background = `${params.badgeColor}18`;
+    }
+    if (mainSensDesc) {
+      mainSensDesc.textContent = params.description;
+    }
+    window.dispatchEvent(new CustomEvent("votex:sensitivity-change", { detail: { percent: val, params } }));
   };
-  minConfEl.addEventListener("input", syncConf);
+
+  // Arşiv geri yükleme / AUTO uygulama gibi render-only senkron:
+  // slider değeri değişmiş olur, yeniden analiz tetiklenmez.
+  minConfEl.addEventListener("votex:sensitivity-sync", () => syncConf());
+
+  minConfEl.addEventListener("input", () => {
+    syncConf();
+    if (mainSensDebounce) clearTimeout(mainSensDebounce);
+    mainSensDebounce = setTimeout(() => {
+      if (state.pendingFile && !$("btn-build-3d")?.disabled) {
+        console.log(`[Main] Hassasiyet canlı yenileniyor (%${minConfEl.value})...`);
+        build3D();
+      }
+    }, 150);
+  });
   syncConf();
+}
+const extraSensitivityControls = [
+  ["main-confidence-slider", "main-confidence-value", "confidencePercent"],
+  ["main-display-confidence-slider", "main-display-confidence-value", "displayConfidencePercent"],
+  ["main-symmetry-slider", "main-symmetry-value", "symmetryPercent"],
+  ["main-signal-slider", "main-signal-value", "signalRatioPercent"],
+  ["main-wall-slider", "main-wall-value", "wallSupportPercent"],
+];
+for (const [sliderId, valueId, stateKey] of extraSensitivityControls) {
+  const slider = $(sliderId);
+  const value = $(valueId);
+  if (!slider) continue;
+  const syncExtra = () => {
+    const next = Number(slider.value);
+    state[stateKey] = Number.isFinite(next) ? next : 50;
+    if (value) value.textContent = stateKey === "symmetryPercent" && state[stateKey] === 0
+      ? "Kapalı"
+      : `%${state[stateKey]}`;
+    window.dispatchEvent(new CustomEvent("votex:analysis-tuning-change", {
+      detail: { key: stateKey, value: state[stateKey] },
+    }));
+  };
+  slider.addEventListener("input", () => {
+    syncExtra();
+    if (["displayConfidencePercent", "symmetryPercent"].includes(stateKey) && state.surfaceState) {
+      const vertExag = (Number($("z-scale")?.value) || 10) / 10;
+      const wire = $("wireframe")?.value === "1";
+      const depScale = (Number($("depression-scale")?.value) || 10) / 10;
+      buildMesh(state.surfaceState, vertExag, wire, depScale);
+      renderStructureList(state.surfaceState);
+      return;
+    }
+    if (mainSensDebounce) clearTimeout(mainSensDebounce);
+    mainSensDebounce = setTimeout(() => {
+      if (state.pendingFile && !$("btn-build-3d")?.disabled) build3D();
+    }, 150);
+  });
+  slider.addEventListener("votex:analysis-tuning-sync", syncExtra);
+  syncExtra();
 }
 document.querySelectorAll('input[name="shot-type"]').forEach((el) => {
   el.addEventListener("change", () => {
@@ -1394,6 +1491,7 @@ refreshMapHintsPanel();
 startUpdateMonitor();
 bindDtaGuide();
 startDtaLinkMonitor();
+bindDtaChatPanel();
 startSoilMonitor();
 startThroughRedMonitor({
   onSurface: (surface) => applySurface(surface),
@@ -1405,18 +1503,60 @@ import("./viewer/groundMagneticOverlay.js").then((mod) => {
   const chk = document.getElementById("mag-ground-toggle");
   const slider = document.getElementById("mag-ground-opacity");
   const valLabel = document.getElementById("mag-ground-opacity-val");
-  const opRow = document.getElementById("mag-ground-opacity-row");
+  const optionsEl = document.getElementById("mag-ground-options");
+  const modeSelect = document.getElementById("mag-ground-mode");
+  const arrowsCheck = document.getElementById("mag-ground-arrows");
+  const contoursCheck = document.getElementById("mag-ground-contours");
+  const autoScaleCheck = document.getElementById("mag-ground-auto-scale");
+  const scaleLowInput = document.getElementById("mag-ground-scale-low");
+  const scaleHighInput = document.getElementById("mag-ground-scale-high");
+  const rebuild = () => {
+    if (state.csvOverlay && state.showMagneticGround) {
+      mod.updateGroundMagneticOverlay(state.csvOverlay, state.surfaceState);
+    }
+  };
   if (chk) {
     chk.addEventListener("change", () => {
       const on = chk.checked;
       mod.toggleMagneticGround(on);
-      if (opRow) opRow.style.display = on ? "flex" : "none";
+      if (optionsEl) optionsEl.style.display = on ? "flex" : "none";
       // CSV yüklüyse yeniden oluştur
-      if (on && state.csvOverlay) {
-        mod.updateGroundMagneticOverlay(state.csvOverlay, state.surface || state.surfaceState);
-      }
+      if (on) rebuild();
     });
   }
+  if (modeSelect) {
+    modeSelect.addEventListener("change", () => {
+      mod.setMagneticOverlayMode(modeSelect.value);
+      rebuild();
+    });
+  }
+  if (arrowsCheck) {
+    arrowsCheck.addEventListener("change", () => {
+      mod.setMagneticOverlayArrows(arrowsCheck.checked);
+    });
+  }
+  if (contoursCheck) {
+    contoursCheck.addEventListener("change", () => {
+      mod.setMagneticOverlayContours(contoursCheck.checked);
+    });
+  }
+  if (autoScaleCheck) {
+    autoScaleCheck.addEventListener("change", () => {
+      state.magneticOverlayAutoScale = autoScaleCheck.checked;
+      if (scaleLowInput) scaleLowInput.disabled = autoScaleCheck.checked;
+      if (scaleHighInput) scaleHighInput.disabled = autoScaleCheck.checked;
+      rebuild();
+    });
+  }
+  const updateManualScale = () => {
+    const low = Number(scaleLowInput?.value);
+    const high = Number(scaleHighInput?.value);
+    state.magneticOverlayScaleLow = Number.isFinite(low) ? low : null;
+    state.magneticOverlayScaleHigh = Number.isFinite(high) ? high : null;
+    rebuild();
+  };
+  scaleLowInput?.addEventListener("change", updateManualScale);
+  scaleHighInput?.addEventListener("change", updateManualScale);
   if (slider) {
     slider.addEventListener("input", () => {
       const v = Number(slider.value) / 100;
@@ -1425,8 +1565,6 @@ import("./viewer/groundMagneticOverlay.js").then((mod) => {
     });
   }
   // CSV yüklendiğinde kontrolleri göster
-  const origShow = mod.updateGroundMagneticOverlay;
-  const origRemove = mod.removeGroundMagneticOverlay;
   const ctrlEl = document.getElementById("mag-ground-controls");
   if (ctrlEl) {
     // CSV yüklendiğinde göster, kaldırınd gizle
@@ -1673,7 +1811,7 @@ if (viewerEl3d) {
       const hits = rc.intersectObjects(state.scene.children, true);
       if (handleMeasurementClick(hits)) {
         const result = getMeasurementResult();
-        if (result) setStatus(`Ölçüm: ${result}`);
+        if (result) setStatus(`Ölçüm: ${result.text}`);
       }
     });
   }
@@ -1681,6 +1819,15 @@ if (viewerEl3d) {
 
 // ── Veri Filtreleme Paneli ──
 bindFilterPanel();
+window.addEventListener("votex:highlight-detection", (event) => {
+  const id = event.detail?.id;
+  if (!id || !state.csvData || !state.csvStructures) return;
+  const entry = state.structureTargets?.[id];
+  if (entry?.csvKind != null && entry.csvIndex != null) {
+    state.csvHighlightDet = { type: entry.csvKind, idx: entry.csvIndex };
+    window.dispatchEvent(new CustomEvent("votex:rebuild-csv"));
+  }
+});
 window.addEventListener("votex:filter-change", () => {
   if (state.surfaceState) {
     logLine("Filtre değişikliği — sahne yeniden oluşturuluyor", "info");

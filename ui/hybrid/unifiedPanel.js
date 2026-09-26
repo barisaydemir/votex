@@ -12,6 +12,7 @@ import { loadImageFromFile } from './imageProcessor.js';
 import { runUnifiedAnalysis, createUnified2DMap } from './unifiedAnalysis.js';
 import { CoordinateAligner, drawControlPoints } from './coordinateAlignment.js';
 import { initClickToAlign, getPoints, getQuality, clearPoints, toggleGrid, destroy as destroyClickAlign } from './clickToAlign.js';
+import { calculateSensitivityParameters, summarizeTiers } from './sensitivity.js';
 
 // ── Durum ──
 
@@ -19,6 +20,9 @@ const panelState = {
   image: null,
   csvLoaded: false,
   analyzing: false,
+  lastResult: null,
+  allStructures: [],
+  debounceTimer: null,
 };
 
 // ── Hizalama Durumu ──
@@ -136,6 +140,9 @@ async function handleStart() {
       magneticDiff: Number(document.getElementById('cv-magnetic-diff')?.value) || 150,
     };
 
+    const sensitivityVal = Number(document.getElementById('unified-sensitivity-slider')?.value || 50);
+    const sensitivityParams = calculateSensitivityParameters(sensitivityVal);
+
     const options = {
       csvWeight: Number(document.getElementById('unified-csv-weight')?.value) || 70,
       soilType: document.querySelector('input[name="soil-profile"]')?.value || 'loam',
@@ -146,6 +153,8 @@ async function handleStart() {
       showHints: true,
       cvThresholds,
       manualAligner: state.manualAligner || null,
+      sensitivityPercent: sensitivityVal,
+      sensitivityParams,
     };
 
     // Tek analiz
@@ -155,6 +164,10 @@ async function handleStart() {
       csvStructures,
       options,
     });
+
+    panelState.lastResult = result;
+    panelState.allStructures = result.allStructures || result.structures || [];
+    updateSensitivityCount(sensitivityVal);
 
     // Sonuçları göster
     showResults(result);
@@ -186,19 +199,25 @@ async function handleStart() {
 
 // ── Sonuçları Göster ──
 
-function showResults(result) {
+export function showResults(result) {
   const resultsEl = document.getElementById('unified-results');
   if (!resultsEl) return;
 
   // 2D harita
   const mapCanvas = document.getElementById('unified-map-canvas');
   if (mapCanvas) {
-    const drawn = createUnified2DMap(result.imageGrid, state.csvData?.points || [], 300, 150, 500);
+    const drawn = createUnified2DMap(result.imageGrid, state.csvData?.points || [], 300, 150, 500, result.edgeAnalysis);
     const ctx = mapCanvas.getContext('2d');
     mapCanvas.width = 300;
     mapCanvas.height = 150;
     ctx.clearRect(0, 0, 300, 150);
     ctx.drawImage(drawn, 0, 0);
+  }
+
+  const edgeStats = document.getElementById('unified-edge-stats');
+  if (edgeStats && result.edgeAnalysis) {
+    const edge = result.edgeAnalysis;
+    edgeStats.textContent = `Resim işlem çıktısı · Kenar hücresi: ${edge.edgeCellCount} · |∇B| ort: ${edge.gradient.meanMagnitude.toFixed(3)} · ${edge.contours.levels.length} iso-seviye`;
   }
 
   // İstatistikler
@@ -208,11 +227,12 @@ function showResults(result) {
     const d = result.depthResult?.stats;
     const h = result.hints?.length || 0;
     const st = result.structures?.length || 0;
+    const tc = result.tierCounts || null;
 
     statsEl.innerHTML = `
       <div class="us-row"><span class="us-label">Image</span><span class="us-value">${s.filledCells} hücre, ${(s.matchRate * 100).toFixed(0)}% eşleşme</span></div>
       <div class="us-row"><span class="us-label">Derinlik</span><span class="us-value">${d?.depthMin?.toFixed(1) || 0}..${d?.depthMax?.toFixed(1) || 0}m, ort ${d?.avgDepth?.toFixed(1) || 0}m</span></div>
-      <div class="us-row"><span class="us-label">Yapılar</span><span class="us-value">${st} tespit</span></div>
+      <div class="us-row"><span class="us-label">Yapılar</span><span class="us-value">${st} tespit${tc ? ` · ${tc.confirmed} ●onaylı · ${tc.candidate} ◌aday · ${tc.noise} elendi` : ''}</span></div>
       <div class="us-row"><span class="us-label">İpuçları</span><span class="us-value">${h} (3D'de gösteriliyor)</span></div>
       <div class="us-row"><span class="us-label">Süre</span><span class="us-value">${result.elapsed}ms</span></div>
     `;
@@ -248,6 +268,23 @@ function showResults(result) {
   }
 
   resultsEl.style.display = '';
+}
+
+// ── Canlı Tespit Sayacı ──
+
+function updateSensitivityCount(sensitivityVal) {
+  const el = document.getElementById('unified-sensitivity-count');
+  if (!el) return;
+  const all = panelState.allStructures || [];
+  if (all.length === 0) {
+    el.textContent = '🎯 Tespit: —';
+    el.title = 'Analiz henüz yapılmadı';
+    return;
+  }
+  // Kademe kırılımı: ● ONAYLI (yüksek oranlı, çubuktan muaf) · ◌ ADAY · elenen
+  const t = summarizeTiers(all, sensitivityVal);
+  el.textContent = `🎯 ${t.confirmed} ●onaylı · ${t.candidate} ◌aday · ${t.noise} elendi`;
+  el.title = `${all.length} toplam · onaylı (yüksek oranlı) tespitler her koşulda görünür`;
 }
 
 // ── Eşik Slider Bağlantıları ──
@@ -370,6 +407,46 @@ function updateAlignQualityUI() {
   `;
 }
 
+function bindSensitivitySlider() {
+  const slider = document.getElementById('unified-sensitivity-slider');
+  const badge = document.getElementById('unified-sensitivity-badge');
+  const desc = document.getElementById('unified-sensitivity-desc');
+  if (!slider) return;
+
+  const updateUI = () => {
+    const raw = Number(slider.value);
+    const val = Number.isFinite(raw) ? raw : 50;
+    const params = calculateSensitivityParameters(val);
+    updateSensitivityCount(val);
+
+    if (badge) {
+      const cleanLabel = params.label.replace(/^[^a-zA-ZÇĞİÖŞÜçğıöşü]+/, '').trim();
+      badge.textContent = `%${params.percent} (${cleanLabel})`;
+      badge.style.color = params.badgeColor;
+      badge.style.borderColor = `${params.badgeColor}44`;
+      badge.style.background = `${params.badgeColor}18`;
+    }
+    if (desc) {
+      desc.textContent = params.description;
+    }
+  };
+
+  slider.addEventListener('input', () => {
+    updateUI();
+
+    // Debounced canlı yenileme
+    if (panelState.debounceTimer) clearTimeout(panelState.debounceTimer);
+    panelState.debounceTimer = setTimeout(() => {
+      if (panelState.image && !panelState.analyzing) {
+        console.log(`[UnifiedPanel] Hassasiyet canlı yenileniyor (%${slider.value})...`);
+        handleStart();
+      }
+    }, 150);
+  });
+
+  updateUI();
+}
+
 // ── Başlatma ──
 
 export function bindUnifiedPanel() {
@@ -379,6 +456,7 @@ export function bindUnifiedPanel() {
 
   console.log('[UnifiedPanel] Bağlandı');
   bindThresholdSliders();
+  bindSensitivitySlider();
   bindClickToAlign();
 
   // Image seç

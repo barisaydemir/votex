@@ -120,9 +120,31 @@
         <button id="btn-anomaly-toggle" class="btn btn-secondary btn-large" title="Anomali kutularını göster/gizle">
           ⬚ Kutular
         </button>
-        <button id="btn-3d-view" class="btn btn-secondary btn-large hidden">
+        <button id="btn-benchmark" class="btn btn-secondary btn-large" title="WASM vs JS performans kıyaslaması">
+          ⚡ Kıyasla
+        </button>
+        <button id="btn-3d-view" class="btn btn-secondary btn-large" title="3D yüzey önizleme">
           🧊 3D Görünüm
         </button>
+      </div>
+
+      <!-- 3D Surface Preview -->
+      <div id="surface3d-panel" class="surface3d-panel hidden">
+        <div class="surface3d-header">
+          <h3>🧊 3D Yüzey (WASM çekirdeği)</h3>
+          <div class="surface3d-actions">
+            <button id="btn-export-heightmap" class="btn btn-secondary btn-sm" title="Yükseklik haritası PNG olarak dışa aktar (Blender, QGIS, Unity)">
+              📥 Heightmap
+            </button>
+            <button id="btn-surface3d-close" class="icon-btn" aria-label="Kapat">×</button>
+          </div>
+        </div>
+        <div class="surface3d-canvas-wrap">
+          <canvas id="surface3d-canvas"></canvas>
+        </div>
+        <div class="surface3d-footer">
+          <span class="surface3d-hint">标准高度图: 黑=低 白=高 — Blender / QGIS / World Machine 兼容</span>
+        </div>
       </div>
 
       <!-- Results Section -->
@@ -131,6 +153,16 @@
         <div class="results-grid" id="results-grid">
           <!-- Analysis results will be inserted here -->
         </div>
+      </div>
+
+      <!-- Benchmark Panel -->
+      <div id="benchmark-panel" class="benchmark-panel hidden">
+        <div class="benchmark-header">
+          <h3>⚡ Motor Kıyaslama (WASM vs JS)</h3>
+          <button id="btn-benchmark-close" class="icon-btn" aria-label="Kapat">×</button>
+        </div>
+        <div id="benchmark-rows" class="benchmark-rows"></div>
+        <p class="benchmark-note">Aynı sentetik haritalarda medyan süre (5 tekrar). “Eş” sütunu iki motorun aynı sayıda anomali bulduğunu doğrular.</p>
       </div>
     </section>
   </main>
@@ -151,6 +183,8 @@
   <script src="js/geo.js"></script>
   <script src="js/wasm-bridge.js"></script>
   <script src="js/overlay.js"></script>
+  <script src="js/benchmark.js"></script>
+  <script src="js/surface3d.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

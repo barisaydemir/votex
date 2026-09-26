@@ -4,13 +4,15 @@ import { initMultiCsv, addFile, addFiles, addCsvContent, removeDataset, clearAll
 import { selectedShotType, selectedTargetKind } from "./shotType.js";
 import { ensureViewer } from "../viewer/scene.js";
 import { addCsvOverlayToScene, removeCsvOverlay, toggleCsvOverlay, anomalyStatsString, renderCsvHeatmap } from "../viewer/csvOverlay.js";
+import { bindLegacyDikPanel } from "./legacyDikPanel.js";
+import { bindDeviceLink } from "./deviceLink.js";
 import { detectStructuresFromTerrain } from "../viewer/csvAnalysis.js";
 import { filterUnderground, sliceDepths, autoBoxFor } from "../viewer/csvFilter.js";
 import { analyzeDepthSlices } from "../viewer/csvAnalysis.js";
 import { bindHeatmapPick } from "../viewer/csvHeatmap.js";
-import { flyCameraTo } from "../viewer/labels.js";
+import { flyCameraTo, focusStructure } from "../viewer/labels.js";
 import * as THREE from "three";
-import { t } from "../i18n/index.js";
+import { dimensionsOf, volumeM3Of, formatVolumeM3 } from "../viewer/volume.js";
 
 // Havuz boyutunu otomatik geçir — yapılar havuz-relative koordinatlarda
 function _heatmap(csvData, opts = {}) {
@@ -433,6 +435,8 @@ export function renderCsvPanel() {
       sliceSlider.max = "0";
       sliceSlider.value = "0";
       sliceLabel.textContent = "Tümü";
+      const playButton = $("csv-depth-play");
+      if (playButton) playButton.disabled = true;
     } else {
       sliceSlider.max = String(sliceCount);
       const v = Number(sliceSlider.value) || 0;
@@ -442,6 +446,8 @@ export function renderCsvPanel() {
       } else {
         sliceLabel.textContent = "Tümü";
       }
+      const playButton = $("csv-depth-play");
+      if (playButton) playButton.disabled = false;
     }
   }
 
@@ -895,24 +901,51 @@ export function renderCsvStructInfo(hit) {
   }
   const { type, data: d, dist } = hit;
   const num = d._num || '';
+  const typeKey = String(type || '').toLowerCase();
+  const topForVolume = Number(d.topFromSurfaceM ?? d.top_from_surface_m);
+  const bottomForVolume = Number(d.bottomFromSurfaceM ?? d.bottom_from_surface_m);
+  const heightForVolume = typeKey === 'oda'
+    ? Math.max((Number.isFinite(topForVolume) && Number.isFinite(bottomForVolume) ? bottomForVolume - topForVolume : 0) || 0.2, 0.2)
+    : typeKey === 'metal'
+      ? Math.max(Number(d.heightM ?? d.height_m ?? d.plumeHeightM ?? d.plume_height_m) || (Number(d.widthM ?? d.width_m) || 1) * 0.5, 0.2)
+      : Math.max(Number(d.heightM ?? d.height_m) || 1.5, 0.2);
+  const volumeRecord = typeKey === 'tünel'
+    ? { ...d, kind: 'tunnel' }
+    : typeKey === 'metal'
+      ? { ...d, kind: 'metal', shapeType: 'rectangle', lengthM: Number(d.lengthM ?? d.length_m) || Number(d.widthM ?? d.width_m) }
+      : { ...d, kind: 'room' };
+  const overlayDims = state.csvOverlay?.userData?.anomalyStats?.dims || {};
+  const volume = volumeM3Of(volumeRecord, {
+    mapWidthM: Number(overlayDims.w) || Number(state.csvOverlay?.userData?.anomalyStats?.poolSizeM) || 30,
+    mapDepthM: Number(overlayDims.d) || Number(state.csvOverlay?.userData?.anomalyStats?.poolSizeM) || 30,
+    height: heightForVolume,
+    tunnelProfile: 'cylinder',
+  });
   let rows = '';
   if (type === 'oda') {
     const top = Number(d.topFromSurfaceM) || 0;
     const bot = Number(d.bottomFromSurfaceM) || (top + 2.5);
     const w = Number(d.widthM) || 0;
-    const l = Number(d.lengthM) || 0;
+    const l = Number(d.lengthM) || w;
+    const h = heightForVolume;
     const strength = d.strength != null ? d.strength.toFixed(3) : '—';
     rows = [
       `<div class="si-row"><span class="si-label">Konum (X,Z)</span><span class="si-value">${Number(d.cx||0).toFixed(1)}m, ${Number(d.cy||0).toFixed(1)}m</span></div>`,
       `<div class="si-row"><span class="si-label">Derinlik</span><span class="si-value">${top.toFixed(1)}m – ${bot.toFixed(1)}m</span></div>`,
       `<div class="si-row"><span class="si-label">Boyut</span><span class="si-value">${w.toFixed(1)} × ${l.toFixed(1)} m</span></div>`,
-      `<div class="si-row"><span class="si-label">Yükseklik</span><span class="si-value">${(bot - top).toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Yükseklik</span><span class="si-value">${h.toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Hacim</span><span class="si-value">${formatVolumeM3(volume)}</span></div>`,
       `<div class="si-row"><span class="si-label">Manyetik güç</span><span class="si-value" style="color:#7eb6ff">${strength}</span></div>`,
     ].join('');
   } else if (type === 'tünel') {
     const x0 = Number(d.x0)||0, z0 = Number(d.y0)||0;
     const x1 = Number(d.x1)||0, z1 = Number(d.y1)||0;
-    const len = Math.hypot(x1-x0, z1-z0);
+    const len = volumeM3Of(volumeRecord, {
+      mapWidthM: Number(overlayDims.w) || 30,
+      mapDepthM: Number(overlayDims.d) || 30,
+      height: heightForVolume,
+      tunnelProfile: 'cylinder',
+    }) > 0 ? Math.hypot(x1-x0, z1-z0) : 0;
     const depth = Number(d.floorFromSurfaceM) || 0;
     const w = Number(d.widthM) || 0;
     const strength = d.strength != null ? d.strength.toFixed(3) : '—';
@@ -922,16 +955,20 @@ export function renderCsvStructInfo(hit) {
       `<div class="si-row"><span class="si-label">Uzunluk</span><span class="si-value">${len.toFixed(1)} m</span></div>`,
       `<div class="si-row"><span class="si-label">Derinlik</span><span class="si-value">${depth.toFixed(1)} m</span></div>`,
       `<div class="si-row"><span class="si-label">Genişlik</span><span class="si-value">${w.toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Hacim</span><span class="si-value">${formatVolumeM3(volume)}</span></div>`,
       `<div class="si-row"><span class="si-label">Manyetik güç</span><span class="si-value" style="color:#4ec0d4">${strength}</span></div>`,
     ].join('');
   } else if (type === 'metal') {
     const depth = Number(d.depthFromSurfaceM) || 0;
     const w = Number(d.widthM) || 0;
+    const l = Number(d.lengthM ?? d.length_m) || w;
+    const h = heightForVolume;
     const strength = d.strength != null ? d.strength.toFixed(3) : '—';
     rows = [
       `<div class="si-row"><span class="si-label">Konum (X,Z)</span><span class="si-value">${Number(d.cx||0).toFixed(1)}m, ${Number(d.cy||0).toFixed(1)}m</span></div>`,
       `<div class="si-row"><span class="si-label">Derinlik</span><span class="si-value">${depth.toFixed(1)} m</span></div>`,
-      `<div class="si-row"><span class="si-label">Boyut</span><span class="si-value">${w.toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Boyut</span><span class="si-value">${w.toFixed(1)} × ${l.toFixed(1)} × ${h.toFixed(1)} m</span></div>`,
+      `<div class="si-row"><span class="si-label">Hacim</span><span class="si-value">${formatVolumeM3(volume)}</span></div>`,
       `<div class="si-row"><span class="si-label">Manyetik güç</span><span class="si-value" style="color:#ff6a4a">${strength}</span></div>`,
     ].join('');
   }
@@ -1290,6 +1327,10 @@ export function bindCsvPanel() {
   console.log('[CSV-BIND] pickBtn.disabled=', pickBtn?.disabled, 'buildBtn.disabled=', buildBtnEl?.disabled, 'toggleBtn.disabled=', toggleBtnEl?.disabled);
   pickBtn?.addEventListener("click", () => { console.log('[CSV-BTN] pickBtn CLICKED'); pickCsv(); });
   buildBtnEl?.addEventListener("click", () => { console.log('[CSV-BTN] buildBtn CLICKED, csvContent=', !!state.csvContent); build3dFromCsv(); });
+
+  bindLegacyDikPanel();
+  bindDeviceLink();
+
   // Sigma slider label + 3D overlay otomatik yeniden oluşturma
   const sigmaSlider = $("csv-sigma");
   const sigmaLabel = $("csv-sigma-label");
@@ -1367,6 +1408,8 @@ export function bindCsvPanel() {
       ? "Tümü"
       : `${v}/${total} (${fmtSlice(sd.yMin)}..${fmtSlice(sd.yMax)})`;
     if (sliceLabel) sliceLabel.textContent = labelText;
+    const playButton = $("csv-depth-play");
+    if (playButton) playButton.disabled = !state.csvData || !sliceSlider || Number(sliceSlider.max) <= 0;
     const bounds = {
       xMin: state.csvData.xMin,
       xMax: state.csvData.xMax,

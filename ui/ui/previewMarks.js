@@ -65,6 +65,58 @@ export function updatePreviewMarks(surface) {
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, w, h);
 
+    const edge = surface.edgeAnalysis || surface.edge_analysis;
+    if (edge?.magnitude?.length) {
+      const ew = Number(edge.gridW || edge.grid_w || 0);
+      const eh = Number(edge.gridH || edge.grid_h || 0);
+      const gx = edge.gradientX || edge.gradient_x || [];
+      const gy = edge.gradientY || edge.gradient_y || [];
+      const magnitudes = edge.magnitude || [];
+      const maxMagnitude = Number(edge.maxMagnitude ?? edge.max_magnitude ?? 0);
+      if (ew > 1 && eh > 1) {
+        // İşlem çıktısı: iso-nT çizgileri ve güçlü gradyan yön okları.
+        ctx.save();
+        ctx.lineWidth = Math.max(1.2, Math.min(w, h) * 0.0025);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+        for (const segment of (edge.contourSegments || edge.contour_segments || [])) {
+          if (!Array.isArray(segment) || segment.length < 4) continue;
+          ctx.beginPath();
+          ctx.moveTo(Number(segment[0]) * w, Number(segment[1]) * h);
+          ctx.lineTo(Number(segment[2]) * w, Number(segment[3]) * h);
+          ctx.stroke();
+        }
+        if (maxMagnitude > 0) {
+          const stride = Math.max(1, Math.ceil(Math.max(ew, eh) / 20));
+          const arrowLength = Math.max(5, Math.min(w / ew, h / eh) * stride * 0.8);
+          ctx.strokeStyle = "rgba(255, 226, 92, 0.9)";
+          ctx.fillStyle = "rgba(255, 226, 92, 0.9)";
+          for (let gyCell = 0; gyCell < eh; gyCell += stride) {
+            for (let gxCell = 0; gxCell < ew; gxCell += stride) {
+              const i = gyCell * ew + gxCell;
+              const mag = Number(magnitudes[i]);
+              const dx = Number(gx[i]);
+              const dy = Number(gy[i]);
+              if (!Number.isFinite(mag) || mag < maxMagnitude * 0.2 || !Number.isFinite(dx) || !Number.isFinite(dy)) continue;
+              const len = Math.hypot(dx, dy) || 1;
+              const ux = dx / len;
+              const uy = dy / len;
+              const x = ((gxCell + 0.5) / ew) * w;
+              const y = ((gyCell + 0.5) / eh) * h;
+              const ex = x + ux * arrowLength;
+              const ey = y + uy * arrowLength;
+              const head = arrowLength * 0.28;
+              ctx.beginPath();
+              ctx.moveTo(x, y); ctx.lineTo(ex, ey);
+              ctx.moveTo(ex, ey); ctx.lineTo(ex - ux * head - uy * head * 0.65, ey - uy * head + ux * head * 0.65);
+              ctx.moveTo(ex, ey); ctx.lineTo(ex - ux * head + uy * head * 0.65, ey - uy * head - ux * head * 0.65);
+              ctx.stroke();
+            }
+          }
+        }
+        ctx.restore();
+      }
+    }
+
     const walls = surface.wallCues || surface.wall_cues || [];
     walls.forEach((c) => {
       const x = Number(c.x);

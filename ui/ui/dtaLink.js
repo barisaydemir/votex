@@ -6,6 +6,7 @@ import {
   pickDtaLaunchPath,
   setAutoLaunchDta,
   setDtaLaunchPath,
+  isTauriRuntime,
 } from "../api/tauri.js";
 import { $ } from "../app/state.js";
 import { setStatus } from "../app/status.js";
@@ -103,6 +104,7 @@ export async function runInterpretVotex() {
 }
 
 async function bindAutoLaunchEvent() {
+  if (!isTauriRuntime()) return;
   try {
     const { listen } = await import("@tauri-apps/api/event");
     await listen("dta-auto-launch", (event) => {

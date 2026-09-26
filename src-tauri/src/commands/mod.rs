@@ -1,6 +1,7 @@
 //! Tauri komutları — sensor-frame + manyetik analiz.
 
 pub mod archive_cmds;
+pub mod bt_cmds;
 pub mod capture_cmds;
 pub mod csv_cmds;
 pub mod dta_cmds;
@@ -26,6 +27,9 @@ pub struct AnalyzeSession {
     pub lut_strip_px: u32,
     pub view_mode: String,
     pub min_confidence: f32,
+    /// Yapı hassasiyeti (0.0–1.0) — tekrar üretilebilirlik için saklanır
+    #[serde(default)]
+    pub sensitivity: Option<f32>,
     pub target_kind: String,
     #[serde(default = "default_soil_profile")]
     pub soil_profile: String,
@@ -47,6 +51,10 @@ pub struct AppState {
     pub dta_last_contact_ms: AtomicU64,
     /// Son yönlendirme ipucu sayısı
     pub dta_last_hint_count: AtomicU64,
+    /// Aktif BLE cihaz oturumu (canlı veri akışı)
+    pub bt_link: Mutex<Option<crate::bt_link::BtSession>>,
+    /// DTA penceresi panel tarafından gizli mi (tray modu)
+    pub dta_window_hidden: AtomicBool,
 }
 
 impl Default for AppState {
@@ -59,6 +67,8 @@ impl Default for AppState {
             bridge_listening: AtomicBool::new(false),
             dta_last_contact_ms: AtomicU64::new(0),
             dta_last_hint_count: AtomicU64::new(0),
+            bt_link: Mutex::new(None),
+            dta_window_hidden: AtomicBool::new(false),
         }
     }
 }

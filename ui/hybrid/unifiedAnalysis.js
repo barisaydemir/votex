@@ -15,7 +15,9 @@
  */
 
 import * as THREE from 'three';
-import { extractMagneticGrid, renderGridToCanvas } from './imageProcessor.js';
+import { extractMagneticGrid, renderGridToCanvas, summarizeImageEdges } from './imageProcessor.js';
+import { calculateSensitivityParameters, filterDetectionsBySensitivity, annotateTiers, summarizeTiers } from './sensitivity.js';
+import { buildStructureDetections } from './structureTiers.js';
 import { CoordinateAligner } from './coordinateAlignment.js';
 import { fuseDataSources } from './dataFusion.js';
 import { analyzeDepth } from './depthAnalysis.js';
@@ -35,6 +37,7 @@ const STRUCTURE_COLORS = {
   chamber: 0x4a9eff,  // Mavi
   tunnel: 0x00d4aa,   // Camgöbeği
   metal: 0xff4444,    // Kırmızı
+  void: 0x8ea8b8,     // Gri-mavi (küçük boşluk)
   hint_consensus: 0x9b5cf6, // Mor (konsensüs)
   hint_image: 0xf59e0b,     // Altın (sadece image)
   hint_csv: 0x3b82f6,       // Mavi (sadece CSV)
@@ -65,7 +68,11 @@ export async function runUnifiedAnalysis(params) {
     showHints = true,      // İpuçlarını göster
     cvThresholds = {},     // Çapraz doğrulama eşikleri
     manualAligner = null,  // Manuel hizalama (varsa)
+    sensitivityPercent = 50, // Yapı hassasiyeti %0-100
+    sensitivityParams = null, // Ön hesaplı eşikler (verilirse yeniden hesaplanmaz)
   } = options;
+
+  const sensParams = sensitivityParams || calculateSensitivityParameters(sensitivityPercent);
 
   const startTime = performance.now();
   console.log('[Unified] Başlıyor...');
@@ -73,14 +80,17 @@ export async function runUnifiedAnalysis(params) {
   // ══════════════════════════════════════════════
   // ADIM 1: Image'dan manyetik grid çıkar (birincil)
   // ══════════════════════════════════════════════
+  // Hassasiyet → renk eşleşme toleransı + min piksel alanı (bkz. sensitivity.js)
   const { grid: imageGrid, lut, stats: imageStats } = extractMagneticGrid(image, {
     stripWidth: 20,
     gridRes,
     ntRange,
-    matchThreshold: 0.35,
+    matchThreshold: sensParams.matchThreshold,
+    minArea: sensParams.minArea,
   });
+  const edgeAnalysis = summarizeImageEdges(imageGrid, gridRes);
 
-  console.log(`[Unified] 1/4 Image grid: ${imageGrid.length} hücre, nT: ${imageStats.nTMin.toFixed(0)}..${imageStats.nTMax.toFixed(0)}`);
+  console.log(`[Unified] 1/4 Image grid: ${imageGrid.length} hücre, nT: ${imageStats.nTMin.toFixed(0)}..${imageStats.nTMax.toFixed(0)}, kenar: ${edgeAnalysis.edgeCellCount}`);
 
   // ══════════════════════════════════════════════
   // ADIM 2: CSV ile doğrula/düzelt (destek)
@@ -217,8 +227,20 @@ export async function runUnifiedAnalysis(params) {
 
   console.log(`[Unified] 3/4 Derinlik: ${depthResult.stats.depthMin.toFixed(1)}..${depthResult.stats.depthMax.toFixed(1)}m`);
 
-  // Yapıları tespit et (bileşik modelden)
-  const structures = detectStructures(fusionGrid, depthResult, gridRes, poolSizeM);
+  // Yapıları tespit et: z-skor tohum + küme birleştirme + şekil sınıflandırma
+  // (bkz. structureTiers.js) — burada budama YOK; keşif tohumu seedZ ile sürülür.
+  const allStructures = buildStructureDetections({
+    fusionGrid,
+    depthResult,
+    poolSizeM,
+    gridRes,
+    sensitivityParams: sensParams,
+  });
+  // Tek kesim noktası (bkz. sensitivity.js): ONAYLI (yüksek oranlı) tespitler
+  // hassasiyet eşiğinden muaftır; yalnız ADAY kademe süzülür.
+  const structures = filterDetectionsBySensitivity(allStructures, sensParams.percent);
+  const tieredStructures = annotateTiers(allStructures, sensParams.percent);
+  const tierCounts = summarizeTiers(allStructures, sensParams.percent);
 
   // ══════════════════════════════════════════════
   // ADIM 4: Tek 3D sahne oluştur
@@ -240,8 +262,8 @@ export async function runUnifiedAnalysis(params) {
     const magneticSurface = createMagneticSurface(imageGrid, poolSizeM, ntRange);
     sceneGroup.add(magneticSurface);
 
-    // Yapıları çiz
-    drawStructures(sceneGroup, structures, poolSizeM);
+    // Yapıları çiz — tümü çizilir: gürültü soluk, ONAYLI parlak (silme yok)
+    drawStructures(sceneGroup, tieredStructures, poolSizeM);
 
     // İpuçlarını çiz
     if (showHints && hints.length > 0) {
@@ -267,9 +289,13 @@ export async function runUnifiedAnalysis(params) {
   return {
     imageGrid,
     imageStats,
+    edgeAnalysis,
     fusionGrid,
     depthResult,
     structures,
+    allStructures,
+    tierCounts,
+    sensitivityParams: sensParams,
     hints,
     crossValResult,
     elapsed: Number(elapsed),
@@ -277,76 +303,9 @@ export async function runUnifiedAnalysis(params) {
 }
 
 // ── Yapı Tespiti ──
-
-/**
- * Fusion grid + derinlik verisinden yapıları tespit et.
- */
-function detectStructures(fusionGrid, depthResult, gridRes, poolSizeM) {
-  const structures = [];
-  const halfPool = poolSizeM / 2;
-
-  // Güçlü manyetik sinyaller → metal
-  for (const cell of fusionGrid) {
-    if (Math.abs(cell.magnetic || 0) > 300 && (cell.confidence || 0) > 0.5) {
-      const worldX = (cell.x - 0.5) * poolSizeM;
-      const worldZ = (cell.y - 0.5) * poolSizeM;
-      const depthCell = depthResult.depthGrid.find(d => d.gx === cell.gx && d.gy === cell.gy);
-      const depth = depthCell?.depth || 5;
-
-      structures.push({
-        type: cell.magnetic > 0 ? 'metal' : 'void',
-        x: worldX,
-        y: -depth,
-        z: worldZ,
-        depth,
-        magnetic: cell.magnetic,
-        confidence: cell.confidence || 0.5,
-        size: 1.5,
-      });
-    }
-  }
-
-  // Geniş düşük sinyal bölgeleri → boşluk/oda
-  for (const cell of fusionGrid) {
-    if ((cell.magnetic || 0) < -200 && (cell.confidence || 0) > 0.4) {
-      // Komşu hücreleri kontrol et — geniş bir boşluk mu?
-      const neighbors = fusionGrid.filter(c =>
-        Math.abs(c.x - cell.x) < 0.1 &&
-        Math.abs(c.y - cell.y) < 0.1 &&
-        (c.magnetic || 0) < -150
-      );
-
-      if (neighbors.length >= 4) {
-        const worldX = (cell.x - 0.5) * poolSizeM;
-        const worldZ = (cell.y - 0.5) * poolSizeM;
-        const depthCell = depthResult.depthGrid.find(d => d.gx === cell.gx && d.gy === cell.gy);
-        const depth = depthCell?.depth || 5;
-
-        // Zaten yakınlarda bir oda var mı?
-        const nearby = structures.find(s =>
-          s.type === 'chamber' &&
-          Math.abs(s.x - worldX) < 3 &&
-          Math.abs(s.z - worldZ) < 3
-        );
-
-        if (!nearby) {
-          structures.push({
-            type: 'chamber',
-            x: worldX,
-            y: -depth,
-            z: worldZ,
-            depth,
-            magnetic: cell.magnetic,
-            confidence: cell.confidence || 0.4,
-            size: Math.max(2, neighbors.length * 0.5),
-          });
-        }
-      }
-    }
-  }
-
-  return structures;
-}
+// Artık structureTiers.js'te: z-skor tohumlama + 8-bağlantılı küme birleştirme
+// + şekil sınıflandırma (metal/oda/tünel/boşluk). Burada güven eşiğiyle budama
+// yok — tek kesim noktası filterDetectionsBySensitivity (kademe dostu).
 
 // ── 3D Yardımcılar ──
 
@@ -409,37 +368,71 @@ function createMagneticSurface(imageGrid, poolSizeM, ntRange) {
   return mesh;
 }
 
-function drawStructures(group, structures, poolSizeM) {
-  for (const s of structures) {
-    const color = STRUCTURE_COLORS[s.type] || 0xffffff;
-    const size = s.size || 1.5;
+/** Kademe → görsel stil (Öneri 4: silme yerine soldurma + vurgu). */
+const TIER_STYLES = {
+  confirmed: { emissive: 0.8, opacity: 0.95, ring: 0.65, scale: 1.2 },
+  candidate: { emissive: 0.3, opacity: 0.55, ring: 0.3, scale: 1.0 },
+  noise: { emissive: 0.08, opacity: 0.12, ring: 0, scale: 0.4 },
+};
 
-    // Küre
-    const geo = new THREE.SphereGeometry(size * 0.5, 8, 8);
-    const mat = new THREE.MeshStandardMaterial({
-      color,
-      emissive: color,
-      emissiveIntensity: 0.3,
-      transparent: true,
-      opacity: 0.6 + 0.4 * (s.confidence || 0.5),
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(s.x, s.y, s.z);
+function drawStructures(group, structures, poolSizeM) {
+  // ONAYLI en sağlam çizilsin: sıralama confirmed → candidate → noise
+  const order = { confirmed: 0, candidate: 1, noise: 2 };
+  const sorted = [...structures].sort((a, b) => (order[a.tier] ?? 1) - (order[b.tier] ?? 1));
+
+  for (const s of sorted) {
+    const color = STRUCTURE_COLORS[s.type] || 0xffffff;
+    const st = TIER_STYLES[s.tier] || TIER_STYLES.candidate;
+    const size = (s.size || 1.5) * st.scale;
+
+    let mesh;
+    if (s.type === 'tunnel' && Number.isFinite(s.x0)) {
+      // Tünel koridoru: uçlar arası silindir
+      const dx = s.x1 - s.x0;
+      const dz = s.z1 - s.z0;
+      const len = Math.max(0.5, Math.hypot(dx, dz));
+      const geo = new THREE.CylinderGeometry(size * 0.16, size * 0.16, len, 8, 1);
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: st.emissive,
+        transparent: true,
+        opacity: st.opacity,
+      });
+      mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set((s.x0 + s.x1) / 2, s.y, (s.z0 + s.z1) / 2);
+      mesh.rotation.z = Math.PI / 2;
+      mesh.rotation.y = -Math.atan2(dz, dx);
+    } else {
+      // Küre
+      const geo = new THREE.SphereGeometry(size * 0.5, 8, 8);
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: st.emissive,
+        transparent: true,
+        opacity: st.opacity,
+      });
+      mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(s.x, s.y, s.z);
+    }
     mesh.userData = { structure: s };
     group.add(mesh);
 
-    // Halka
-    const ringGeo = new THREE.RingGeometry(size * 0.6, size * 0.8, 16);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: 0.3,
-      side: THREE.DoubleSide,
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.set(s.x, s.y, s.z);
-    ring.lookAt(0, s.y, 0);
-    group.add(ring);
+    // Halka (gürültüde yok — yalnız ONAYLI/ADAY vurgusu)
+    if (st.ring > 0) {
+      const ringGeo = new THREE.RingGeometry(size * 0.6, size * 0.8, 16);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: st.ring,
+        side: THREE.DoubleSide,
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.set(s.x, s.y, s.z);
+      ring.lookAt(0, s.y, 0);
+      group.add(ring);
+    }
   }
 }
 
@@ -502,7 +495,7 @@ export function clearUnifiedScene(scene) {
  * @param {number} ntRange
  * @returns {HTMLCanvasElement}
  */
-export function createUnified2DMap(imageGrid, csvPoints, canvasW, canvasH, ntRange = 500) {
+export function createUnified2DMap(imageGrid, csvPoints, canvasW, canvasH, ntRange = 500, edgeAnalysis = null) {
   const canvas = document.createElement('canvas');
   canvas.width = canvasW;
   canvas.height = canvasH;
@@ -553,6 +546,38 @@ export function createUnified2DMap(imageGrid, csvPoints, canvasW, canvasH, ntRan
       ctx.arc(px, py, 2, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  // İşlem tarafı çıktısı: iso-nT konturları + gradient yön okları.
+  if (edgeAnalysis) {
+    const contours = edgeAnalysis.contours || {};
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.78)';
+    ctx.lineWidth = 1;
+    for (const segment of contours.segments || []) {
+      const a = segment[0], b = segment[1];
+      ctx.beginPath();
+      ctx.moveTo((a[0] / Math.max(1, edgeAnalysis.gradient.gradientX.length ? edgeAnalysis.gradient.gradientX.length ** 0.5 - 1 : 1)) * canvasW, (a[1] / Math.max(1, edgeAnalysis.gradient.gradientX.length ? edgeAnalysis.gradient.gradientX.length ** 0.5 - 1 : 1)) * canvasH);
+      ctx.lineTo((b[0] / Math.max(1, edgeAnalysis.gradient.gradientX.length ? edgeAnalysis.gradient.gradientX.length ** 0.5 - 1 : 1)) * canvasW, (b[1] / Math.max(1, edgeAnalysis.gradient.gradientX.length ? edgeAnalysis.gradient.gradientX.length ** 0.5 - 1 : 1)) * canvasH);
+      ctx.stroke();
+    }
+    const gradient = edgeAnalysis.gradient;
+    const res = Math.round(Math.sqrt(gradient.magnitude.length));
+    const stride = Math.max(1, Math.ceil(res / 16));
+    const maxMag = gradient.maxMagnitude || 0;
+    ctx.strokeStyle = 'rgba(255,226,92,0.9)';
+    for (let gy = 0; gy < res; gy += stride) for (let gx = 0; gx < res; gx += stride) {
+      const i = gy * res + gx, mag = gradient.magnitude[i];
+      if (!Number.isFinite(mag) || mag < maxMag * 0.2) continue;
+      const dx = gradient.gradientX[i], dy = gradient.gradientY[i], len = Math.hypot(dx, dy) || 1;
+      const x = ((gx + 0.5) / res) * canvasW, y = ((gy + 0.5) / res) * canvasH;
+      const length = Math.min(canvasW / res, canvasH / res) * stride * 0.8;
+      const ex = x + dx / len * length, ey = y + dy / len * length, head = length * 0.28;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey);
+      ctx.moveTo(ex, ey); ctx.lineTo(ex - dx / len * head - dy / len * head * 0.65, ey - dy / len * head + dx / len * head * 0.65);
+      ctx.moveTo(ex, ey); ctx.lineTo(ex - dx / len * head + dy / len * head * 0.65, ey - dy / len * head - dx / len * head * 0.65); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // Legend

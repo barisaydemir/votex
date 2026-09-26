@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three';
-import { mapToWorld } from './coords.js';
+import { recordPointToWorld, recordSegmentToWorld } from './coords.js';
 import { invalidate } from './scene.js';
 
 // ── Görünürlük kontrolü (kullanıcı açıp kapatabilir) ──
@@ -81,7 +81,8 @@ function structuresToHints(structures) {
                : 'room';
     hints.push({
       kind,
-      cx: Math.max(0, Math.min(1, ch.cx)), cy: Math.max(0, Math.min(1, ch.cy)), rx: ch.rx, ry: ch.ry,
+      coordinateSpace: ch.coordinateSpace || ch.coordinate_space || "normalized",
+      cx: ch.cx, cy: ch.cy, rx: ch.rx, ry: ch.ry,
       confidence: ch.confidence || 0.5,
       depth: ch.top_from_surface_m || ch.topFromSurfaceM || 0,
       height: ch.height_m || ch.heightM || 0,
@@ -93,14 +94,14 @@ function structuresToHints(structures) {
   });
 
   tunnels.forEach((t, i) => {
-    // x0/y0/x1/y1 0-1 dışında olabilir — orta noktayı da kıskaçla
-    const cx = Math.max(0, Math.min(1, (t.x0 + t.x1) * 0.5));
-    const cy = Math.max(0, Math.min(1, (t.y0 + t.y1) * 0.5));
     hints.push({
       kind: 'tunnel',
-      cx, cy,
-      rx: Math.abs(t.x1 - t.x0) * 0.5,
-      ry: Math.abs(t.y1 - t.y0) * 0.5,
+      coordinateSpace: t.coordinateSpace || t.coordinate_space || "normalized",
+      x0: t.x0, y0: t.y0, x1: t.x1, y1: t.y1,
+      cx: (Number(t.x0) + Number(t.x1)) * 0.5,
+      cy: (Number(t.y0) + Number(t.y1)) * 0.5,
+      rx: Math.abs(Number(t.x1) - Number(t.x0)) * 0.5,
+      ry: Math.abs(Number(t.y1) - Number(t.y0)) * 0.5,
       confidence: t.confidence || 0.5,
       depth: t.crown_from_surface_m || t.crownFromSurfaceM || 0,
       height: t.height_m || t.heightM || 0,
@@ -114,7 +115,8 @@ function structuresToHints(structures) {
   metals.forEach((m, i) => {
     hints.push({
       kind: 'metal',
-      cx: Math.max(0, Math.min(1, m.cx)), cy: Math.max(0, Math.min(1, m.cy)), rx: m.rx, ry: m.ry,
+      coordinateSpace: m.coordinateSpace || m.coordinate_space || "normalized",
+      cx: m.cx, cy: m.cy, rx: m.rx, ry: m.ry,
       confidence: m.confidence || 0.5,
       depth: m.depth_from_surface_m || m.depthFromSurfaceM || 0,
       metalGuess: m.metal_guess || m.metalGuess || '',
@@ -129,7 +131,7 @@ function structuresToHints(structures) {
 }
 
 // ── 3D sahneye ipuçlarını ekle ──
-function createHintMeshes(hints, mapW, mapD, vertExag, source) {
+function createHintMeshes(hints, mapW, mapD, vertExag, source, sideView = false) {
   const group = new THREE.Group();
   group.name = 'hintLayer';
   group.userData.votexLayer = 'hint';
@@ -141,18 +143,22 @@ function createHintMeshes(hints, mapW, mapD, vertExag, source) {
     // Koordinat sistemi: DTA yapıları 0-1 aralığında (normalize), CSV yapıları metre cinsinde.
     // Kaynak etiketiyle karar ver — 0-1 sezgisi CSV havuz ortasındaki yapıları yanlış okurdu.
     let x, z;
-    if (isCsv) {
-      // CSV — zaten metre cinsinden; harita sınırına kıskaçla (harita dışına taşmasın)
-      x = Math.max(-mapW / 2, Math.min(mapW / 2, hint.cx));
-      z = Math.max(-mapD / 2, Math.min(mapD / 2, hint.cy));
+    if (isCsv || hint.coordinateSpace === "meters" || hint.coordinateSpace === "meter" || hint.coordinateSpace === "world") {
+      if (hint.x0 != null && hint.x1 != null) {
+        const segment = recordSegmentToWorld(hint, mapW, mapD, sideView);
+        if (segment) {
+          x = (segment.a.x + segment.b.x) * 0.5;
+          z = (segment.a.z + segment.b.z) * 0.5;
+        }
+      } else {
+        const point = recordPointToWorld(hint, "cx", "cy", mapW, mapD, sideView);
+        x = point.x;
+        z = point.z;
+      }
     } else {
-      // DTA (image) — normalize 0-1 → metre
-      // cx/cy her zaman 0-1 arasında olmayabilir (geniş yapılar, tünel baş/son)
-      const cxClamped = Math.max(0, Math.min(1, hint.cx));
-      const cyClamped = Math.max(0, Math.min(1, hint.cy));
-      const w = mapToWorld(cxClamped, cyClamped, mapW, mapD);
-      x = w.x;
-      z = w.z;
+      const point = recordPointToWorld(hint, "cx", "cy", mapW, mapD, sideView);
+      x = point.x;
+      z = point.z;
     }
     // Derinlik: metre cinsinden derinlik → negatif Y
     const depthM = hint.depth || 0;
@@ -235,7 +241,7 @@ export function showHints(scene, structures, opts = {}) {
   // Kaynak: DTA (image) ipuçları yalnız GÖRÜNTÜ/HİBRİT; CSV ipuçları yalnız CSV/HİBRİT.
   const source = opts.source === "csv" ? "csv" : "dta";
 
-  const group = createHintMeshes(hints, mapW, mapD, vertExag, source);
+  const group = createHintMeshes(hints, mapW, mapD, vertExag, source, (opts.viewMode || opts.view_mode) === "side");
   group.userData.hintSource = source;
   group.userData.votexLayer = source === "csv" ? "hint-csv" : "hint-dta";
   scene.add(group);

@@ -19,3 +19,54 @@ update_staging/
 
 # WASM build artifacts (votex-wasm)
 votex-wasm/target/
+
+# Şekil doğrulama fikstürü (cargo test üretir)
+dev/contour-fixture.js
+dev/contour-verify-standalone.html
+
+# Lisans modülleri — HMAC imza seed'i içerir, public repoya girmez
+modules/dft_license/
+modules/dft_license_issuer/
+
+# Kişisel yazışma / müşteri dokümanları
+docs/
+
+# Packager geliştirme çıktıları (runtimes + staging ~1.5 GB)
+modules/dft_packager/staging/
+modules/dft_packager/payload/
+
+# Python önbellekleri
+__pycache__/
+
+# Freebuff masaüstü durum dosyaları
+.freebuff/
+
+# Geçici analiz/yama dosyaları
+tmp/
+temp/
+yama/
+
+# DTA yerel çalışma verileri (venv, build çıktıları, loglar, kullanıcı verileri)
+Derin_Tarama_Asistan/.venv_jarvis/
+Derin_Tarama_Asistan/dist/
+Derin_Tarama_Asistan/logs/
+Derin_Tarama_Asistan/reports/
+Derin_Tarama_Asistan/__pycache__/
+Derin_Tarama_Asistan/actions/__pycache__/
+Derin_Tarama_Asistan/core/__pycache__/
+Derin_Tarama_Asistan/tools/__pycache__/
+Derin_Tarama_Asistan/memory/__pycache__/
+Derin_Tarama_Asistan/config/api_keys.json
+Derin_Tarama_Asistan/config/license.dat
+Derin_Tarama_Asistan/memory/memory.json
+
+# Gradle derleme çıktıları
+votex-android/.gradle/
+votex-android/build/
+votex-android/app/build/
+
+# Geçici plan dosyaları
+.tmp_brainstorm_plan.txt
+
+# Artemis ayrı paket staging (derleme çıktısı)
+modules/dft_packager/staging_artemis/

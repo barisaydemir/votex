@@ -106,6 +106,26 @@ pub struct AppSettings {
     /// Yeraltı filtresi
     #[serde(default = "default_true")]
     pub csv_underground_only: bool,
+
+    /// Legacy JSON derinlik proxy çarpanları (Parametre)
+    #[serde(default)]
+    pub legacy_depth_params: crate::legacy_mag_json::LegacyDepthParams,
+    /// Saha kalibrasyon defteri (etiket + parametre anlık görüntüleri)
+    #[serde(default)]
+    pub legacy_depth_calib_notes: Vec<crate::legacy_mag_json::LegacyDepthCalibNote>,
+    /// Saha inceleme oturumları (JSON fingerprint → incelenen hedefler / rapor seçimi)
+    #[serde(default)]
+    pub legacy_field_sessions: std::collections::HashMap<String, crate::legacy_mag_json::LegacyFieldSession>,
+    /// Doğrulanmış hedeflerden öğrenilen eşik modeli (yerel istatistik kalibrasyonu)
+    #[serde(default)]
+    pub legacy_learned_thresholds: Option<serde_json::Value>,
+    /// DTA paneli otomatik katlanma süresi (saniye). 0 = hiç katlama (açık kalsın).
+    #[serde(default = "default_dta_panel_auto_collapse")]
+    pub dta_panel_auto_collapse_secs: u32,
+}
+
+fn default_dta_panel_auto_collapse() -> u32 {
+    0
 }
 
 fn default_soil_profile() -> String {
@@ -204,6 +224,11 @@ impl Default for AppSettings {
             csv_min_strength: default_csv_min_strength(),
             csv_grid_res: default_csv_grid_res(),
             csv_underground_only: true,
+            legacy_depth_params: crate::legacy_mag_json::LegacyDepthParams::default(),
+            legacy_depth_calib_notes: Vec::new(),
+            legacy_field_sessions: std::collections::HashMap::new(),
+            legacy_learned_thresholds: None,
+            dta_panel_auto_collapse_secs: default_dta_panel_auto_collapse(),
         }
     }
 }

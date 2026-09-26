@@ -44,7 +44,9 @@ export function confPct(obj) {
 
 export function confLabel(obj) {
   const p = confPct(obj);
-  return p > 0 ? ` · %${p}` : "";
+  if (p <= 0) return "";
+  const tier = p >= 65 ? "güçlü" : p >= 35 ? "aday" : "zayıf aday";
+  return ` · %${p} ${tier}`;
 }
 
 function geoOf(obj) {
@@ -72,7 +74,7 @@ function whyRows(obj) {
   if (!chips.length && !reasonBits.length) return "";
   return `
     <div class="sc-why">
-      <div class="sc-why-head">${t("sc.why", { n: conf || "—" })}</div>
+      <div class="sc-why-head">${t("sc.why", { n: conf || "—" })} · güven skoru</div>
       ${chips.length ? `<div class="sc-why-chips">${chips.map((c) => `<span>${c}</span>`).join("")}</div>` : ""}
       ${
         reasonBits.length
@@ -109,8 +111,22 @@ export function renderStructureList(surface) {
   const tunnels = s.tunnels || [];
   const metals = s.metals || [];
   const waters = s.waters || [];
+  const minDisplayConfidence = Math.max(0, Math.min(0.8, Number(state.displayConfidencePercent ?? 50) / 100));
+  const minSymmetry = Math.max(0, Math.min(1, Number(state.symmetryPercent ?? 0) / 100));
+  const visibleChambers = chambers.filter((c) => {
+    const score = Number(c.confidence);
+    const symmetry = Number(c.geometry?.symmetryIndex ?? c.geometry?.symmetry_index);
+    return (!Number.isFinite(score) || score >= minDisplayConfidence)
+      && (!minSymmetry || !Number.isFinite(symmetry) || symmetry >= minSymmetry);
+  });
+  const visibleTunnels = tunnels.filter((tunnel) => {
+    const score = Number(tunnel.confidence);
+    const symmetry = Number(tunnel.geometry?.symmetryIndex ?? tunnel.geometry?.symmetry_index);
+    return (!Number.isFinite(score) || score >= minDisplayConfidence)
+      && (!minSymmetry || !Number.isFinite(symmetry) || symmetry >= minSymmetry);
+  });
 
-  if (!chambers.length && !tunnels.length && !metals.length && !waters.length) {
+  if (!visibleChambers.length && !visibleTunnels.length && !metals.length && !waters.length) {
     const rejected = s.rejectedCount ?? s.rejected_count ?? 0;
     host.innerHTML = `<p class="hint">${rejected ? t("list.noneRejected", { n: rejected }) : t("list.none")}</p>`;
     return;
@@ -119,7 +135,7 @@ export function renderStructureList(surface) {
   const cards = [];
   let num = 1;
 
-  chambers.forEach((c, i) => {
+  visibleChambers.forEach((c, i) => {
     if (c.kind === "cavity") return;
     const kind = chamberKindLabel(c.kind);
     const w = (c.widthM ?? c.width_m ?? 0).toFixed(1);
@@ -150,7 +166,7 @@ export function renderStructureList(surface) {
     `);
   });
 
-  tunnels.forEach((tun, i) => {
+  visibleTunnels.forEach((tun, i) => {
     const dir = tun.direction || "?";
     const heading = tun.heading || "";
     const deg = Math.round(tun.bearingDeg ?? tun.bearing_deg ?? 0);

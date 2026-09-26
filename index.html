@@ -143,6 +143,20 @@
       <div class="boot-maker">Barış Aydemir · Digital Future Tech</div>
     </div>
 
+    <div id="field-report-modal" class="field-report-modal" hidden role="dialog" aria-modal="true" aria-labelledby="field-report-title">
+      <div class="field-report-panel">
+        <div class="field-report-bar">
+          <h2 id="field-report-title">Saha Raporu</h2>
+          <div class="btn-row">
+            <button type="button" id="field-report-print" class="mil accent">Yazdır / PDF</button>
+            <button type="button" id="field-report-save" class="mil">HTML Kaydet</button>
+            <button type="button" id="field-report-close" class="mil">Kapat</button>
+          </div>
+        </div>
+        <iframe id="field-report-frame" class="field-report-frame" title="Saha raporu"></iframe>
+      </div>
+    </div>
+
     <div id="license-gate" class="license-gate" hidden aria-modal="true" role="dialog" aria-labelledby="license-gate-title">
       <div class="license-gate-panel">
         <img class="license-gate-logo" src="/votex-logo.png" alt="VOTEX" width="96" height="96" />
@@ -215,6 +229,7 @@
           </div>
           <button type="button" class="update-badge" id="update-badge" hidden data-i18n="header.update" data-i18n-title="header.updateTitle">Güncelleme</button>
           <span class="app-ver" id="app-version-label" data-i18n-title="header.verTitle">—</span>
+          <span class="app-ver legacy-runtime-context" id="legacy-runtime-context" title="Aktif Legacy çalışma durumu">Legacy · —</span>
           <button type="button" class="mil dta-launch" id="btn-launch-dta" data-i18n="header.dtaOpen" data-i18n-title="header.dtaOpenTitle">
             DTA Aç
           </button>
@@ -233,7 +248,9 @@
       <div class="subbar">
         <div class="mod-rail" id="votex-ray" role="tablist">
           <button type="button" class="vr-btn active" data-mod="image" data-i18n-title="rail.image" title="Görüntü (DTA)">🖥 <span>GÖRÜNTÜ</span></button>
-          <button type="button" class="vr-btn" data-mod="csv" data-i18n-title="rail.csv" title="CSV / Excel" style="display:none;">📊 <span>CSV</span></button>
+          <button type="button" class="vr-btn" data-mod="csv" data-i18n-title="rail.csv" title="CSV veri içe aktarma">📊 <span>CSV VERİ</span></button>
+          <button type="button" class="vr-btn" data-mod="legacy" title="LEGACY3DMAG JSON dik tarama">🧭 <span>LEGACY3DMAG</span></button>
+          <button type="button" class="vr-btn" data-mod="tools" title="Analiz ve dışa aktarma araçları">🛠 <span>ARAÇLAR</span></button>
           <button type="button" class="vr-btn" data-mod="hybrid" data-i18n-title="rail.hybrid" title="Hibrit analiz" style="display:none;">🔀 <span>HİBRİT</span></button>
           <button type="button" class="vr-btn" data-mod="sys" data-i18n-title="rail.sys" title="Sistem (lisans, DTA/VPE, arşiv)">⚙ <span>SİSTEM</span></button>
         </div>
@@ -264,6 +281,49 @@
             ardından analizi başlatın.
           </p>
 
+          <!-- 🎯 YAPI TESPİT HASSASİYETİ AYAR KARTI (GÖRSEL / İLK SEKME) -->
+          <div id="main-sensitivity-section" class="main-sensitivity-card">
+            <div class="sens-header">
+              <span class="sens-title">
+                🎯 Yapı Tespit Hassasiyeti
+              </span>
+              <span id="main-sensitivity-badge" class="sens-badge">
+                %50 (Dengeli)
+              </span>
+            </div>
+            <input type="range" id="main-sensitivity-slider" min="0" max="100" step="5" value="50" aria-label="Yapı Tespit Hassasiyeti" />
+            <div class="sens-ticks">
+              <span>🔴 Katı</span>
+              <span>🟡 Dengeli</span>
+              <span>🔵 Maksimum</span>
+            </div>
+            <div id="main-sensitivity-desc" class="sens-desc">
+              Yüksek oranlı yapı/anomaliler ONAYLI olarak her koşulda görünür; çubuk aday eşiğini ve keşfi yönetir
+            </div>
+            <div class="sens-extra-controls" aria-label="Analiz destek ayarları">
+              <label class="sens-extra-control">
+                <span>Güven <b id="main-confidence-value">%48</b></span>
+                <input type="range" id="main-confidence-slider" min="15" max="80" step="1" value="48" aria-label="Güven yüzdesi" />
+              </label>
+              <label class="sens-extra-control">
+                <span>Çizim eşiği <b id="main-display-confidence-value">%50</b></span>
+                <input type="range" id="main-display-confidence-slider" min="0" max="80" step="1" value="50" aria-label="Minimum yapı çizim güveni" />
+              </label>
+              <label class="sens-extra-control">
+                <span>Simetri filtresi <b id="main-symmetry-value">Kapalı</b></span>
+                <input type="range" id="main-symmetry-slider" min="0" max="100" step="1" value="0" aria-label="Minimum simetri filtresi" />
+              </label>
+              <label class="sens-extra-control">
+                <span>Sinyal oranı <b id="main-signal-value">%50</b></span>
+                <input type="range" id="main-signal-slider" min="0" max="100" step="5" value="50" aria-label="Sinyal oranı" />
+              </label>
+              <label class="sens-extra-control">
+                <span>Duvar desteği <b id="main-wall-value">%50</b></span>
+                <input type="range" id="main-wall-slider" min="0" max="100" step="5" value="50" aria-label="Duvar desteği" />
+              </label>
+            </div>
+          </div>
+
           <div class="dropzone" id="dropzone">
             <p class="drop-title" data-i18n="ops.dropTitle">HARİTA KAYNAĞI</p>
             <p class="drop-sub" id="file-name">Henüz dosya yok</p>
@@ -276,6 +336,7 @@
                 Analizi Başlat
               </button>
             </div>
+          </div>
 
             <!-- ⚡ AUTO — Akıllı Ayar Öneri Kartı -->
             <div id="auto-tune-card" class="auto-tune-card" style="display:none;"></div>
@@ -435,7 +496,6 @@
               <div id="fd-ct-chips" class="fd-bands"></div>
               <div id="fd-ct-list" class="fd-list fd-jx-list"></div>
             </div>
-          </div>
         </div><!-- /ops-core-a -->
         <div id="panel-fold-zone" class="fold-zone">
 
@@ -517,6 +577,15 @@
                 <button type="button" id="btn-archive-refresh" class="mil compact" data-i18n="archive.refresh">Yenile</button>
               </div>
               <div class="archive-list" id="archive-list" aria-live="polite"></div>
+              <div class="btn-row">
+                <button type="button" id="btn-archive-export-training" class="mil compact" title="Arşivdeki Legacy JSON vakalarını operatör kararlarıyla etiketli JSONL eğitim seti olarak kaydet">🎓 JSONL eğitim seti çıkar</button>
+              </div>
+              <div class="btn-row">
+                <button type="button" id="btn-case-package-export" class="mil compact" title="Açık Legacy vakasını taşınabilir Case Package JSON olarak kaydet">📦 Vaka JSON dışa aktar</button>
+                <button type="button" id="btn-case-package-import" class="mil compact" title="Taşınabilir VOTEX Case Package JSON dosyası aç">📂 Vaka JSON içe aktar</button>
+              </div>
+              <p class="hint compact">Vaka JSON: analiz + 3D model + kalibrasyon + operatör kararlarını tek taşınabilir dosyada saklar.</p>
+              <p class="hint compact">Eğitim seti: girdi ölçüm özeti → operatör kararı (Gemini few-shot / tuning)</p>
             </div>
           </details>
 
@@ -558,6 +627,341 @@
                 <button type="button" id="btn-csv-toggle" class="mil" disabled>Overlay</button>
                 <button type="button" id="btn-csv-zoom-all" class="mil" disabled title="Tüm yapıları sığdır">⊕ Tümünü Gör</button>
               </div>
+              <div id="legacy-dik-box" class="is-simple" style="margin-top:0.45rem;padding:0.45rem 0.55rem;border:1px solid var(--line);border-radius:var(--r-sharp);background:rgba(255,255,255,0.02);">
+                  <div class="legacy-user-toolbar" aria-label="Kullanım görünümü">
+                    <div>
+                      <span class="legacy-section-kicker">KULLANIM</span>
+                      <strong id="legacy-user-mode-label">Basit kullanım</strong>
+                    </div>
+                    <div class="legacy-user-toolbar-actions">
+                      <select id="legacy-user-mode" class="legacy-select" title="Basit veya uzman kullanım görünümü">
+                        <option value="simple">Basit kullanım</option>
+                        <option value="expert">Uzman ayarları</option>
+                      </select>
+                      <select id="legacy-depth-profile" class="legacy-select" title="Hazır analiz profili">
+                        <option value="normal">Profil: Normal</option>
+                        <option value="deep">Profil: Derin hedef</option>
+                        <option value="stake">Profil: Saha kazığı</option>
+                      </select>
+                      <select id="legacy-merge-profile" class="legacy-select" title="Birleşme duyarlılığı">
+                        <option value="cautious">Birleşme: Temkinli</option>
+                        <option value="normal">Birleşme: Normal</option>
+                        <option value="research">Birleşme: Araştırma</option>
+                      </select>
+                      <button type="button" id="btn-legacy-target-mode" class="mil" title="Yalnızca seçili hedefi büyük görünümde göster">🎯 Hedef modu</button>
+                      <button type="button" id="btn-legacy-underground-top" class="mil" disabled title="İlişkili bulguları tek sürekli 3D obje olarak birleştirir">⬡ Birleşik objeler</button>
+                    </div>
+                  </div>
+                  <div id="legacy-field-workflow" class="legacy-field-workflow" aria-live="polite">
+                    <div class="legacy-field-workflow-head">
+                      <span class="legacy-section-kicker">SAHA AKIŞI</span>
+                      <span id="legacy-workflow-progress">0/5 tamamlandı</span>
+                    </div>
+                    <div id="legacy-workflow-title" class="legacy-workflow-title">Başlamak için Legacy JSON dosyasını açın</div>
+                    <div id="legacy-workflow-steps" class="legacy-workflow-steps"></div>
+                    <button type="button" id="btn-legacy-workflow-next" class="mil accent">JSON seç</button>
+                  </div>
+                  <div id="legacy-target-card" class="legacy-target-card" hidden aria-live="polite">
+                    <div class="legacy-target-card-head">
+                      <span class="legacy-section-kicker">SEÇİLİ HEDEF</span>
+                      <span id="legacy-target-status" class="legacy-target-status">—</span>
+                    </div>
+                    <div id="legacy-target-title" class="legacy-target-title">Henüz hedef seçilmedi</div>
+                    <div id="legacy-target-metrics" class="legacy-target-metrics"></div>
+                    <details id="legacy-target-section" class="legacy-target-section" open hidden>
+                      <summary>Hedef kesiti · ölçüm profili ve tahmini derinlik</summary>
+                      <div id="legacy-target-section-content"></div>
+                    </details>
+                    <label class="legacy-target-view-control">
+                      <span>Birleşik hedef görünümü</span>
+                      <select id="legacy-target-view-mode" class="legacy-select" title="Seçili birleşik hedefin 3D görünümü">
+                        <option value="simple">Sade · hedef + bağlantılar</option>
+                        <option value="evidence">Kanıt · hedef + kaynak anomaliler</option>
+                        <option value="full">Tam · tüm saha</option>
+                      </select>
+                    </label>
+                    <div id="legacy-target-confidence" class="legacy-target-confidence"></div>
+                    <div id="legacy-target-notes" class="legacy-target-notes" hidden></div>
+                    <div class="legacy-target-workspace-actions">
+                      <button type="button" id="btn-legacy-target-notes" class="mil" disabled>📝 Not / fotoğraf</button>
+                      <button type="button" id="btn-legacy-target-report" class="mil" disabled>📋 Rapora ekle</button>
+                    </div>
+                    <div class="legacy-target-workspace-actions legacy-verify-actions">
+                      <button type="button" id="btn-legacy-target-confirm" class="mil" disabled title="Sahada doğrulandı — eşik öğrenmesi bu kararı örnek olarak kullanır">✔ Sahada doğrulandı</button>
+                      <button type="button" id="btn-legacy-target-reject" class="mil" disabled title="Erandı — eşik öğrenmesi bu kararı örnek olarak kullanır">✖ Ele</button>
+                      <span id="legacy-learn-summary" class="legacy-learn-summary" title="Yerel öğrenme: doğrulanmış kararlar GÜÇLÜ/DİKKAT eşiklerini ve tip bazlı derinlik bandını günceller"></span>
+                    </div>
+                    <div class="legacy-target-actions">
+                      <button type="button" id="btn-legacy-target-prev" class="mil" disabled>‹ Önceki</button>
+                      <button type="button" id="btn-legacy-target-focus" class="mil accent" disabled>Hedefe git</button>
+                      <button type="button" id="btn-legacy-target-next" class="mil" disabled>Sonraki ›</button>
+                      <button type="button" id="btn-legacy-target-only" class="mil" disabled>Sadece bunu göster</button>
+                      <button type="button" id="btn-legacy-target-calibrate" class="mil" disabled>Kalibrasyona al</button>
+                    </div>
+                  </div>
+                  <div id="legacy-simple-help" class="legacy-simple-help">Dosyayı seçin, bir adım veya obje seçin. Kamera hedefe gider ve yalnızca seçili hedef gösterilir.</div>
+
+                <div id="legacy-dik-guide" class="legacy-dik-guide" hidden>
+                  <div class="legacy-dik-guide-title">İlk 5 dakika</div>
+                  <ol class="legacy-dik-guide-list">
+                    <li>Tarama matrisini gir (örn. 6×3) veya 0 bırak</li>
+                    <li><b>JSON Seç</b> ile Legacy3DMAG dosyasını aç</li>
+                    <li>Soldaki listeden bir tespiti seç → 3D odak</li>
+                    <li>Gerekirse <b>Parametre</b> + saha etiketi ile kalibre et</li>
+                    <li>Tomografi / Invert proxy ile derinlik ve ayak izini kontrol et</li>
+                  </ol>
+                  <button type="button" id="btn-legacy-guide-dismiss" class="mil" style="font-size:0.72rem;padding:0.2rem 0.45rem;">Anladım</button>
+                </div>
+                <p class="hint compact" style="margin:0 0 0.35rem;">Üstten manyetik tarama — anomali kontürü ve derinlik proxy’si (gerçek cisim CAD’i değil; ham nokta bulutu yok).</p>
+                <label class="legacy-input-row legacy-input-row--matrix">
+                  <span class="legacy-input-label">Tarama matrisi</span>
+                  <span class="legacy-matrix-fields">
+                    <input type="number" id="legacy-dik-matrix-rows" class="legacy-matrix-input" min="0" max="500" step="1" value="0" placeholder="Satır" title="Satır sayısı" />
+                    <span class="legacy-matrix-x" aria-hidden="true">×</span>
+                    <input type="number" id="legacy-dik-matrix-cols" class="legacy-matrix-input" min="0" max="500" step="1" value="0" placeholder="Sütun" title="Sütun sayısı" />
+                  </span>
+                  <span class="legacy-input-help" id="legacy-dik-matrix-product">0 = otomatik · yalnızca adım no</span>
+                </label>
+                <label class="legacy-input-row">
+                  <span class="legacy-input-label">Yatay adım ölçüsü</span>
+                  <input type="number" id="legacy-dik-step-spacing" min="0" max="1000" step="0.01" value="0" placeholder="Otomatik" />
+                  <span class="legacy-input-help">metre · matris boşsa</span>
+                </label>                  <div id="legacy-dik-step-help" class="legacy-step-help">Örn. 6×3 = 6 satır × 3 sütun = 18 kare. Her adım bir kare hücredir; alt satırdan başlanır, hatlar gidiş–dönüş ilerler.</div>
+                <div id="bt-device-box" class="bt-device-box" style="margin:0.4rem 0;padding:0.45rem 0.5rem;border:1px solid rgba(55,148,255,0.25);border-radius:5px;background:rgba(30,80,160,0.08);">
+                  <div class="hint compact" style="margin:0 0 0.3rem;font-weight:600;">📱 Cihaza Bağlan · Bluetooth</div>
+                  <div class="btn-row">
+                    <button id="btn-bt-scan" class="mil">Cihaz Ara</button>
+                    <button id="btn-bt-connect" class="mil" disabled>Bağlan</button>
+                    <button id="btn-bt-disconnect" class="mil" disabled>Kes</button>
+                  </div>
+                  <select id="bt-device-list" class="legacy-select" style="width:100%;margin:0.25rem 0;" disabled>
+                    <option value="">— önce cihaz arayın —</option>
+                  </select>
+                  <div id="bt-link-status" class="hint compact" style="margin:0 0 0.3rem;">Bağlı değil</div>
+                  <label class="legacy-input-row">
+                    <span class="legacy-input-label">Alan genişliği</span>
+                    <input type="number" id="bt-field-width" min="0.5" max="100" step="0.1" value="4" />
+                    <span class="legacy-input-help">m · cihaz göndermiyorsa</span>
+                  </label>
+                  <label class="legacy-input-row">
+                    <span class="legacy-input-label">Alan boyu</span>
+                    <input type="number" id="bt-field-length" min="0.5" max="100" step="0.1" value="5" />
+                    <span class="legacy-input-help">m</span>
+                  </label>
+                  <label class="legacy-input-row">
+                    <span class="legacy-input-label">Harita görünümü</span>
+                    <select id="bt-heat-style" class="legacy-select">
+                      <option value="device" selected>Cihaz · gökkuşağı + eşik konturu</option>
+                      <option value="votex">Votex · simetrik yeşil zemin</option>
+                    </select>
+                    <span class="legacy-input-help">cihaz ekranı yanında karşılaştırma</span>
+                  </label>
+                  <div class="btn-row">
+                    <button id="btn-bt-finish" class="mil accent" disabled>⏹ Bitir ve Kaydet</button>
+                  </div>
+                  <div class="btn-row">
+                    <button id="btn-bt-analyze" class="mil" disabled>Analiz Et</button>
+                    <button id="btn-bt-reset" class="mil" disabled>Akışı Sıfırla</button>
+                  </div>
+                  <div id="bt-stream-status" class="hint compact mono" style="margin:0.25rem 0 0;">0 mesaj · 0 nokta</div>
+                </div>
+                <details class="dta-settings-fold" id="legacy-depth-params-fold" style="margin-top:0.4rem;">
+                  <summary>Parametre</summary>
+                  <div class="dta-settings">
+                      <p class="hint compact" style="margin:0 0 0.25rem;">Cihaz–yüzey mesafesi normalde 10 cm’dir; en fazla 20 cm olabilir. Hedef derinliği bipolar çarpan ve dipol karışımıyla ayarlayın.</p>
+                    <label class="legacy-input-row">
+                      <span class="legacy-input-label">Cihaz–yüzey sınırı (m)</span>
+                      <input type="number" id="legacy-param-sensor-height" min="0" max="0.20" step="0.01" value="0.10" title="Normal 10 cm; mutlak üst sınır 20 cm" />
+                      <span class="legacy-input-help">normal 10 cm · max 20 cm</span>
+                    </label>
+                    <label class="legacy-input-row">
+                      <span class="legacy-input-label">Bipolar çarpan</span>
+                      <input type="number" id="legacy-param-bipolar" min="0.5" max="4" step="0.01" value="1.85" />
+                      <span class="legacy-input-help">Δ × çarpan</span>
+                    </label>
+                    <label class="legacy-input-row">
+                      <span class="legacy-input-label">Dipol karışım (%)</span>
+                      <input type="number" id="legacy-param-dipole-blend" min="0" max="100" step="1" value="30" />
+                      <span class="legacy-input-help">bipolar = 100−%</span>
+                    </label>
+                    <label class="legacy-input-row">
+                      <span class="legacy-input-label">Kalibrasyon modu</span>
+                      <select id="legacy-calibration-mode" class="legacy-select" title="Tek obje veya 1 metre referans kazığı ile saha kalibrasyonu">
+                        <option value="single-object">Tek obje · bilinen derinlik</option>
+                        <option value="field-stake">Saha cihazı · 1 m referans kazığı</option>
+                      </select>
+                      <span class="legacy-input-help" id="legacy-calibration-mode-help">Seçili objenin bilinen derinliğini girin</span>
+                      <span id="legacy-calibration-restore-status" class="legacy-calibration-restore-status" hidden aria-live="polite"></span>
+                    </label>
+                    <label class="legacy-input-row">
+                      <span class="legacy-input-label" id="legacy-label-depth-text">Bilinen derinlik (m)</span>
+                      <input type="number" id="legacy-param-label-depth" min="0.1" max="20" step="0.1" value="" placeholder="örn. 3.4" title="Bilinen gömü derinliği (kalibrasyon)" />
+                      <span class="legacy-input-help" id="legacy-label-depth-help">tek obje kalibrasyonu</span>
+                    </label>
+                    <div id="legacy-field-stake-controls" hidden style="margin:0.25rem 0;padding:0.35rem 0.45rem;border:1px solid rgba(244,200,117,0.35);border-radius:0.35rem;background:rgba(244,200,117,0.06);">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.4rem;font-size:0.7rem;"><b>1 m referans kazığı tekrar okumaları</b><span id="legacy-stake-reading-count" style="color:#f4c875;">0/3 okuma</span></div>
+                      <div id="legacy-stake-readings" style="font-size:0.67rem;color:var(--muted);margin:0.2rem 0;">Henüz kayıt yok</div>
+                      <button type="button" id="btn-legacy-stake-record" class="mil" style="font-size:0.68rem;padding:0.15rem 0.4rem;">Okumayı kaydet</button>
+                      <div id="legacy-stake-comparison" style="font-size:0.67rem;line-height:1.35;color:#dce8ef;margin-top:0.25rem;">Önce aynı kazığı okuyup <b>Okumayı kaydet</b> ile en fazla 3 tekrar ekleyin.</div>
+                    </div>
+                    <div class="btn-row">
+                      <button type="button" id="btn-legacy-params-apply" class="mil primary">Uygula</button>
+                      <button type="button" id="btn-legacy-params-reset" class="mil">Sıfırla</button>
+                      <button type="button" id="btn-legacy-params-ai" class="mil" title="Etiket + mevcut metal derinliğine göre Parametre öner ve alanlara yaz (AI yoksa yerel)">🤖 AI öner</button>
+                      <button type="button" id="btn-legacy-params-ai-fill" class="mil" disabled title="Son öneriyi alanlara yeniden yaz — kaydetmek için Uygula">Öneriyi yaz</button>
+                    </div>
+                    <pre id="legacy-params-ai-result" class="legacy-geo-ai-result" hidden></pre>
+                    <div class="legacy-calib-book" id="legacy-calib-book">
+                      <div class="legacy-calib-book-head">
+                        <span class="legacy-section-kicker">KALİBRASYON DEFTERİ</span>
+                        <button type="button" id="btn-legacy-calib-save" class="mil" style="font-size:0.68rem;padding:0.15rem 0.4rem;" title="Saha etiketi + mevcut Parametre’yi deftere kaydet">Deftere kaydet</button>
+                      </div>
+                      <p class="hint compact" style="margin:0.2rem 0;">Tek obje veya 1 m referans kazığı ile kalibrasyon kaydı. Yükle → alanlara yaz; Uygula ile kaydet.</p>
+                      <div id="legacy-calib-notes-list" class="legacy-calib-notes-list"></div>
+                    </div>
+                  </div>
+                </details>
+                <div class="btn-row">
+                  <button type="button" id="btn-legacy-dik-pick" class="mil primary">JSON Seç</button>
+                  <button type="button" id="btn-legacy-dik-level" class="mil" title="Zero-order median leveling sonra yeniden analiz">Leveling</button>
+                  <button type="button" id="btn-legacy-tomography" class="mil" disabled title="JSON grid verisinden türetilen yeraltı dilim haritası">▦ Tomografi</button>
+                  <button type="button" id="btn-legacy-subsurface" class="mil" disabled title="Tespitlerden bağımsız yüzey altı 3D renk haritası (aç/kapa)">▣ Yüzey altı</button>
+                  <button type="button" id="btn-legacy-underground" class="mil" disabled title="İlişkili bulguları tek sürekli 3D obje olarak birleştirir">⬡ Birleşik objeler</button>
+                  <button type="button" id="btn-legacy-geothermal" class="mil" disabled title="|σ| tabanlı jeotermal ısı proxy haritası — gerçek °C değil (aç/kapa)">♨ Jeotermal</button>
+                  <button type="button" id="btn-legacy-depth" class="mil" disabled title="Tahmini derinlik plan haritası (m proxy) — invert değil; sonuçları etkilemez">▤ Derinlik</button>
+                  <button type="button" id="btn-legacy-invert" class="mil" disabled title="Kompakt dipol invert proxy ayak izi — CAD / gerçek şekil değil; ölçülen kontürü değiştirmez">◇ Invert proxy</button>
+                  <button type="button" id="btn-legacy-dik-clear" class="mil" disabled>Temizle</button>
+                </div>
+                <label class="legacy-input-row" id="legacy-label-mode-row" style="margin-top:0.35rem;">
+                  <span class="legacy-input-label">3D etiket</span>
+                  <select id="legacy-label-mode" class="legacy-select" title="3D etiketlerini göster veya kaldır">
+                    <option value="badge">Göster · rozet</option>
+                    <option value="full">Göster · tam kart</option>
+                    <option value="off">Etiketleri kaldır</option>
+                  </select>
+                  <span class="legacy-input-help">göster / kaldır</span>
+                </label>
+                <label class="legacy-input-row" id="legacy-step-numbering-row">
+                  <span class="legacy-input-label">Adım sırası</span>
+                  <select id="legacy-step-numbering" class="legacy-select" title="Adım numaralandırma yönü">
+                    <option value="rtl" selected>Sağdan sola</option>
+                    <option value="ltr">Soldan sağa</option>
+                  </select>
+                  <span class="legacy-input-help">1 → 2 → 3</span>
+                </label>
+                <label class="legacy-input-row" id="legacy-map-view-row">
+                  <span class="legacy-input-label">Harita katmanı</span>
+                  <select id="legacy-map-view" class="legacy-select" title="Öncelikli hedefler veya ham tarama kanıtları">
+                    <option value="merged">Öncelikli hedefler</option>
+                    <option value="full">Ham kanıtlar · tüm tarama</option>
+                    <option value="both">Birleşik + ham kanıtlar</option>
+                  </select>
+                  <span class="legacy-input-help">tam / hedef</span>
+                </label>
+                <label class="legacy-input-row" id="legacy-scene-view-row">
+                  <span class="legacy-input-label">Saha görünümü</span>
+                  <select id="legacy-scene-view" class="legacy-select" title="Saha planını, objeleri veya birleşik 3D görünümü seçin">
+                    <option value="combined">Birleşik 3D</option>
+                    <option value="plan">Saha planı</option>
+                    <option value="objects">Sadece objeler</option>
+                  </select>
+                  <span class="legacy-input-help">plan / obje</span>
+                </label>
+                <label class="legacy-input-row" id="legacy-object-view-row">
+                  <span class="legacy-input-label">3D çizim</span>
+                  <select id="legacy-object-view" class="legacy-select" title="Anomali kontürü / sinyal bulutu — gömülü cismin birebir şekli değil">
+                    <option value="shape">Anomali kontürü</option>
+                    <option value="signal">Sinyal bulutu</option>
+                    <option value="both">İkisi birlikte</option>
+                  </select>
+                  <span class="legacy-input-help">proxy · CAD değil · 1 m ölçek</span>
+                </label>
+                <label class="legacy-input-row" id="legacy-object-blend-row" title="Kontür ↔ sinyal karışımı; Invert açıksa ortada her ikisi + proxy">
+                  <span class="legacy-input-label">Karşılaştır</span>
+                  <input type="range" id="legacy-object-blend" min="0" max="100" step="1" value="50" />
+                  <b id="legacy-object-blend-label">kontür↔sinyal</b>
+                </label>
+                <div id="legacy-object-legend" class="legacy-object-legend" aria-live="polite">
+                  <div class="legacy-object-legend-row">
+                    <span class="legacy-object-swatch is-metal"></span><span>Metal adayı</span>
+                    <span class="legacy-object-swatch is-anomaly"></span><span>Anomali</span>
+                    <span class="legacy-object-swatch is-tunnel"></span><span>Uzun aday</span>
+                    <span class="legacy-object-swatch is-room"></span><span>Kompakt aday</span>
+                  </div>
+                  <div class="legacy-object-legend-row is-signal" title="3D sinyal renkleri residual / arka plan σ">
+                    <span class="legacy-object-swatch is-pos-sigma"></span><span>+σ pozitif</span>
+                    <span class="legacy-object-swatch is-neg-sigma"></span><span>−σ negatif</span>
+                    <span class="legacy-object-swatch is-metal"></span><span>metal adayı</span>
+                  </div>
+                  <div class="legacy-object-legend-row is-status" title="Operatör doğrulama durumu obje rengiyle gösterilir">
+                    <span class="legacy-object-swatch is-verified"></span><span>Doğrulandı</span>
+                    <span class="legacy-object-swatch is-mismatch"></span><span>Reddedildi</span>
+                    <span class="legacy-object-swatch is-reviewed"></span><span>İncelendi</span>
+                  </div>
+                  <div class="legacy-object-legend-note">Manyetik ayak izi · gerçek duvar/obje çizimi değil · renk: obje türü veya operatör doğrulama durumu</div>
+                  <div id="legacy-object-legend-scale" class="legacy-object-legend-scale"></div>
+                </div>
+                <div id="legacy-geo-ai-controls" class="legacy-geo-ai-controls" style="display:none;" aria-live="polite">
+                  <div class="legacy-geo-ai-row">
+                    <button type="button" id="btn-legacy-geo-ai" class="mil" title="Jeotermal proxy özetini AI ile yorumla">🤖 AI yorumla</button>
+                    <span class="legacy-geo-ai-hint">|σ| proxy · gerçek °C değil · tespitleri değiştirmez</span>
+                  </div>
+                  <pre id="legacy-geo-ai-result" class="legacy-geo-ai-result" hidden></pre>
+                </div>
+                <div id="legacy-depth-legend" class="legacy-depth-legend" style="display:none;" aria-live="polite">
+                  <span class="legacy-depth-swatch is-shallow"></span><span>sığ</span>
+                  <span class="legacy-depth-swatch is-mid"></span><span>orta</span>
+                  <span class="legacy-depth-swatch is-deep"></span><span>derin</span>
+                  <span class="legacy-depth-hint">tahmini m · invert değil</span>
+                </div>
+                <div id="legacy-invert-legend" class="legacy-depth-legend" style="display:none;" aria-live="polite">
+                  <span class="legacy-object-swatch is-metal" style="border-style:dashed;"></span><span>Invert proxy</span>
+                  <span class="legacy-depth-hint">uydurma ayak izi · CAD değil · ölçülen kontürü değiştirmez</span>
+                </div>
+                <div id="legacy-tomo-controls" class="legacy-tomo-controls" style="display:none;" aria-live="polite">
+                  <div class="legacy-tomo-legend" title="Renk efsanesi">
+                    <span class="legacy-tomo-swatch is-neg"></span><span>−σ</span>
+                    <span class="legacy-tomo-swatch is-zero"></span><span>0</span>
+                    <span class="legacy-tomo-swatch is-pos"></span><span>+σ</span>
+                    <span class="legacy-tomo-swatch is-miss"></span><span>ölçülmedi</span>
+                  </div>
+                  <label class="legacy-tomo-row">
+                    <span>Derinlik</span>
+                    <input type="range" id="legacy-tomo-depth" min="0.1" max="10" step="0.05" value="2" />
+                    <b id="legacy-tomo-depth-label">2.00 m</b>
+                  </label>
+                  <label class="legacy-tomo-row">
+                    <span>Opaklık</span>
+                    <input type="range" id="legacy-tomo-opacity" min="0.15" max="0.95" step="0.01" value="0.55" />
+                    <b id="legacy-tomo-opacity-label">55%</b>
+                  </label>
+                  <label class="legacy-tomo-row">
+                    <span>|σ| eşik</span>
+                    <input type="range" id="legacy-tomo-sigma" min="0" max="2.5" step="0.05" value="0" />
+                    <b id="legacy-tomo-sigma-label">0.00</b>
+                  </label>
+                  <div class="legacy-tomo-actions">
+                    <button type="button" id="btn-legacy-tomo-play" class="mil">Play</button>
+                    <span id="legacy-tomo-hint" class="legacy-tomo-hint">Tek dilim · dilimdeki objeler parlak · tespit tıklayınca odaklanır</span>
+                  </div>
+                </div>
+                <div id="legacy-dik-status" style="font-size:0.68rem;color:var(--muted);margin-top:0.3rem;"></div>
+                <div id="legacy-export-row" class="legacy-export-row" style="display:none;margin-top:0.35rem;gap:0.3rem;flex-wrap:wrap;">
+                  <button type="button" id="btn-legacy-export-csv" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Tespitleri CSV olarak kaydet">CSV</button>
+                  <button type="button" id="btn-legacy-export-geojson" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Tespitleri GeoJSON olarak kaydet">GeoJSON</button>
+                  <button type="button" id="btn-legacy-export-summary" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Yazdırılabilir saha özeti (HTML → PDF)">Saha özeti</button>
+                  <button type="button" id="btn-legacy-dta-brief-copy" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;" title="Vaka özetini DTA/Gemini bağlamı için panoya kopyala">DTA özeti</button>
+                  <label class="legacy-dta-case-context" title="Seçili adayla benzer, operatör kararı kayıtlı vakaları tarar. Seçerseniz özet metnine eklenir ve DTA'ya yapıştırdığınızda paylaşılır."><input type="checkbox" id="legacy-dta-similar-cases" /> Benzer, karar kayıtlı arşiv vakalarını ekle</label>
+                </div>
+                <div id="legacy-saha-brief" class="legacy-saha-brief" style="display:none;" aria-live="polite">
+                  <div class="legacy-saha-brief-kicker">SAHA ÖZETİ</div>
+                  <div id="legacy-saha-brief-body"></div>
+                  <div class="legacy-saha-brief-actions">
+                    <button type="button" id="btn-legacy-saha-copy" class="mil" style="font-size:0.72rem;padding:0.2rem 0.4rem;">Metni kopyala</button>
+                  </div>
+                </div>
+                <div id="legacy-dik-list" class="legacy-dik-list"></div>
+              </div>
               <div id="multi-csv-list" style="display:none;margin-top:0.4rem;padding:0.3rem;background:rgba(255,255,255,0.02);border:1px solid var(--line);border-radius:var(--r-sharp);max-height:140px;overflow-y:auto;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
                   <span style="font-size:0.62rem;color:var(--muted);font-weight:600;">YÜKLÜ DOSYALAR</span>
@@ -575,10 +979,35 @@
                   <input type="checkbox" id="mag-ground-toggle" style="accent-color:#e85858;" />
                   <span style="color:#e85858;font-weight:600;">🗺 Manyetik Zemin Haritası</span>
                 </label>
-                <div id="mag-ground-opacity-row" style="display:none;margin-top:0.3rem;align-items:center;gap:0.4rem;">
-                  <span style="font-size:0.6rem;color:var(--muted);min-width:40px;">Opaklık</span>
-                  <input type="range" id="mag-ground-opacity" min="0" max="100" value="45" step="5" style="flex:1;accent-color:#e85858;" />
-                  <span id="mag-ground-opacity-val" style="font-size:0.6rem;color:#e85858;min-width:28px;text-align:right;">45%</span>
+                <div id="mag-ground-options" style="display:none;margin-top:0.3rem;flex-direction:column;gap:0.35rem;">
+                  <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.6rem;color:var(--muted);">
+                    <span style="min-width:40px;">Görünüm</span>
+                    <select id="mag-ground-mode" style="flex:1;font-size:0.62rem;background:#101820;color:var(--text);border:1px solid var(--line);">
+                      <option value="magnetic">Manyetik alan (B)</option>
+                      <option value="gradient">Gradyan büyüklüğü (|∇B|)</option>
+                    </select>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.6rem;color:var(--muted);cursor:pointer;">
+                    <input type="checkbox" id="mag-ground-arrows" checked style="accent-color:#e85858;" />
+                    <span>Gradyan yön oklarını göster</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.6rem;color:var(--muted);cursor:pointer;">
+                    <input type="checkbox" id="mag-ground-contours" checked style="accent-color:#e85858;" />
+                    <span>Iso-nT kontur çizgilerini göster</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.6rem;color:var(--muted);cursor:pointer;">
+                    <input type="checkbox" id="mag-ground-auto-scale" checked style="accent-color:#e85858;" />
+                    <span>Otomatik renk ölçeği</span>
+                  </label>
+                  <div style="display:flex;gap:0.35rem;align-items:center;">
+                    <input type="number" id="mag-ground-scale-low" placeholder="Min nT" step="any" style="width:78px;font-size:0.6rem;" disabled />
+                    <input type="number" id="mag-ground-scale-high" placeholder="Max nT" step="any" style="width:78px;font-size:0.6rem;" disabled />
+                  </div>
+                  <div id="mag-ground-opacity-row" style="display:flex;align-items:center;gap:0.4rem;">
+                    <span style="font-size:0.6rem;color:var(--muted);min-width:40px;">Opaklık</span>
+                    <input type="range" id="mag-ground-opacity" min="0" max="100" value="45" step="5" style="flex:1;accent-color:#e85858;" />
+                    <span id="mag-ground-opacity-val" style="font-size:0.6rem;color:#e85858;min-width:28px;text-align:right;">45%</span>
+                  </div>
                 </div>
               </div>
               <!-- 📍 GPS AYARLARI -->
@@ -726,6 +1155,7 @@
                 <span>Derinlik Dilimi (Y) — 0 = tümü</span>
                 <input type="range" id="csv-depth-slice" min="0" max="0" step="1" value="0" disabled />
                 <span id="csv-depth-slice-label">Tümü</span>
+                <button type="button" id="csv-depth-play" class="mil compact" disabled title="Derinlik dilimlerini sırayla oynat">▶ Derinlik animasyonu</button>
               </label>
               <label>
                 <span>Dilim Sayısı (4-16)</span>
@@ -745,8 +1175,8 @@
               <div id="csv-slice-report" class="csv-slice-report" style="display:none;"></div>
             </div>
             <div class="slider-row">
-                <label>GRID ÇÖZÜNÜRLÜĞÜ</label>
-                <input type="range" id="csv-grid-res" min="8" max="64" step="1" value="32" />
+                <label>GRID ÇÖZÜNÜRLÜĞÜ
+                  <input type="range" id="csv-grid-res" min="8" max="64" step="1" value="32" />
                 <span id="csv-grid-res-label">20³</span>
               </label>
               <details class="dta-settings-fold" id="csv-anomaly-fold">
@@ -858,6 +1288,30 @@
                 </div>
               </details>
 
+              <!-- Yapı Tespit Hassasiyeti Slider -->
+              <div id="unified-sensitivity-section" style="margin-top:0.5rem;padding:0.4rem 0.5rem;border:1px solid var(--line);border-radius:var(--r-sharp);background:rgba(255,255,255,0.015);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                  <span style="font-size:0.68rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:0.3rem;">
+                    🎯 Yapı Tespit Hassasiyeti
+                  </span>
+                  <span id="unified-sensitivity-badge" style="font-size:0.6rem;font-weight:600;padding:2px 6px;border-radius:3px;background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3);">
+                    %50 (Dengeli)
+                  </span>
+                </div>
+                <input type="range" id="unified-sensitivity-slider" min="0" max="100" step="5" value="50" style="width:100%;accent-color:#eab308;cursor:pointer;" />
+                <div id="unified-sensitivity-count" style="font-size:0.6rem;font-weight:600;color:var(--text);margin-top:0.25rem;" title="Analiz henüz yapılmadı">
+                  🎯 Tespit: —
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.56rem;color:var(--muted);margin-top:0.15rem;">
+                  <span>🔴 Katı</span>
+                  <span>🟡 Dengeli</span>
+                  <span>🔵 Maksimum</span>
+                </div>
+                <div id="unified-sensitivity-desc" style="font-size:0.58rem;color:var(--muted);margin-top:0.25rem;">
+                  Yüksek oranlı yapı/anomaliler ONAYLI olarak her koşulda görünür; çubuk aday eşiğini ve keşfi yönetir
+                </div>
+              </div>
+
               <!-- Tek Başlat Butonu -->
               <button type="button" id="btn-unified-start" class="mil accent" disabled style="width:100%;margin-top:0.5rem;font-size:0.9rem;padding:0.7rem;">🚀 BAŞLAT</button>
 
@@ -866,6 +1320,7 @@
                 <span style="font-size:0.68rem;color:var(--muted);letter-spacing:0.05em;">BİRLEŞİK HARİTA</span>
                 <canvas id="unified-map-canvas" style="width:100%;min-height:140px;border:1px solid var(--line);border-radius:var(--r-sharp);background:#080c10;margin-top:0.2rem;"></canvas>
                 <div id="unified-stats" style="margin-top:0.4rem;"></div>
+                <div id="unified-edge-stats" style="margin-top:0.3rem;font-size:0.62rem;color:#f5c542;"></div>
                 <!-- Çapraz Doğrulama Raporu -->
                 <div id="unified-cv-report" style="display:none;margin-top:0.5rem;padding:0.5rem;border:1px solid var(--line);border-radius:var(--r-sharp);background:rgba(255,255,255,0.02);"></div>
               </div>
@@ -1073,6 +1528,8 @@
           <p class="hint" id="soil-hint">
             Derinlik çarpanı (fizik inversiyonu değil). Sorun olursa Kapalı’ya al — eski derinlik hesabı.
           </p>
+            </div>
+          </details>
 
           <label class="dta-auto-check" style="margin-top: 0.55rem">
             <input type="checkbox" id="structures-through-red" checked />
@@ -1087,11 +1544,6 @@
             <h2 data-i18n="cfg.title">Parametreler</h2>
           </div>
           <div class="grid-form">
-            <label>
-              <span data-i18n="cfg.minConf">Min. güven</span>
-              <input id="min-confidence" type="range" min="25" max="70" value="45" step="5" />
-              <span class="hint" id="min-confidence-label">0.45</span>
-            </label>
             <label>
               <span data-i18n="cfg.vert">Dikey abartı</span>
               <input id="z-scale" type="range" min="10" max="15" value="10" step="1" />
@@ -1153,6 +1605,7 @@
           <p class="hint">Kısayollar: <b>K</b> kesit · <b>X</b> X-Ray · <b>↑/↓</b> kesit yüksekliği</p>
           <p class="hint" data-i18n="cfg.kotHint">Kot farkı: yapı kartında · yüzey yükselir · yüzey→yapı değeri artar.</p>
           <p class="hint" id="surface-stats">—</p>
+          <p class="hint" id="image-edge-stats" style="color:#f5c542;">—</p>
           <p class="hint compass-legend" data-i18n="shot.legendTop">
             Yön: K Kuzey · D Doğu · G Güney · B Batı (harita üstü = Kuzey)
           </p>
@@ -1219,6 +1672,19 @@
               <span data-i18n="stage.showHints">İpuçları</span>
             </label>
             <span class="hint-inline" data-i18n="stage.hint">Sürükle: döndür · tekerlek: zoom</span>
+            <div class="stage-tools" aria-label="3D görünüm araçları">
+              <select id="view-profile" class="stage-tool-select" title="Görünüm profili">
+                <option value="simple">Basit görünüm</option>
+                <option value="technical">Teknik görünüm</option>
+                <option value="field">Saha görünümü</option>
+              </select>
+              <button type="button" id="view-camera-focus" class="mil compact" title="Seçili tespite odaklan">🎯</button>
+              <button type="button" id="view-camera-fit" class="mil compact" title="Tüm sahayı göster">⊞</button>
+              <button type="button" id="view-camera-top" class="mil compact" title="Üstten görünüm">Üst</button>
+              <button type="button" id="view-camera-front" class="mil compact" title="Önden görünüm">Ön</button>
+              <button type="button" id="view-camera-side" class="mil compact" title="Yandan görünüm">Yan</button>
+              <button type="button" id="view-camera-3d" class="mil compact" title="Perspektif görünüm">3D</button>
+            </div>
           </div>
           <div class="frame-wrap viewer-3d hud-frame" id="viewer">
             <div class="hud-corners" aria-hidden="true">
@@ -1229,6 +1695,34 @@
             </div>
             <div class="placeholder" id="placeholder" data-i18n-html="stage.placeholder">
               JPG / PNG yükle → çekim tipi seç → <strong>Analizi Başlat</strong>
+            </div>
+          </div>
+          <!-- DTA sohbet paneli: 3D altında yarı saydam şerit (localhost köprüsü) -->
+          <div id="dta-chat-panel" data-open="0" class="dta-chat" style="flex-shrink:0;border-top:1px solid var(--line);">
+            <button type="button" id="dta-chat-toggle" class="dta-chat-head" title="DTA sohbetini aç/kapat">
+              <span class="dta-chat-title">DTA · <span id="dta-chat-status" data-state="off">DTA bekleniyor</span></span>
+              <span id="dta-chat-badge" class="dta-chat-badge" hidden>●</span>
+              <span id="dta-chat-hidden-badge" class="dta-chat-hidden-badge" title="DTA penceresi tray'de gizli; konuşma sürüyor" hidden>D gizli</span>
+              <button type="button" id="dta-chat-hide-dta" class="dta-chat-hide-btn" title="DTA penceresini tray'e küçült (konuşma sürer)">D'yi gizle</button>
+              <label class="dta-chat-collapse-label" title="Yanıttan sonra panelin kendiliğinden katlanma süresi (0 = açık kalsın)">
+                <select id="dta-chat-collapse" aria-label="Otomatik katlanma süresi">
+                  <option value="0">açık kalsın</option>
+                  <option value="5">5 sn</option>
+                  <option value="10">10 sn</option>
+                  <option value="15">15 sn</option>
+                  <option value="30">30 sn</option>
+                  <option value="60">60 sn</option>
+                </select>
+              </label>
+              <span class="dta-chat-caret">▴</span>
+            </button>
+            <div class="dta-chat-body-wrap">
+              <div id="dta-chat-chips" class="dta-chat-chips" hidden></div>
+              <div id="dta-chat-body" aria-live="polite"></div>
+              <div class="dta-chat-input-row">
+                <input type="text" id="dta-chat-input" placeholder="DTA'ya yaz… (Enter: gönder)" maxlength="2000" autocomplete="off" />
+                <button type="button" id="dta-chat-send" class="mil compact" title="Gönder">➤</button>
+              </div>
             </div>
           </div>
           <!-- Heatmap: 3D sahnenin altında bölünmüş görünüm (sadece CSV modülününde) -->
@@ -1259,6 +1753,11 @@
           <p class="hint compact" id="intel-engine" style="margin-bottom:0.2rem;">Hesap: —</p>
           <p class="hint compact" id="intel-soil" style="margin-bottom:0.3rem;">Toprak: —</p>
           <p class="hint compact" id="intel-dual-status" style="margin-bottom:0.3rem;color:#888;">Çift Analiz: pasif</p>
+          <section id="legacy-field-summary" style="display:none;margin:0.35rem 0 0.45rem;padding:0.45rem 0.55rem;border:1px solid rgba(244,200,117,0.45);border-radius:var(--r-sharp);background:rgba(244,200,117,0.05);">
+            <div style="font-size:0.68rem;font-weight:700;color:#f4c875;letter-spacing:0.04em;">SAHA SONUCU</div>
+            <div id="legacy-field-summary-content"></div>
+            <div id="legacy-field-detection-list" style="display:flex;flex-direction:column;gap:0.2rem;margin-top:0.35rem;"></div>
+          </section>
 
           <!-- 🔍 Tespitler -->
           <details class="tree-section" open>

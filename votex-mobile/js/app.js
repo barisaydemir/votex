@@ -6,6 +6,9 @@
 // State
 let _currentFile = null;
 let _currentImageData = null;
+let _currentSurface = null;
+let _currentStructures = null;
+let _currentWallCues = null;
 
 /**
  * Initialize the application
@@ -29,11 +32,16 @@ function initApp() {
   // Anomaly overlay canvas
   VotexOverlay.init();
 
+  // 3D surface preview panel
+  VotexSurface3D.init();
+
   // Bind event listeners
   bindFileInput();
   bindDragDrop();
   bindNavigation();
   bindAnalysis();
+  bindBenchmark();
+  bindSurface3D();
 
   console.log('Votex Mobile initialized');
 }
@@ -147,6 +155,18 @@ function bindAnalysis() {
           VotexOverlay.clear();
         }
 
+        // 2c) Build 3D surface field (cached for the 3D button)
+        _currentSurface = VotexWasm.buildSurfaceField(_currentImageData, { gridW: 96, gridH: 96 });
+
+        // 2d) Classify structures for 3D markers (room/tunnel/shaft)
+        _currentStructures = VotexWasm.classifyStructures(wasmResult, {
+          width: _currentImageData.width,
+          height: _currentImageData.height
+        });
+
+        // 2e) Detect wall cues (green-line tunnel segments) for 3D view
+        _currentWallCues = VotexWasm.detectWallCues(_currentImageData);
+
         // 3) WASM anomaly summary → toast + console detail
         if (wasmResult) {
           const structures = VotexWasm.anomaliesToStructures(wasmResult);
@@ -167,6 +187,83 @@ function bindAnalysis() {
       } finally {
         hideLoading();
       }
+    });
+  }
+}
+
+/**
+ * Bind 3D surface view button
+ */
+function bindSurface3D() {
+  const btn = document.getElementById('btn-3d-view');
+  if (!btn) return;
+
+  btn.addEventListener('click', () => {
+    if (!_currentSurface) {
+      // Build on demand if analysis hasn't run yet
+      if (_currentImageData) {
+        showLoading('3D yüzey oluşturuluyor...');
+        setTimeout(() => {
+          _currentSurface = VotexWasm.buildSurfaceField(_currentImageData, { gridW: 96, gridH: 96 });
+          _currentStructures = null; // structures need analysis first
+          _currentWallCues = null;   // wall cues need analysis first
+          hideLoading();
+          if (_currentSurface) {
+            VotexSurface3D.show(_currentSurface, _currentStructures, _currentWallCues);
+          } else {
+            VotexColorizer.showToast('3D yüzey için WASM gerekli', 'error');
+          }
+        }, 50);
+      } else {
+        VotexColorizer.showToast('Önce bir harita yükleyin', 'error');
+      }
+      return;
+    }
+    VotexSurface3D.show(_currentSurface, _currentStructures, _currentWallCues);
+  });
+}
+
+/**
+ * Bind benchmark button + panel close
+ */
+function bindBenchmark() {
+  const benchBtn = document.getElementById('btn-benchmark');
+  const closeBtn = document.getElementById('btn-benchmark-close');
+
+  if (benchBtn) {
+    benchBtn.addEventListener('click', async () => {
+      if (!_currentImageData) {
+        VotexColorizer.showToast('Kıyaslama için önce bir harita yükleyin', 'error');
+        return;
+      }
+
+      benchBtn.disabled = true;
+      showLoading('Kıyaslama çalışıyor...');
+
+      try {
+        const results = await VotexBenchmark.runBenchmark({
+          onProgress: (msg) => {
+            const t = document.getElementById('loading-text');
+            if (t) t.textContent = msg;
+          }
+        });
+        VotexBenchmark.renderBenchmark(results);
+        console.table(results.rows.map(r => ({
+          map: r.label, js_ms: r.jsMs, wasm_ms: r.wasmMs, speedup: r.speedup, match: r.match
+        })));
+      } catch (err) {
+        console.error('Benchmark error:', err);
+        VotexColorizer.showToast('Kıyaslama hatası: ' + (err?.message || err), 'error');
+      } finally {
+        benchBtn.disabled = false;
+        hideLoading();
+      }
+    });
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      document.getElementById('benchmark-panel')?.classList.add('hidden');
     });
   }
 }
@@ -205,8 +302,11 @@ function handleFile(file) {
         showSection('map');
         VotexColorizer.showToast(`Yüklendi: ${file.name}`, 'success');
 
-        // Clear previous anomaly overlay for the new map
+        // Clear previous anomaly overlay + surface for the new map
         VotexOverlay.clear();
+        _currentSurface = null;
+        _currentStructures = null;
+        _currentWallCues = null;
 
         // Save GPS location for this map
         const location = VotexGPS.saveLocationForMap(file.name);

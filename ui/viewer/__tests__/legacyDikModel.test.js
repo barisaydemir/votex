@@ -1,0 +1,261 @@
+import { describe, expect, it } from "vitest";
+import rustResultFixture from "../../../examples/legacy_dik_result_fixture.json";
+import {
+  contentFingerprint,
+} from "../legacyCaseModel.js";
+import {
+  createEmptyFieldSession,
+  createFieldSessionStore,
+  setLateralCalibration,
+} from "../legacyFieldSession.js";
+import {
+  buildLegacyAnalysisEvidence,
+  analysisEvidenceRowsOf,
+  buildLegacyFieldBrief,
+  buildLegacyFieldModel,
+  buildLegacyAnalysisTrace,
+  formatLegacyFieldBriefHtml,
+  formatLegacyFieldLine,
+  legacyStepsOf,
+  magneticResponseOf,
+  matchesLegacyListFilter,
+  residualScaleOf,
+  statusLabel,
+} from "../legacyDikModel.js";
+import { buildLearnedThresholds } from "../legacyThresholdLearning.js";
+
+const result = {
+  scanSteps: [
+    { index: 1, xStartM: 0, xEndM: 0, xCenterM: 0, yStartM: 0, yEndM: 2, yCenterM: 1, widthM: 0, lengthM: 2 },
+    { index: 2, xStartM: 1, xEndM: 1, xCenterM: 1, yStartM: 0, yEndM: 2, yCenterM: 1, widthM: 0, lengthM: 2 },
+  ],
+  anomalies: [{ kind: "anomaly", cx: 1, cy: 1, confidence: 0.96, peakSigma: 3.4, depthTopM: 1.2, depthBottomM: 1.8, shapeType: "ellipse" }],
+  metals: [],
+};
+
+describe("legacyDikModel", () => {
+  it("replays the canonical Rust result into a detection and analysis evidence", () => {
+    const model = buildLegacyFieldModel(rustResultFixture);
+    expect(model.result.fingerprint).toBe("legacy-result-fixture-v1");
+    expect(model.steps).toHaveLength(1);
+    expect(model.detections).toHaveLength(1);
+    expect(model.detections[0].stepIndex).toBe(1);
+    expect(model.detections[0].analysisEvidence.metrics.signalStrength.value).toBe(64);
+    expect(model.mergedTargets.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("gerçek JSON fixture + fingerprint oturumundan lateral kalibrasyonu geri yükler", async () => {
+    const content = JSON.stringify(rustResultFixture);
+    const key = contentFingerprint(content, "legacy_dik_result_fixture.json");
+    const backing = {};
+    const store = createFieldSessionStore({
+      loadAll: async () => backing,
+      saveAll: async (sessions) => Object.assign(backing, sessions),
+    });
+    const saved = await store.save(setLateralCalibration(createEmptyFieldSession(key), {
+      mode: "field-stake",
+      referenceDepthM: 1,
+      readings: [0.49, 0.5, 0.51],
+      beforeM: 0.5,
+      afterM: 1.02,
+      observedM: 0.5,
+      depthScale: 1.33,
+      quality: "repeatable",
+    }));
+    const reopenedStore = createFieldSessionStore({
+      loadAll: async () => backing,
+      saveAll: async () => {},
+    });
+    const restored = await reopenedStore.load(key, "legacy_dik_result_fixture.json");
+    const calibration = restored?.lateralCalibration;
+    const model = buildLegacyFieldModel(rustResultFixture, {
+      fieldCalibrationReadings: calibration?.readings,
+      fieldCalibrationReferenceM: calibration?.referenceDepthM,
+      fieldCalibrationAfterM: calibration?.afterM,
+    });
+    expect(saved.key).toBe(key);
+    expect(restored?.key).toBe(key);
+    expect(calibration).toMatchObject({ mode: "field-stake", readings: [0.49, 0.5, 0.51], afterM: 1.02 });
+    expect(model.result.fingerprint).toBe("legacy-result-fixture-v1");
+    expect(model.lateralCalibration).toMatchObject({ applied: true, readingCount: 3, observedM: 1.02 });
+  });
+
+  it("öğrenilmiş eşik modeli durum etiketlerini günceller ve modele işlenir", () => {
+    // Onaylı örneklerin güveni düşük (0.62–0.66), reddedilenler çok düşük → öğrenilen eşik ~0.6
+    const samples = [
+      { detectionId: "a", status: "confirmed", confidence: 0.66, strength: 3.4, depthTopM: 1.2, depthBottomM: 1.8 },
+      { detectionId: "b", status: "confirmed", confidence: 0.62, strength: 3.2, depthTopM: 1.2, depthBottomM: 1.8 },
+      { detectionId: "c", status: "confirmed", confidence: 0.64, strength: 3.3, depthTopM: 1.2, depthBottomM: 1.8 },
+      { detectionId: "d", status: "rejected", confidence: 0.5, strength: 2.0, depthTopM: 3, depthBottomM: 4 },
+      { detectionId: "e", status: "rejected", confidence: 0.45, strength: 1.8, depthTopM: 3, depthBottomM: 4 },
+    ];
+    const learned = buildLearnedThresholds(samples);
+    const learnedModel = buildLegacyFieldModel(rustResultFixture, { learnedThresholds: learned });
+    const detection = learnedModel.detections[0];
+    // Fixture tespiti: güven 0.82, σ ~3.4 → öğrenilen güven eşiği 0.58 altında kaldığından strong kalır
+    expect(detection.status).toBe("strong");
+    expect(learnedModel.learnedThresholds).toBe(learned);
+    // Kontrol: öğrenme olmadan da aynı sonuç — davranış değişmez kalır
+    const plainModel = buildLegacyFieldModel(rustResultFixture);
+    expect(plainModel.detections[0].status).toBe("strong");
+  });
+
+  it("görünür analiz akışını aynı saha modelinden üretir", () => {
+    const model = buildLegacyFieldModel(rustResultFixture);
+    const trace = buildLegacyAnalysisTrace(model.result, model, {
+      inputPresent: true,
+      fileName: "fixture.json",
+    });
+    expect(trace.schemaVersion).toBe(1);
+    expect(trace.status).toBe("complete");
+    expect(trace.fingerprint).toBe("legacy-result-fixture-v1");
+    expect(trace.stages.map((stage) => stage.key)).toEqual([
+      "json", "normalized", "steps", "detections", "field-model", "merged", "evidence",
+    ]);
+    expect(trace.stages.find((stage) => stage.key === "steps")).toMatchObject({ count: 1, status: "complete" });
+    expect(trace.stages.find((stage) => stage.key === "evidence")).toMatchObject({ count: 1, status: "complete" });
+  });
+
+  it("eksik saha verisini akışta uyarı olarak gösterir", () => {
+    const trace = buildLegacyAnalysisTrace({ ok: true, scanSteps: [], shapes: [], fingerprint: "empty" }, { steps: [], detections: [], mergedTargets: [] }, { inputPresent: false });
+    expect(trace.status).toBe("complete");
+    expect(trace.stages.find((stage) => stage.key === "json").status).toBe("warning");
+    expect(trace.stages.find((stage) => stage.key === "steps").status).toBe("warning");
+  });
+
+  it("normalizes camelCase and snake_case scan step fields", () => {
+    const steps = legacyStepsOf({ scan_steps: [{ index: 3, x_center_m: 2, y_center_m: 4, width_m: 1.5 }] });
+    expect(steps[0].index).toBe(1); // sol-önce yeniden numaralandırma
+    expect(steps[0].xCenterM).toBe(2);
+    expect(steps[0].widthM).toBe(1.5);
+  });
+
+  it("binds a detection to its nearest step and exposes station/offset/depth", () => {
+    const model = buildLegacyFieldModel(result);
+    expect(model.detections).toHaveLength(1);
+    expect(model.detections[0].stepIndex).toBe(2);
+    expect(model.detections[0].stationM).toBeCloseTo(1, 5);
+    expect(model.detections[0].offsetM).toBeCloseTo(0, 5);
+    expect(model.detections[0].depthTopM).toBeCloseTo(1.2, 5);
+    expect(model.detections[0].depthBottomM).toBeCloseTo(1.8, 5);
+    expect(model.detections[0].status).toBe("strong");
+    expect(formatLegacyFieldLine(model.detections[0])).toContain("Adım 2");
+  });
+
+  it("serpentine taramada panel adımı ile 3D adım numarası aynı kalır", () => {
+    const scanSteps = [];
+    for (let x = 0; x < 6; x += 1) {
+      const ys = x % 2 === 0 ? [0, 1, 2, 3, 4] : [4, 3, 2, 1, 0];
+      for (const y of ys) {
+        scanSteps.push({
+          xStartM: x,
+          xEndM: x,
+          xCenterM: x,
+          yStartM: y,
+          yEndM: y,
+          yCenterM: y,
+          widthM: 0,
+          lengthM: 0,
+        });
+      }
+    }
+    const raw = {
+      scan_steps: scanSteps.map((s, i) => ({ ...s, index: i + 1 })),
+      metals: [{ kind: "metal", cx: 1.5, cy: 4.43, confidence: 0.78, peak_sigma: 3.1, depth_top_m: 1, depth_bottom_m: 2 }],
+      anomalies: [],
+      meta: { x_meters: 6, y_meters: 5 },
+      grid_width_m: 6,
+      grid_depth_m: 5,
+    };
+    const model = buildLegacyFieldModel(raw);
+    const metal = model.detections[0];
+    const step = model.steps.find((entry) => entry.stepIndex === metal.stepIndex);
+    expect(step).toBeTruthy();
+    // 3D cetvel aynı normalize sırasını kullanır — raw.index panel ile birebir.
+    expect(step.raw.index).toBe(metal.stepIndex);
+    // Metal (1.5, 4.43) X=1 veya X=2 hattına oturmalı; ikinci sıralama kayması olmamalı.
+    expect(Math.abs(step.raw.xCenterM - 1.5)).toBeLessThanOrEqual(0.5);
+  });
+
+  it("adım aralığını hat metresine göre ardışık bantlara böler", () => {
+    const model = buildLegacyFieldModel(result);
+    expect(model.steps[0].startM).toBeCloseTo(0, 5);
+    expect(model.steps[0].endM).toBeCloseTo(0.5, 5);
+    expect(model.steps[1].startM).toBeCloseTo(0.5, 5);
+    expect(model.steps[1].endM).toBeCloseTo(2, 5);
+  });
+
+  it("filtreyi son kullanıcı etiketlerine göre eşleştirir", () => {
+    expect(matchesLegacyListFilter("all", { isDetection: false })).toBe(true);
+    expect(matchesLegacyListFilter("detections", { isDetection: true })).toBe(true);
+    expect(matchesLegacyListFilter("detections", { isDetection: false, anomalyCount: 0 })).toBe(false);
+    expect(matchesLegacyListFilter("strong", { status: "strong" })).toBe(true);
+    expect(matchesLegacyListFilter("normal", { status: "attention" })).toBe(false);
+  });
+
+  it("canonical analiz kanıt DTO'su yüzdeleri ve dayanakları birlikte taşır", () => {
+    const model = buildLegacyFieldModel(result, { mergeProfile: "cautious" });
+    const detection = model.detections[0];
+    const analysis = buildLegacyAnalysisEvidence(detection, {
+      mergeProfile: "cautious",
+      repeatability: { n: 3, spreadM: 0.25 },
+    });
+    expect(analysis.schemaVersion).toBe(1);
+    expect(analysis.detectionId).toBe(detection.detectionId);
+    expect(analysis.metrics.signalStrength).toMatchObject({ value: 68, source: "peakSigma", rawValue: 3.4 });
+    expect(analysis.metrics.anomalyConfidence).toMatchObject({ value: 96, source: "confidence" });
+    expect(analysis.metrics.compactness.value).toBe(0);
+    expect(analysis.metrics.repeatability).toMatchObject({ value: 90, source: "archiveDepthSpread" });
+    expect(analysis.inputs).toMatchObject({ mergeProfile: "cautious", repeatedScans: 3, depthSpreadM: 0.25 });
+    expect(analysis.warning).toBe("material-not-identifiable");
+    expect(analysisEvidenceRowsOf(analysis)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "signalStrength", source: "peakSigma", raw: "3.4 σ" }),
+      expect.objectContaining({ key: "repeatability", source: "archiveDepthSpread", raw: "0.25 m" }),
+    ]));
+  });
+
+  it("tekrar verisi yoksa repeatability metriğini hesaplamaz", () => {
+    const model = buildLegacyFieldModel(result);
+    const analysis = model.detections[0].analysisEvidence;
+    expect(analysis.metrics.repeatability.value).toBeNull();
+    expect(analysis.metrics.repeatability.reason).toBe("insufficient-repeated-scans");
+  });
+
+  it("seçili tespit için sade saha özeti üretir", () => {
+    const model = buildLegacyFieldModel(result);
+    const brief = buildLegacyFieldBrief(model.detections[0]);
+    expect(brief.plainText).toContain("Ne kadar derin");
+    expect(brief.plainText).toContain("güven");
+    expect(brief.plainText).toMatch(/%\d+/);
+    expect(brief.plainText).toMatch(/\d+\.\dσ|σ/);
+    expect(brief.plainText).toContain("Manyetik tepki");
+    expect(formatLegacyFieldBriefHtml(brief)).toContain("legacy-saha-brief-title");
+  });
+
+  it("manyetik tepki yorumu χ / ferro iddiası taşımaz", () => {
+    const metal = magneticResponseOf({ kind: "metal", polarity: 1, peakSigma: 3.2 });
+    expect(metal.classId).toBe("metal_like_positive");
+    expect(metal.label).toMatch(/metal-benzeri|pozitif/i);
+    expect(metal.label).not.toMatch(/Ferromanyetik/i);
+    expect(metal.disclaimer).toMatch(/χ ölçülmedi/);
+    const neg = magneticResponseOf({ kind: "anomaly", polarity: -1, peakSigma: 2.0 });
+    expect(neg.classId).toBe("void_like_negative");
+  });
+
+  it("residual ölçeğini grid max |değer| ile verir", () => {
+    const raw = residualScaleOf({ gridValues: [0, -2, 4, 1], residualPreview: [] });
+    expect(raw.maxAbs).toBe(4);
+    expect(raw.unit).toBe("residual");
+    const scaled = residualScaleOf({ gridValues: [0, -2, 4, 1], magSigma: 2 });
+    expect(scaled.maxAbsSigma).toBeCloseTo(2, 5);
+    expect(scaled.unit).toBe("σ");
+  });
+
+  it("counts detections per step and labels empty steps normal", () => {
+    const model = buildLegacyFieldModel(result);
+    expect(model.steps[0].anomalyCount).toBe(0);
+    expect(statusLabel(model.steps[0].status)).toBe("NORMAL");
+    expect(model.steps[1].anomalyCount).toBe(1);
+    expect(statusLabel(model.steps[1].status)).toBe("GÜÇLÜ");
+  });
+});

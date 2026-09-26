@@ -3,6 +3,8 @@ import { state } from "../app/state.js";
 import { mapToWorld } from "./coords.js";
 import { invalidate } from "./scene.js";
 
+const TERRAIN_NORMAL_STRENGTH = 0.18;
+
 /** Soft relief amplitude (m) — view-mode default (yapı kot farkı ayrı). */
 export function reliefAmpM(viewMode) {
   return viewMode === "side" ? 0.15 : 1.0;
@@ -169,10 +171,161 @@ function heightAt(heights, gw, gh, gx, gyImg) {
   return Math.tanh(h);
 }
 
+/**
+ * Deterministic value-noise relief. It deliberately avoids external noise
+ * dependencies so the same survey always renders the same terrain.
+ */
+function smoothNoise(t) {
+  return t * t * (3 - 2 * t);
+}
+
+function hashNoise(ix, iz) {
+  let n = Math.imul(ix, 374761393) + Math.imul(iz, 668265263);
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295 * 2 - 1;
+}
+
+function valueNoise2d(x, z) {
+  const x0 = Math.floor(x);
+  const z0 = Math.floor(z);
+  const tx = smoothNoise(x - x0);
+  const tz = smoothNoise(z - z0);
+  const a = hashNoise(x0, z0);
+  const b = hashNoise(x0 + 1, z0);
+  const c = hashNoise(x0, z0 + 1);
+  const d = hashNoise(x0 + 1, z0 + 1);
+  const ab = a + (b - a) * tx;
+  const cd = c + (d - c) * tx;
+  return ab + (cd - ab) * tz;
+}
+
+/**
+ * Multi-octave procedural relief in the stable [-1, 1] range.
+ * Low frequency gives broad undulation; later octaves add micro-relief.
+ */
+export function multiOctaveTerrainNoise(x, z, octaves = 4) {
+  let amplitude = 1;
+  let frequency = 1;
+  let total = 0;
+  let amplitudeSum = 0;
+  for (let i = 0; i < Math.max(1, Math.floor(octaves)); i++) {
+    total += valueNoise2d(x * frequency, z * frequency) * amplitude;
+    amplitudeSum += amplitude;
+    amplitude *= 0.5;
+    frequency *= 2;
+  }
+  return amplitudeSum > 0 ? total / amplitudeSum : 0;
+}
+
+function terrainNoiseAt(ix, iz, gw, gh, amplitude) {
+  if (!(amplitude > 0)) return 0;
+  const u = gw > 1 ? ix / (gw - 1) : 0;
+  const v = gh > 1 ? iz / (gh - 1) : 0;
+  // Keep the broadest octave tied to the map, not to the sample count.
+  return multiOctaveTerrainNoise(u * 3.5, v * 3.5, 4) * amplitude;
+}
+
+/** Select terrain geometry LOD from camera distance (0 = finest). */
+export function lodLevelForDistance(distance, thresholds = [60, 120]) {
+  const d = Number(distance);
+  if (!Number.isFinite(d) || d < thresholds[0]) return 0;
+  if (d < thresholds[1]) return 1;
+  return 2;
+}
+
+function createTerrainGeometry(mapW, mapD, segX, segZ, gw, gh, heights, amp, noiseAmplitude, kotPatches, captureHeights = false) {
+  const geometry = new THREE.PlaneGeometry(mapW, mapD, Math.max(1, segX), Math.max(1, segZ));
+  geometry.rotateX(-Math.PI / 2);
+  const pos = geometry.attributes.position;
+  const terrainHeights = captureHeights ? new Float32Array(pos.count) : null;
+  let yMin = Infinity;
+  let yMax = -Infinity;
+  for (let iz = 0; iz <= segZ; iz++) {
+    for (let ix = 0; ix <= segX; ix++) {
+      const vi = iz * (segX + 1) + ix;
+      const sampleX = Math.min(gw - 1, Math.round((ix / Math.max(1, segX)) * (gw - 1)));
+      const sampleZ = Math.min(gh - 1, Math.round((iz / Math.max(1, segZ)) * (gh - 1)));
+      const wx = pos.getX(vi);
+      const wz = pos.getZ(vi);
+      const base = burialReliefY(heightAt(heights, gw, gh, sampleX, sampleZ)) * amp;
+      const proceduralRelief = terrainNoiseAt(sampleX, sampleZ, gw, gh, noiseAmplitude);
+      const y = base + proceduralRelief + kotLiftAt(wx, wz, kotPatches);
+      pos.setY(vi, y);
+      if (terrainHeights) terrainHeights[vi] = y;
+      yMin = Math.min(yMin, y);
+      yMax = Math.max(yMax, y);
+    }
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return { geometry, terrainHeights, yMin, yMax };
+}
+
 /** Signed alan → yer altı Y. Mavi (−) daha derin; kırmızı (+) sığ ama yine aşağı — yukarı çıkmaz. */
 function burialReliefY(signed01) {
   if (signed01 <= 0) return signed01; // void: −Y → tam derinlik
   return -signed01 * 0.7; // metal/kırmızı: yine aşağı, biraz daha derin
+}
+
+/**
+ * Encode finite-difference heightfield derivatives as tangent-space normals.
+ * Rows follow the plane's local +V tangent (world -Z after rotation).
+ *
+ * @returns {Uint8Array} RGBA normal-map pixels, row-major by heightfield cell.
+ */
+export function computeHeightfieldNormalData(heights, gw, gh, mapW, mapD) {
+  const data = new Uint8Array(Math.max(0, gw * gh * 4));
+  const stepX = mapW / Math.max(1, gw - 1);
+  const stepV = mapD / Math.max(1, gh - 1);
+  const sample = (gx, gz) => {
+    const value = Number(heights?.[gz * gw + gx]);
+    return Number.isFinite(value) ? value : 0;
+  };
+  const derivative = (gx, gz, axis) => {
+    const max = axis === "x" ? gw - 1 : gh - 1;
+    const step = axis === "x" ? stepX : stepV;
+    if (max <= 0 || step <= 0) return 0;
+    if (axis === "x") {
+      if (gx === 0) return (sample(1, gz) - sample(0, gz)) / step;
+      if (gx === max) return (sample(max, gz) - sample(max - 1, gz)) / step;
+      return (sample(gx + 1, gz) - sample(gx - 1, gz)) / (2 * step);
+    }
+    if (gz === 0) return (sample(gx, 1) - sample(gx, 0)) / step;
+    if (gz === max) return (sample(gx, max) - sample(gx, max - 1)) / step;
+    return (sample(gx, gz + 1) - sample(gx, gz - 1)) / (2 * step);
+  };
+
+  for (let gz = 0; gz < gh; gz++) {
+    for (let gx = 0; gx < gw; gx++) {
+      // Plane tangent basis: +U = world +X, +V = world -Z, +N = world +Y.
+      // For y = h(u,v), N = normalize((-dh/du, 1, -dh/dv)).
+      const nx = -derivative(gx, gz, "x");
+      const ny = 1;
+      const nz = -derivative(gx, gz, "v");
+      const length = Math.hypot(nx, ny, nz) || 1;
+      const offset = (gz * gw + gx) * 4;
+      data[offset] = Math.round((nx / length * 0.5 + 0.5) * 255);
+      data[offset + 1] = Math.round((ny / length * 0.5 + 0.5) * 255);
+      data[offset + 2] = Math.round((nz / length * 0.5 + 0.5) * 255);
+      data[offset + 3] = 255;
+    }
+  }
+  return data;
+}
+
+export function makeHeightfieldNormalTexture(heights, gw, gh, mapW, mapD) {
+  const data = computeHeightfieldNormalData(heights, gw, gh, mapW, mapD);
+  const tex = new THREE.DataTexture(data, gw, gh, THREE.RGBAFormat);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = groundAniso();
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.flipY = true;
+  tex.needsUpdate = true;
+  return tex;
 }
 
 function resolveColors(surface) {
@@ -191,9 +344,11 @@ function niceStep(x) {
   return 10;
 }
 
-function makeMaterial(tex, wireframe, contour = null) {
+function makeMaterial(tex, wireframe, contour = null, normalMap = null) {
   const mat = new THREE.MeshStandardMaterial({
     map: wireframe ? null : tex,
+    normalMap: wireframe ? null : normalMap,
+    normalScale: new THREE.Vector2(TERRAIN_NORMAL_STRENGTH, TERRAIN_NORMAL_STRENGTH),
     emissiveMap: wireframe ? null : tex,
     emissive: wireframe ? 0x000000 : 0xffffff,
     emissiveIntensity: wireframe ? 0 : 0.55,
@@ -267,6 +422,11 @@ export function buildGroundSurface(surface, wireframe = false, vertExag = 1, dep
   const previewUrl =
     surface.cleanedPreviewBase64 || surface.cleaned_preview_base64 || "";
   const kotPatches = collectKotPatches(surface, mapW, mapD, vertExag);
+  // Veri kabartmasına çok küçük, deterministik çok oktavlı relief ekle.
+  // Böylece düz/seyrek örnekli alanlar tamamen sentetik görünmeden mikro-doku kazanır.
+  const noiseAmplitude = surface.terrainNoise === false
+    ? 0
+    : Number(surface.terrainNoiseAmplitudeM ?? surface.terrain_noise_amplitude_m ?? Math.min(0.12, Math.max(0.03, amp * 0.08)));
 
   let tex = null;
   if (!wireframe) {
@@ -274,6 +434,7 @@ export function buildGroundSurface(surface, wireframe = false, vertExag = 1, dep
     if (!tex) tex = makeMapDataTexture(colors, gw, gh);
   }
 
+  const terrainHeights = new Float32Array(gw * gh);
   const geo = new THREE.PlaneGeometry(mapW, mapD, gw - 1, gh - 1);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -287,7 +448,9 @@ export function buildGroundSurface(surface, wireframe = false, vertExag = 1, dep
       const wx = pos.getX(vi);
       const wz = pos.getZ(vi);
       const base = burialReliefY(heightAt(heights, gw, gh, ix, iy)) * amp;
-      const y = base + kotLiftAt(wx, wz, kotPatches);
+      const proceduralRelief = terrainNoiseAt(ix, iy, gw, gh, noiseAmplitude);
+      const y = base + proceduralRelief + kotLiftAt(wx, wz, kotPatches);
+      terrainHeights[vi] = y;
       pos.setY(vi, y);
       if (y < yMin) yMin = y;
       if (y > yMax) yMax = y;
@@ -300,14 +463,42 @@ export function buildGroundSurface(surface, wireframe = false, vertExag = 1, dep
   const span = Number.isFinite(yMin) && Number.isFinite(yMax) ? yMax - yMin : 0;
   const contour = span > 0.05 ? { interval: niceStep(span / 9) } : null;
 
-  const mat = makeMaterial(tex, wireframe, contour);
+  const normalMap = wireframe ? null : makeHeightfieldNormalTexture(terrainHeights, gw, gh, mapW, mapD);
+  const mat = makeMaterial(tex, wireframe, contour, normalMap);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = "groundMap";
   mesh.position.set(0, 0, 0);
   mesh.userData.mapTexture = wireframe ? null : tex;
+  mesh.userData.normalMap = normalMap;
   mesh.userData.reliefAmpM = amp;
+  mesh.userData.terrainNoiseAmplitudeM = noiseAmplitude;
+  // Mesafe bazlı LOD: yakın plan veri çözünürlüğü, uzakta daha hafif geometri.
+  const maxSegments = Math.max(gw - 1, gh - 1);
+  const midScale = Math.max(8, Math.floor(maxSegments * 0.5));
+  const lowScale = Math.max(6, Math.min(24, Math.floor(maxSegments * 0.25)));
+  const lodSpecs = [
+    [gw - 1, gh - 1],
+    [Math.min(gw - 1, midScale), Math.min(gh - 1, midScale)],
+    [Math.min(gw - 1, lowScale), Math.min(gh - 1, lowScale)],
+  ];
+  const lodLevels = [{ geometry: geo, level: 0 }];
+  const seen = new Set([`${gw - 1}x${gh - 1}`]);
+  for (let i = 1; i < lodSpecs.length; i++) {
+    const [sx, sz] = lodSpecs[i];
+    const key = `${sx}x${sz}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    lodLevels.push({
+      geometry: createTerrainGeometry(mapW, mapD, sx, sz, gw, gh, heights, amp, noiseAmplitude, kotPatches).geometry,
+      level: i,
+    });
+  }
+  const mapScale = Math.max(mapW, mapD);
+  mesh.userData.lodLevels = lodLevels;
+  mesh.userData.lodThresholds = [mapScale * 2, mapScale * 4];
+  mesh.userData.lodLevel = 0;
   // Etiket gizlemesi için arazi örnekleyici verisi (sampleTerrainY kullanır)
-  mesh.userData.relief = { heights, gw, gh, mapW, mapD, amp, kotPatches };
+  mesh.userData.relief = { heights, gw, gh, mapW, mapD, amp, kotPatches, noiseAmplitude };
 
   // Yalnızca gerçek <img> tabanlı dokularda load bekle (DataTexture.image düz nesnedir)
   if (
@@ -330,6 +521,25 @@ export function buildGroundSurface(surface, wireframe = false, vertExag = 1, dep
   return { mesh, mapW, mapD, amp };
 }
 
+/** Apply the closest terrain geometry according to camera distance. */
+export function updateTerrainLOD(mesh, camera) {
+  const levels = mesh?.userData?.lodLevels;
+  if (!mesh || !camera || !levels?.length) return false;
+  const distance = camera.position.distanceTo(mesh.position);
+  const thresholds = mesh.userData.lodThresholds || [60, 120];
+  let target = lodLevelForDistance(distance, thresholds);
+  target = Math.min(target, levels.length - 1);
+  if (target === mesh.userData.lodLevel) return false;
+  const next = levels[target];
+  if (!next?.geometry || mesh.geometry === next.geometry) return false;
+  mesh.geometry = next.geometry;
+  mesh.userData.lodLevel = target;
+  mesh.userData.lodDistance = distance;
+  mesh.geometry.computeBoundingSphere();
+  invalidate();
+  return true;
+}
+
 /**
  * Dünya (x,z) → arazi yüzey Y'si. Etiket gizleme testi kullanır.
  * Harita ayak izi dışında null döner.
@@ -347,7 +557,8 @@ export function sampleTerrainY(mesh, wx, wz) {
   const tx = fx - ix;
   const tz = fz - iy;
   const lift = kotLiftAt(wx, wz, r.kotPatches);
-  const cell = (cx, cz) => burialReliefY(heightAt(r.heights, r.gw, r.gh, cx, cz)) * r.amp + lift;
+  const cell = (cx, cz) => burialReliefY(heightAt(r.heights, r.gw, r.gh, cx, cz)) * r.amp
+    + terrainNoiseAt(cx, cz, r.gw, r.gh, r.noiseAmplitude || 0) + lift;
   const h00 = cell(ix, iy);
   const h10 = cell(ix + 1, iy);
   const h01 = cell(ix, iy + 1);
@@ -359,9 +570,19 @@ export function sampleTerrainY(mesh, wx, wz) {
 
 export function disposeGround(mesh) {
   if (!mesh) return;
-  mesh.geometry?.dispose();
+  const lodLevels = mesh.userData?.lodLevels || [];
+  const disposed = new Set();
+  lodLevels.forEach(({ geometry }) => {
+    if (geometry && !disposed.has(geometry)) {
+      geometry.dispose();
+      disposed.add(geometry);
+    }
+  });
+  if (mesh.geometry && !disposed.has(mesh.geometry)) mesh.geometry.dispose();
   const tex = mesh.userData?.mapTexture;
   if (tex) tex.dispose();
+  const normalMap = mesh.userData?.normalMap;
+  if (normalMap) normalMap.dispose();
   if (mesh.material) {
     if (mesh.material.map && mesh.material.map !== tex) {
       mesh.material.map.dispose?.();

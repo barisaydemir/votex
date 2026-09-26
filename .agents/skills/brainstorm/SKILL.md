@@ -1,0 +1,14 @@
+---
+name: brainstorm
+description: "Think through what could improve this change and give varied suggestions"
+metadata:
+  freebuff-builtin: "brainstorm"
+---
+
+# Brainstorm
+
+Inspect the full diff and surrounding architecture. Do not edit files.
+
+Considering this whole change with fresh eyes, what new ideas for improvement, in overall design, in architecture, in simplification, cleanup, or behavior do you have? What would be a big change that could shake things up, in a good way? What has not been considered so far? What hint of an idea did you have before that could actually make a big difference?
+
+Come up with a few recommendations if you can. Consider including evidence, expected impact, effort, and tradeoffs. Use `suggest_prompts` only for the best actionable follow-ups.

@@ -4,12 +4,15 @@
  * Modüller:
  *   image   → GÖRÜNTÜ (DTA / Proton ELIC) — varsayılan ekran
  *   csv     → CSV / Excel verisi
+ *   legacy  → LEGACY3DMAG (JSON dik tarama)
+ *   tools   → ARAÇLAR (analiz, rapor, dışa aktarma, ölçüm)
  *   hybrid  → HİBRİT analiz (image + csv)
  *   sys     → SİSTEM (lisans, DTA/VPE, arşiv, güncelleme)
  *
  * Davranış:
  *   - body[data-mod] + ops-core / fold-zone görünürlüğü ile her modülün
- *     kendi ekranı açılır; aktif olmayan modülün kontrolleri gizlenir.
+ *     kendi ekranı açılır; CSV, LEGACY3DMAG ve ARAÇLAR ayrı üst sekmelerdir.
+ *     Aktif olmayan modülün kontrolleri gizlenir.
  *   - Modül JS'i ilk açılışta lazy yüklenir (csvPanel, unifiedPanel) —
  *     three.js + CSV motoru yalnızca ihtiyaç olunca yüklenir.
  *   - 3D sahne katmanları modüle göre gösterilir (DTA / CSV / ipuçları).
@@ -26,22 +29,93 @@ import { isHintsVisible } from "../viewer/hintEngine.js";
 import { invalidate } from "../viewer/scene.js";
 
 const MODULES = {
-  image: { label: "GÖRÜNTÜ", note: "DTA / Proton ELIC" },
-  csv: { label: "CSV", note: "CSV / EXCEL" },
+  image: { label: "GÖRÜNTÜ", note: "DTA / PROTON ELIC" },
+  csv: { label: "CSV VERİ", note: "İÇE AKTARMA / HARİTA" },
+  legacy: { label: "LEGACY3DMAG", note: "JSON DİK TARAMA" },
+  tools: { label: "ARAÇLAR", note: "ANALİZ / RAPOR / ÖLÇÜM" },
   hybrid: { label: "HİBRİT", note: "IMAGE + CSV" },
   sys: { label: "SİSTEM", note: "AYARLAR / ARŞİV" },
 };
 
-/** hangi modülde hangi fold'lar görünür (other `hidden`) */
+/** hangi modülde hangi üst içerik görünür (other `hidden`) */
 const FOLD_GROUPS = {
-  image: ["csv-fold"],  // CSV artık GÖRÜNTÜ içinde
+  image: [],
   csv: ["csv-fold"],
+  legacy: ["legacy-fold"],
+  tools: ["tools-fold"],
   hybrid: ["unified-fold"],
   sys: ["dta-settings-fold", "vpe-settings-fold", "archive-fold", "update-fold"],
 };
 
+let _panelsPrepared = false;
+
+function sectionByLabel(root, label) {
+  return [...root.querySelectorAll("details.tree-section")]
+    .find((el) => el.querySelector(":scope > summary .tree-label")?.textContent?.trim() === label);
+}
+
+/**
+ * Mevcut DOM düğümlerini yeni üst sekmelere taşır.
+ * ID'ler değişmediği için main.js ve csvPanel.js bağlayıcıları bozulmaz.
+ */
+function prepareModulePanels() {
+  if (_panelsPrepared) return;
+  _panelsPrepared = true;
+
+  const foldZone = document.getElementById("panel-fold-zone");
+  if (!foldZone) return;
+
+  // JSON kutusunu CSV akışından çıkarıp kendi üst sekmesine al.
+  const legacyBox = document.getElementById("legacy-dik-box");
+  if (legacyBox) {
+    const legacyFold = document.createElement("details");
+    legacyFold.className = "dta-settings-fold module-tab-fold";
+    legacyFold.id = "legacy-fold";
+    legacyFold.dataset.fold = "legacy";
+    legacyFold.innerHTML = `
+      <summary>
+        <span class="panel-tag">JSON</span>
+        <span>LEGACY3DMAG · JSON VERİ İŞLEM</span>
+      </summary>
+      <div class="dta-settings module-tab-body" id="legacy-panel"></div>`;
+    legacyFold.querySelector("#legacy-panel").appendChild(legacyBox);
+    foldZone.appendChild(legacyFold);
+  }
+
+  // Analiz araçları, rapor/dışa aktarma ve ölçüm araçlarını tek üst sekmede topla.
+  const toolsFold = document.createElement("details");
+  toolsFold.className = "dta-settings-fold module-tab-fold";
+  toolsFold.id = "tools-fold";
+  toolsFold.dataset.fold = "tools";
+  toolsFold.innerHTML = `
+    <summary>
+      <span class="panel-tag">TOOLS</span>
+      <span>ARAÇLAR · ANALİZ VE DIŞA AKTARMA</span>
+    </summary>
+    <div class="dta-settings module-tab-body" id="tools-panel"></div>`;
+  const toolsBody = toolsFold.querySelector("#tools-panel");
+  const opsA = document.getElementById("ops-core-a");
+  const opsB = document.getElementById("ops-core-b");
+  if (opsA) {
+    const analysisTools = sectionByLabel(opsA, "ANALİZ ARAÇLARI");
+    const tools = sectionByLabel(opsA, "ARAÇLAR");
+    if (analysisTools) toolsBody.appendChild(analysisTools);
+    if (tools) toolsBody.appendChild(tools);
+    const freeDraw = document.getElementById("fd-panel");
+    if (freeDraw) toolsBody.appendChild(freeDraw);
+  }
+  if (opsB) {
+    for (const label of ["OTURUMLAR", "3D ÖLÇÜM", "DERİNLİK PROFİLİ"]) {
+      const section = sectionByLabel(opsB, label);
+      if (section) toolsBody.appendChild(section);
+    }
+  }
+  foldZone.appendChild(toolsFold);
+}
+
 let active = "image";
-const loaded = new Set(["image"]);
+// main.js CSV bağlayıcısını başlangıçta kurduğu için ikinci kez bağlamayalım.
+const loaded = new Set(["image", "csv"]);
 
 // ── 3D katmanlar: modül → görünürlük ──
 function applyLayerVisibility() {
@@ -49,7 +123,7 @@ function applyLayerVisibility() {
   if (!scene) return;
 
   const isImageLike = active === "image" || active === "hybrid";
-  const isCsvLike = active === "csv" || active === "hybrid" || active === "image";  // CSV artık GÖRÜNTÜ içinde
+  const isCsvLike = active === "csv" || active === "hybrid";
 
   scene.traverse((obj) => {
     const layer = obj.userData?.votexLayer;
@@ -63,7 +137,7 @@ function applyLayerVisibility() {
     else if (layer === "hint-csv") obj.visible = isCsvLike && isHintsVisible();
     else if (layer === "hint") obj.visible = isHintsVisible(); // geriye dönük
   });
-  // csvOverlay state üzerinden ayrıca
+  // CSV overlay yalnız CSV/HİBRİT sekmesinde görünür.
   if (state.csvOverlay) state.csvOverlay.visible = isCsvLike;
   invalidate();
 }
@@ -77,7 +151,7 @@ function applyScreen() {
     el.hidden = !isImage;
   });
 
-  // Fold bölgesi: sadece aktif modülün fold'ları görünür
+  // Fold bölgesi: sadece aktif modülün üst sekme içeriği görünür
   const showList = FOLD_GROUPS[active] || [];
   document.querySelectorAll("[data-fold]").forEach((el) => {
     const on = showList.includes(el.id);
@@ -87,10 +161,10 @@ function applyScreen() {
 
   // data-mod-show elemanları (ör. split-heatmap sadece CSV'de)
   document.querySelectorAll("[data-mod-show]").forEach((el) => {
-    const show = active === "csv";
     const sets = el.dataset.modShow.split(",").map((s) => s.trim());
-    el.hidden = !sets.includes(active);
-    if (!sets.includes(active)) el.style.display = "none";
+    const show = sets.includes(active);
+    el.hidden = !show;
+    el.style.display = show ? "" : "none";
   });
 }
 
@@ -101,7 +175,9 @@ export async function setModule(name) {
 
   // Sekme aktifliği
   document.querySelectorAll("#votex-ray .vr-btn").forEach((b) => {
-    b.classList.toggle("active", b.dataset.mod === name);
+    const selected = b.dataset.mod === name;
+    b.classList.toggle("active", selected);
+    b.setAttribute("aria-selected", selected ? "true" : "false");
   });
 
   document.body.dataset.module = name;
@@ -120,12 +196,11 @@ export async function setModule(name) {
   }
 
   // Modül JS'ini ilk açılışta yükle (lazy chunk)
-  // CSV artık GÖRÜNTÜ içinde — image modülünde de yüklenir
   if (!loaded.has(name)) {
     loaded.add(name);
     heartbeatBusy(true);
     try {
-      if (name === "csv" || name === "image") {
+      if (name === "csv") {
         const { bindCsvPanel } = await import("../ui/csvPanel.js");
         bindCsvPanel();
       }
@@ -150,11 +225,14 @@ export async function bindModuleRail() {
   const rail = document.getElementById("votex-ray");
   if (!rail || rail.dataset.bound === "1") return;
   rail.dataset.bound = "1";
+  prepareModulePanels();
 
   rail.querySelectorAll(".vr-btn").forEach((btn) => {
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", btn.classList.contains("active") ? "true" : "false");
     btn.addEventListener("click", () => setModule(btn.dataset.mod));
   });
 
-  // İlk modül: image (varsayılan)
+  // İlk modül: image (varsayılan); CSV/JSON/Araçlar üst sekmeleri kapalı içerikle başlar.
   await setModule("image");
 }

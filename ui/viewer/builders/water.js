@@ -2,11 +2,11 @@ import * as THREE from "three";
 import { state } from "../../app/state.js";
 import { formatDepthM } from "../colors.js";
 import { makeBadgeSprite, makeDetailSprite } from "../labels.js";
-import { mapToWorld } from "../coords.js";
+import { recordPointToWorld } from "../coords.js";
 
 /** Olası su: yarı saydam açık mavi / turkuaz disk. */
 export function makeWater(wtr, mapW, mapD, vertExag, wireframe, id, num, sideView = false) {
-  const { x, z } = mapToWorld(Math.max(0, Math.min(1, wtr.cx)), Math.max(0, Math.min(1, wtr.cy)), mapW, mapD, sideView);
+  const { x, z } = recordPointToWorld(wtr, "cx", "cy", mapW, mapD, sideView);
   const dM = Number(wtr.depthFromSurfaceM ?? wtr.depth_from_surface_m ?? 0.5);
   const wM = Number(wtr.widthM ?? wtr.width_m ?? wtr.rx * 2 * mapW);
   const lM = Number(wtr.lengthM ?? wtr.length_m ?? wtr.ry * 2 * mapD);

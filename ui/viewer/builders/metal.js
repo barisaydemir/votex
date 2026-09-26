@@ -1,8 +1,9 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { state } from "../../app/state.js";
 import { colorByDepth, formatDepthM } from "../colors.js";
 import { makeBadgeSprite, makeDetailSprite } from "../labels.js";
-import { mapToWorld } from "../coords.js";
+import { recordPointToWorld } from "../coords.js";
 import { applyTierGhost, makeTierLabel } from "./tierGhost.js";
 import { t } from "../../i18n/index.js";
 import { metalCueTitle } from "../../i18n/labels.js";
@@ -11,15 +12,15 @@ function cueTitleOf(m) {
   return metalCueTitle(m, { short: true });
 }
 
-function fieldMat(color, opacity, wireframe) {
+function fieldMat(color, opacity, wireframe, emissiveI = 0.35) {
   return new THREE.MeshStandardMaterial({
     color,
-    emissive: 0x4a1208,
-    emissiveIntensity: 0.35,
+    emissive: color,
+    emissiveIntensity: wireframe ? emissiveI * 0.5 : emissiveI,
     transparent: true,
     opacity: wireframe ? Math.min(opacity, 0.28) : opacity,
-    roughness: 0.85,
-    metalness: 0.15,
+    roughness: 0.55,
+    metalness: 0.2,
     depthWrite: false,
     side: THREE.DoubleSide,
     wireframe: !!wireframe,
@@ -33,7 +34,7 @@ export function makeMetal(m, mapW, mapD, vertExag, wireframe, id, num, sideView 
   // Host yoksa bile çiz — her metal haritada görünsün
   // if (!host || !inside) return null;  // eskisi: sadece chamber içi
 
-  const { x, z } = mapToWorld(Math.max(0, Math.min(1, m.cx)), Math.max(0, Math.min(1, m.cy)), mapW, mapD, sideView);
+  const { x, z } = recordPointToWorld(m, "cx", "cy", mapW, mapD, sideView);
   const dM = m.depthFromSurfaceM ?? m.depth_from_surface_m ?? 1;
   const wM = Math.max(m.widthM ?? m.width_m ?? 1.2, 0.4);
   const lM = Math.max(m.lengthM ?? m.length_m ?? wM, 0.4);
@@ -55,56 +56,141 @@ export function makeMetal(m, mapW, mapD, vertExag, wireframe, id, num, sideView 
     if (Math.abs(bearing) > 0.02) {
       group.rotation.y = -bearing;
     }
-  };
+  };  // Ortak radius corner — RoundedBox için
+  const rBox = 0.06;
+  // Strength'e göre glow efekti
+  const glowScale = 0.08 + strength * 0.12; // 0.08 → 0.20 arası
+  const emissiveBoost = 0.3 + strength * 0.5; // 0.3 → 0.8 arası
 
   if (host === "shaft") {
     const h = plumeH * vertExag;
     const r = Math.max(Math.min(wM, lM) * 0.5, 0.25);
     const y = -(dM * vertExag);
+    // Ana gövde — silindirik plume
     group.add(
       new THREE.Mesh(
-        new THREE.CylinderGeometry(r * 0.95, r * 1.05, h, 20, 1, true),
-        fieldMat(baseColor, opCore * 0.85, wireframe)
+        new THREE.CylinderGeometry(r * 0.95, r * 1.05, h, 24, 1, true),
+        fieldMat(baseColor, opCore * 0.85, wireframe, emissiveBoost)
       )
     );
+    // Dış glow halka
     group.add(
       new THREE.Mesh(
-        new THREE.CylinderGeometry(r * 1.25, r * 1.35, h * 0.92, 16, 1, true),
-        fieldMat(0xc04028, opCore * 0.35, false)
+        new THREE.CylinderGeometry(r * 1.25, r * 1.35, h * 0.92, 20, 1, true),
+        fieldMat(0xc04028, opCore * 0.3, false, emissiveBoost * 0.6)
       )
     );
+    // Üst koni — plume ağzı
+    const coneH = h * 0.18;
+    group.add(
+      new THREE.Mesh(
+        new THREE.ConeGeometry(r * 1.1, coneH, 20, 1, true),
+        fieldMat(baseColor, opCore * 0.5, false, emissiveBoost * 0.7)
+      )
+    );
+    // Glow küre (güçlü metal için)
+    if (strength > 0.5) {
+      const glowR = Math.max(wM, lM) * 0.55;
+      const glow = new THREE.Mesh(
+        new THREE.SphereGeometry(glowR, 16, 16),
+        new THREE.MeshStandardMaterial({
+          color: 0xff4422, emissive: 0xff2200,
+          emissiveIntensity: strength * 1.5,
+          transparent: true, opacity: 0.12 + strength * 0.1,
+          depthWrite: false, side: THREE.DoubleSide,
+        })
+      );
+      group.add(glow);
+    }
     group.position.set(x, y, z);
     applyOrient();
   } else if (host === "tunnel") {
     const h = plumeH * vertExag;
     const along = Math.max(lM, 0.35);
     const cross = Math.max(wM, 0.3);
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(along, h, cross), fieldMat(baseColor, opCore * 0.72, wireframe)));
+    // Ana yapı — yuvarlatılmış kutu
+    const coreGeo = new RoundedBoxGeometry(along, h, cross, 3, rBox);
+    group.add(new THREE.Mesh(coreGeo, fieldMat(baseColor, opCore * 0.72, wireframe, emissiveBoost)));
+    // Dış glow — strength orantılı
+    const gScale = 1.0 + glowScale;
     group.add(
       new THREE.Mesh(
-        new THREE.BoxGeometry(along * 1.05, h * 0.7, cross * 1.05),
-        fieldMat(0xc04028, opCore * (sideView ? 0.32 : 0.28), false)
+        new RoundedBoxGeometry(along * gScale, h * 0.7, cross * gScale, 3, rBox * 1.2),
+        fieldMat(0xc04028, opCore * (sideView ? 0.32 : 0.25), false, emissiveBoost * 0.5)
       )
     );
+    // Glow küre
+    if (strength > 0.5) {
+      const glowR = Math.max(along, cross) * 0.4;
+      group.add(new THREE.Mesh(
+        new THREE.SphereGeometry(glowR, 14, 14),
+        new THREE.MeshStandardMaterial({
+          color: 0xff4422, emissive: 0xff2200,
+          emissiveIntensity: strength * 1.2,
+          transparent: true, opacity: 0.08 + strength * 0.08,
+          depthWrite: false, side: THREE.DoubleSide,
+        })
+      ));
+    }
     group.position.set(x, -(dM * vertExag), z);
     applyOrient();
   } else if (host === "room" || host === "tomb") {
     const h = plumeH * vertExag;
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(wM, h, lM), fieldMat(baseColor, opCore * 0.7, wireframe)));
+    // Ana yapı — yuvarlatılmış kutu
+    const coreGeo = new RoundedBoxGeometry(wM, h, lM, 3, rBox);
+    group.add(new THREE.Mesh(coreGeo, fieldMat(baseColor, opCore * 0.7, wireframe, emissiveBoost)));
+    // Dış glow
+    const gScale = 1.0 + glowScale;
     group.add(
-      new THREE.Mesh(new THREE.BoxGeometry(wM * 1.1, h * 0.7, lM * 1.1), fieldMat(0xb83820, opCore * 0.28, false))
+      new THREE.Mesh(
+        new RoundedBoxGeometry(wM * gScale, h * 0.7, lM * gScale, 3, rBox * 1.2),
+        fieldMat(0xb83820, opCore * 0.25, false, emissiveBoost * 0.5)
+      )
     );
+    // Glow küre
+    if (strength > 0.5) {
+      const glowR = Math.max(wM, lM) * 0.4;
+      group.add(new THREE.Mesh(
+        new THREE.SphereGeometry(glowR, 14, 14),
+        new THREE.MeshStandardMaterial({
+          color: 0xff4422, emissive: 0xff2200,
+          emissiveIntensity: strength * 1.2,
+          transparent: true, opacity: 0.08 + strength * 0.08,
+          depthWrite: false, side: THREE.DoubleSide,
+        })
+      ));
+    }
     group.position.set(x, -(dM * vertExag), z);
     applyOrient();
   } else {
-    // Hostsuz metal — basit küp olarak çiz
+    // Hostsuz metal — algılaama küresi + yuvarlatılmış kutu
     const h = Math.max(plumeH * vertExag, 0.5);
     const s = Math.max(wM, lM, 0.6);
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(s, h, s), fieldMat(baseColor, opCore, wireframe)));
+    // Ana küre — metal tespit topu
+    const sphereR = s * 0.45;
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(sphereR, 20, 20),
+      fieldMat(baseColor, opCore, wireframe, emissiveBoost)
+    );
+    sphere.position.y = -h * 0.15;
+    group.add(sphere);
+    // Dış glow küre
     group.add(new THREE.Mesh(
-      new THREE.BoxGeometry(s * 1.15, h * 0.7, s * 1.15),
-      fieldMat(0xc04028, opCore * 0.25, false)
+      new RoundedBoxGeometry(s, h, s, 3, rBox),
+      fieldMat(0xc04028, opCore * 0.2, false, emissiveBoost * 0.4)
     ));
+    // Ek glow (strength > 0.6)
+    if (strength > 0.6) {
+      group.add(new THREE.Mesh(
+        new THREE.SphereGeometry(sphereR * 1.6, 14, 14),
+        new THREE.MeshStandardMaterial({
+          color: 0xff4422, emissive: 0xff2200,
+          emissiveIntensity: strength * 1.8,
+          transparent: true, opacity: 0.1 + strength * 0.1,
+          depthWrite: false, side: THREE.DoubleSide,
+        })
+      ));
+    }
     group.position.set(x, -(dM * vertExag), z);
     applyOrient();
   }
@@ -156,7 +242,7 @@ export function makeMetal(m, mapW, mapD, vertExag, wireframe, id, num, sideView 
 
 /** 3D mesh yoksa bile (yapı dışı alan) kameranın gideceği nokta. */
 export function ensureMetalFocusTarget(m, id, mapW, mapD, vertExag, sideView = false) {
-  if (!m || !id || state.structureTargets[id]) return;    const { x, z } = mapToWorld(Math.max(0, Math.min(1, m.cx)), Math.max(0, Math.min(1, m.cy)), mapW, mapD, sideView);
+  if (!m || !id || state.structureTargets[id]) return;  const { x, z } = recordPointToWorld(m, "cx", "cy", mapW, mapD, sideView);
     const dM = Number(m.depthFromSurfaceM ?? m.depth_from_surface_m ?? 1);
     const wM = Math.max(m.widthM ?? m.width_m ?? 1.2, 0.4);
   const lM = Math.max(m.lengthM ?? m.length_m ?? wM, 0.4);

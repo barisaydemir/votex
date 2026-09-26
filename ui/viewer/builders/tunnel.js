@@ -1,8 +1,9 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { state } from "../../app/state.js";
 import { colorByDepth, edgeColorByDepth, formatDepthM } from "../colors.js";
 import { makeBadgeSprite, makeDetailSprite } from "../labels.js";
-import { mapToWorld } from "../coords.js";
+import { recordSegmentToWorld } from "../coords.js";
 import { applyTierGhost, makeTierLabel } from "./tierGhost.js";
 import { t } from "../../i18n/index.js";
 
@@ -27,13 +28,10 @@ export function makeTunnel(t, mapW, mapD, vertExag, wireframe, id, num, sideView
   const crownM = Number(t.crownFromSurfaceM ?? t.crown_from_surface_m ?? 0.5);
   const spanM = Math.max(Math.abs(floorM - crownM), 0.4);
   const hM0 = Math.max(Number(t.heightM ?? t.height_m ?? spanM), 0.4);
-  // x0/y0/x1/y1 0-1 dışında olabilir — harita sınırlarıyla kıskaçla
-  const x0c = Math.max(0, Math.min(1, t.x0 || 0));
-  const y0c = Math.max(0, Math.min(1, t.y0 || 0));
-  const x1c = Math.max(0, Math.min(1, t.x1 || 0));
-  const y1c = Math.max(0, Math.min(1, t.y1 || 0));
-  const a = mapToWorld(x0c, y0c, mapW, mapD, sideView);
-  const b = mapToWorld(x1c, y1c, mapW, mapD, sideView);
+  const segment = recordSegmentToWorld(t, mapW, mapD, sideView);
+  if (!segment) return null;
+  const a = segment.a;
+  const b = segment.b;
   const hM = hM0;
   const wM = Number(t.widthM ?? t.width_m ?? hM);
 
@@ -45,8 +43,8 @@ export function makeTunnel(t, mapW, mapD, vertExag, wireframe, id, num, sideView
   const widthDraw = Math.max(wM, 0.5);
 
   // Aspect ratio kontrolü — kısa tünel için basit koridor çiz
-  const dx = (t.x1 || 0) - (t.x0 || 0);
-  const dz = (t.y1 || 0) - (t.y0 || 0);
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
   const tunnelLen = Math.hypot(dx, dz);
   const aspect = tunnelLen / (wM || 1);
   const isShortTunnel = aspect < 2.5;
@@ -90,18 +88,42 @@ export function makeTunnel(t, mapW, mapD, vertExag, wireframe, id, num, sideView
   group.userData.type = "tunnel";
 
   if (isShortTunnel) {
-    // ── Kısa tünel: basit koridor çizgisi (zorlama vault yerine) ──
+    // ── Kısa tünel: yuvarlatılmış koridor ──
     const corridorH = heightDraw * 0.6;
     const corridorW = widthDraw * 0.8;
-    const corridorGeo = new THREE.BoxGeometry(corridorW, corridorH, len);
+    const rBox = Math.min(0.12, Math.min(corridorW, corridorH) * 0.15);
+    const corridorGeo = new RoundedBoxGeometry(corridorW, corridorH, len, 3, rBox);
     const corridorMat = new THREE.MeshStandardMaterial({
-      color: wallColor, transparent: true, opacity: 0.45,
-      roughness: 0.7, side: THREE.DoubleSide, depthWrite: false,
+      color: wallColor, emissive: wallColor, emissiveIntensity: 0.2,
+      transparent: true, opacity: 0.5,
+      roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide, depthWrite: false,
     });
     const corridor = new THREE.Mesh(corridorGeo, corridorMat);
     corridor.position.copy(mid);
     corridor.quaternion.copy(quat);
     group.add(corridor);
+
+    // İç karanlık
+    const innerGeo = new RoundedBoxGeometry(corridorW * 0.85, corridorH * 0.85, len * 0.98, 2, rBox * 0.5);
+    const inner = new THREE.Mesh(innerGeo, new THREE.MeshStandardMaterial({
+      color: 0x080e14, transparent: true, opacity: 0.45,
+      roughness: 0.95, side: THREE.BackSide, depthWrite: false,
+    }));
+    inner.position.copy(mid);
+    inner.quaternion.copy(quat);
+    group.add(inner);
+
+    // Zemin plakası
+    const floorGeo = new THREE.PlaneGeometry(corridorW * 0.92, len * 0.95);
+    const floor = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({
+      color: 0x1a3038, transparent: true, opacity: 0.5,
+      roughness: 0.95, depthWrite: false,
+    }));
+    floor.position.copy(mid);
+    floor.position.y += 0.02;
+    floor.quaternion.copy(quat);
+    floor.rotateX(-Math.PI / 2);
+    group.add(floor);
 
     // Kenar çizgisi
     const edgeLine = new THREE.LineSegments(
@@ -111,6 +133,23 @@ export function makeTunnel(t, mapW, mapD, vertExag, wireframe, id, num, sideView
     edgeLine.position.copy(mid);
     edgeLine.quaternion.copy(quat);
     group.add(edgeLine);
+
+    // Periyodik ışık noktaları
+    const nLights = Math.max(2, Math.floor(len / 2.5));
+    const lightMat = new THREE.MeshBasicMaterial({ color: 0xffdd88, transparent: true, opacity: 0.7 });
+    const lightGeo = new THREE.SphereGeometry(0.06, 8, 8);
+    for (let li = 1; li <= nLights; li++) {
+      const lt = li / (nLights + 1);
+      const lPos = new THREE.Vector3().lerpVectors(p0, p1, lt);
+      lPos.y += corridorH * 0.35;
+      const lMesh = new THREE.Mesh(lightGeo, lightMat);
+      lMesh.position.copy(lPos);
+      group.add(lMesh);
+      // Zayıf nokta ışığı
+      const pLight = new THREE.PointLight(0xffdd88, 0.4, 2.5, 2);
+      pLight.position.copy(lPos);
+      group.add(pLight);
+    }
   } else {
     // ── Uzun tünel: vault/kemer şekli ──
     const shape = unitVaultShape();

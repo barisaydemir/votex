@@ -21,6 +21,13 @@ export function initTreeAnimations() {
   const opsPanel = document.querySelector(".panel-ops");
   if (!opsPanel) return;
 
+  // Sol paneldeki tüm açılır menüler varsayılan olarak kapalı başlasın:
+  // tree-section'lara ek olarak DTA/CSV/Sistem ve iç içe GPS-hizalama
+  // bölümleri de ilk açılışta açık kalmamalı.
+  for (const detail of opsPanel.querySelectorAll("details")) {
+    detail.removeAttribute("open");
+  }
+
   const sections = opsPanel.querySelectorAll(".tree-section");
 
   for (const section of sections) {
@@ -153,6 +160,9 @@ function initRightPanelTrees() {
 
   const sections = rightPanel.querySelectorAll(".tree-section");
   for (const section of sections) {
+    // Sağ panel ilk açılışta tamamen kapalı başlasın; kullanıcı isterse
+    // summary'ye tıklayarak ilgili bölümü açabilir.
+    section.removeAttribute("open");
     const summary = section.querySelector(":scope > summary");
     if (summary) {
       summary.addEventListener("click", (e) => {
