@@ -1,3 +1,9 @@
+## 0.4.152 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- votex.pdf broşürü (3 sayfa, 112 KB) repoya eklendi; hassas içerik taraması temiz (e-posta/telefon/fiyat/anahtar bulunamadı).
+
 ## 0.4.151 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri
