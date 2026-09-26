@@ -1,3 +1,9 @@
+## 0.4.163 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Fix: DTA Gemini ws 1006 anormal kopmalarinda aninda reconnect (3sn -> 0.6sn pencere); kalici hatalarda 3sn + sayac sifirlama korundu
+
 ## 0.4.162 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

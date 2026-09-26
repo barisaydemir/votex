@@ -462,6 +462,7 @@ class JarvisLive:
         self._is_speaking = False
         self._speaking_lock = threading.Lock()
         self._paused = False
+        self._reconnect_count = 0  # anormal ws kopmalarında hızlı reconnect sayacı
 
         self.ui.on_text_command = self._on_text_command
         self.ui.on_pause_toggle = self._on_pause_toggle
@@ -1120,11 +1121,30 @@ class JarvisLive:
             except Exception as e:
                 err = str(e)
                 print(f"[DTA] {e}")
-                traceback.print_exc()
                 self.set_speaking(False)
                 self.session = None
-                # Kullaniciya daha net mesaj
+
+                # Gemini ws arada 1006 (abnormal closure) ile kopup gelebiliyor;
+                # bu bizden kaynakli bir hata degil — 3 sn beklemeden HEMEN reconnect.
                 low = err.lower()
+                transient = (
+                    "1006" in err
+                    or "abnormal closure" in low
+                    or "connection closed" in low
+                    or "internal" in low and "1006" in err
+                )
+                if transient:
+                    self._reconnect_count += 1
+                    if self._reconnect_count <= 3 or self._reconnect_count % 20 == 0:
+                        _boot_log(
+                            f"[chat] ws koptu ({err[:80]}) — aninda reconnect #{self._reconnect_count}"
+                        )
+                    self.ui.set_state("THINKING")
+                    await asyncio.sleep(0.6)  # reconnect penceresi: 3 sn → 0.6 sn
+                    continue
+
+                traceback.print_exc()
+                # Kullaniciya daha net mesaj
                 if "1008" in err or "not found" in low or "not supported" in low:
                     tip = "Live model desteklenmiyor — internet/API anahtarini kontrol edin."
                 elif "429" in err or "quota" in low or "resource" in low:
@@ -1135,6 +1155,7 @@ class JarvisLive:
                     tip = "Live baglanti zaman asimi — interneti kontrol edip tekrar deneyin."
                 else:
                     tip = err[:160]
+                self._reconnect_count = 0  # kalici hata — sayaci sifirla
                 self.ui.write_log(f"ERR: Baglanti kesildi — {tip}")
                 self.ui.set_state("ERROR")
                 await asyncio.sleep(3)
