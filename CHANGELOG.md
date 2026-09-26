@@ -1,3 +1,9 @@
+## 0.4.154 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Canlı E2E doğrulaması: hide/restore işleyicileri boot.log'a '[panel] hide/restore uygulandi' kanıt satırı bırakıyor (panel_hide_quiet_audio sorgusuyla); 18/18 adım doğrulandı.
+
 ## 0.4.153 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

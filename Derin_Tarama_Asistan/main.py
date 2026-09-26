@@ -34,7 +34,7 @@ if sys.platform == "win32":
 
 # AGIR import'lar (google/pyaudio/elic) mainloop'tan SONRA — aksi halde
 # ElitePad'de pencere açılmadan kum saati saatlerce döner.
-from app_config import get_app_config_value, get_product_name, PRODUCT_NAME
+from app_config import get_app_config_value, get_product_name, is_panel_hide_quiet, PRODUCT_NAME
 from actions import votex_chat
 from ui import JarvisUI
 
@@ -541,6 +541,7 @@ class JarvisLive:
             self.ui.on_panel_hidden_changed(True)
         except Exception:
             pass
+        _boot_log(f"[panel] hide uygulandi — panel_hide_quiet_audio={is_panel_hide_quiet()}")
         return True
 
     def _on_votex_window_restore(self) -> bool:
@@ -554,6 +555,7 @@ class JarvisLive:
             self.ui.on_panel_hidden_changed(False)
         except Exception:
             pass
+        _boot_log(f"[panel] restore uygulandi — panel_hide_quiet_audio={is_panel_hide_quiet()}")
         return True
 
     # votex_chat poller'ının pencere isteklerini ui callback'lerine köprülediği işleyiciler
