@@ -1,3 +1,9 @@
+## 0.4.162 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Araclar: scripts/dta_update.py - tek komutla uc kopya senkron + DTA restart + canli E2E; E2E zincir testlerine ws-kopma probe'u
+
 ## 0.4.161 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

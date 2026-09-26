@@ -1,7 +1,7 @@
 {
   "name": "votex",
   "private": true,
-  "version": "0.4.161",
+  "version": "0.4.162",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,6 +17,7 @@
     "test:e2e:bridge": "python scripts/e2e_dta_bridge.py",
     "test:e2e:bridge:bridge-only": "python scripts/e2e_dta_bridge.py --bridge-only",
     "dta:sync-check": "python scripts/dta_sync_check.py",
+    "dta:update": "python scripts/dta_update.py",
     "check:rust": "cargo check",
     "ci": "node scripts/ci-local.js",
     "ci:quick": "node scripts/ci-local.js --quick",
