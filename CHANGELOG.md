@@ -1,3 +1,9 @@
+## 0.4.166 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Artemis: kuruma VotexProb hesap motoru eklendi (DTA yerine motor profili; autostart gorevi + Run kaydi opsiyonel)
+
 ## 0.4.165 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

@@ -49,7 +49,7 @@ def _resolve_release_dir() -> Path:
 RELEASE = _resolve_release_dir()
 BUNDLE_NSIS = RELEASE / "bundle" / "nsis"
 ISS = HERE / "DFT_Suite.iss"
-PACKAGE_VERSION = "0.4.165"
+PACKAGE_VERSION = "0.4.166"
 
 ISCC_CANDIDATES = [
     Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
@@ -297,6 +297,35 @@ def stage_dta(dest: Path) -> None:
     _stage(dest)
 
 
+def stage_prob_engine(dest: Path) -> None:
+    """VotexProb hesap motorunu Artemis staging'ine kopyalar.
+
+    Artemis profili DTA yerine motor-odaklıdır: localhost hesap motoru
+    (VotexProb.exe, 127.0.0.1:18766) kurulumda hazır bulunur; VotexArtemis
+    onu kendi klasöründen çalıştırır (port çakışması yok — DFT Suite'teki
+    full VOTEX zaten 18765 köprüsünü taşır).
+    """
+    release = _resolve_release_dir()
+    prob = None
+    for name in ("VotexProb.exe", "votex_prob.exe"):
+        p = release / name
+        if p.is_file():
+            prob = p
+            break
+    if not prob:
+        raise SystemExit(
+            f"VotexProb.exe yok: {release} — 'cargo build --release' ile motor da derlenir"
+        )
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(prob, dest / "VotexProb.exe")
+    # Yan dosyalar (varsa): eşleme şema/versiyon dosyaları
+    for extra in ("votex_prob_meta.json",):
+        p = release / extra
+        if p.is_file():
+            shutil.copy2(p, dest / extra)
+    log(f"VotexProb motoru stage edildi: {dest / 'VotexProb.exe'}")
+
+
 ARTEMIS_ISS = HERE / "VotexArtemis.iss"
 ARTEMIS_STAGING = HERE / "staging_artemis"
 
@@ -311,6 +340,8 @@ VotexArtemis AYRI BİR PROGRAMDIR:
     DFT Suite / VOTEX / Derin Tarama Asistan kurulumlarına DOKUNMAZ.
   • Eski kurulum kaldırılmaz; süreçler kapatılmaz.
   • Kullanıcı verileri %APPDATA%\\VotexArtemis altında ayrı tutulur.
+  • Paket içinde DTA YOKTUR; yerel hesap motoru VotexProb.exe
+    (127.0.0.1:18766) aynı klasöre kurulur.
   • Gerekli çalışma zamanları (VC++ / WebView2 / Node / Rust) sistemde
     yoksa sessiz kurulur; varsa atlanır.
 
@@ -364,6 +395,9 @@ def build_artemis_setup(args) -> int:
         log("Votex.exe -> VotexArtemis.exe olarak adlandırıldı")
     else:
         raise SystemExit("staging Votex.exe yok — tauri build çıktısı eksik")
+
+    # Hesap motoru: DTA yok — Artemis profili motoru (VotexProb.exe) taşır
+    stage_prob_engine(ARTEMIS_STAGING / "ProbEngine")
 
     write_artemis_info()
 

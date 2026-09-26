@@ -11,7 +11,7 @@
 ;   • Kullanıcı verileri %APPDATA%\VotexArtemis altında ayrık tutulur.
 
 #define MyAppName "VotexArtemis"
-#define MyAppVersion "0.4.165"
+#define MyAppVersion "0.4.166"
 #define MyAppPublisher "Digital Future Tech"
 #define MyAppURL "https://digitalfuture.tech"
 
@@ -26,7 +26,7 @@ UsePreviousAppDir=no
 DefaultGroupName=VotexArtemis
 DisableProgramGroupPage=yes
 OutputDir=dist
-OutputBaseFilename=VotexArtemis_Setup_0.4.165
+OutputBaseFilename=VotexArtemis_Setup_0.4.166
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -44,8 +44,13 @@ RestartApplications=no
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+; Autostart görevi işaretliyse Run kaydı yazılır (motor başlangıçta otomatik)
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "VotexProbEngine"; ValueData: """{app}\VotexProb.exe"""; Flags: uninsdeletevalue; Tasks: autostartprob
+
 [Tasks]
 Name: "desktopicon"; Description: "Masaüstü kısayolu"; GroupDescription: "Ek görevler:"; Flags: checkedonce
+Name: "autostartprob"; Description: "Hesap motorunu (VotexProb.exe) Windows başlangıcında otomatik çalıştır"; GroupDescription: "Motor:"; Flags: unchecked
 
 [Files]
 ; --- Runtimes (Pascal kodunda varlık kontrolüyle koşullu kurulur) ---
@@ -54,9 +59,13 @@ Source: "staging_artemis\runtimes\*"; DestDir: "{tmp}\artemis_runtimes"; Flags: 
 ; --- VotexArtemis uygulaması (ayrı klasör; DFT_Suite ile çakışmaz) ---
 Source: "staging_artemis\VotexArtemis\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; --- Hesap motoru (DTA yok; VotexProb.exe 18766 portunu kullanır) ---
+Source: "staging_artemis\ProbEngine\*"; DestDir: "{app}"; Flags: ignoreversion
+
 [Icons]
 Name: "{group}\VotexArtemis"; Filename: "{app}\VotexArtemis.exe"; WorkingDir: "{app}"
 Name: "{autodesktop}\VotexArtemis"; Filename: "{app}\VotexArtemis.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\VotexProb Hesap Motoru"; Filename: "{app}\VotexProb.exe"; WorkingDir: "{app}"; Tasks: autostartprob
 
 [Run]
 ; VC++ — yalnız eksikse
@@ -112,6 +121,7 @@ begin
   NeedsRestart := False;
   // Yalnız kendi süreci; Votex.exe/DTA süreçlerine dokunulmaz.
   Exec(ExpandConstant('{cmd}'), '/C taskkill /F /IM VotexArtemis.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{cmd}'), '/C taskkill /F /IM VotexProb.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
