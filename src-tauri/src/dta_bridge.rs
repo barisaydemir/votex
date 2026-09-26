@@ -1,7 +1,6 @@
 //! DTA → VOTEX localhost köprüsü (127.0.0.1:18765).
 //! POST /guide ile yapı ipuçları enjekte edilir; son harita yeniden hesaplanır.
 
-use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::atomic::Ordering;
 use std::thread;
@@ -13,6 +12,7 @@ use crate::commands::{decode_image_bytes, AppState};
 use crate::structures::StructureHint;
 use crate::dta_chat;
 use crate::dta_chat::ChatRing;
+use votex_prob::http;
 
 pub const DTA_BRIDGE_ADDR: &str = "127.0.0.1:18765";
 
@@ -98,7 +98,7 @@ pub fn start_bridge(app: AppHandle) {
 
 fn handle_connection(mut stream: std::net::TcpStream, app: &AppHandle) -> Result<(), String> {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
-    let buf = read_request(&mut stream)?;
+    let buf = http::read_request(&mut stream)?;
     if buf.is_empty() {
         return Ok(());
     }
@@ -329,54 +329,6 @@ fn apply_guide(app: &AppHandle, req: GuideRequest) -> Result<GuideResponse, Stri
     })
 }
 
-/// İsteği başlık sonu (\r\n\r\n) + Content-Length tamamlanana kadar okur.
-/// İstemci erken kapandıysa eldeki baytlarla döner; asla sonsuza dek beklemez.
-fn read_request<R: Read>(stream: &mut R) -> Result<Vec<u8>, String> {
-    // İstek TCP'de birden çok segmentte gelebilir (başlık + gövde ayrı ayrı);
-    // tek read() yarım isteği yakalayıp yanıtsız kapanmaya yol açıyordu.
-    let mut buf: Vec<u8> = Vec::with_capacity(65536);
-    let mut tmp = [0u8; 16384];
-    loop {
-        let n = stream.read(&mut tmp).map_err(|e| e.to_string())?;
-        if n == 0 {
-            break;
-        }
-        buf.extend_from_slice(&tmp[..n]);
-        if buf.windows(4).any(|w| w == b"\r\n\r\n") {
-            break;
-        }
-        if buf.len() > 1024 * 1024 {
-            break; // güvenlik sınırı
-        }
-    }
-    // Content-Length kadar gövdeyi tamamla
-    let header_end = buf
-        .windows(4)
-        .position(|w| w == b"\r\n\r\n")
-        .map(|p| p + 4)
-        .unwrap_or(buf.len());
-    let headers_text = String::from_utf8_lossy(&buf[..header_end]);
-    let content_length: usize = headers_text
-        .lines()
-        .find_map(|l| {
-            let (k, v) = l.split_once(':')?;
-            if k.trim().eq_ignore_ascii_case("content-length") {
-                v.trim().parse::<usize>().ok()
-            } else {
-                None
-            }
-        })
-        .unwrap_or(0);
-    while buf.len() < header_end + content_length {
-        let n = stream.read(&mut tmp).map_err(|e| e.to_string())?;
-        if n == 0 {
-            break;
-        }
-        buf.extend_from_slice(&tmp[..n]);
-    }
-    Ok(buf)
-}
-
 /// POST /dta/chat gövdesini halka şekline çevirir: düz/panel şekli
 /// {"text": "..."} → {"turns":[{role, text, meta:"panel"}]}. Aksi halde
 /// handle_chat_post turns=0 ile sessiz ok döndürüyor ve mesaj halkaya
@@ -492,50 +444,16 @@ fn dispatch_chat_routes(
 }
 
 fn parse_http(raw: &str) -> Result<(String, String, &str), String> {
-    let (head, body) = raw
-        .split_once("\r\n\r\n")
-        .or_else(|| raw.split_once("\n\n"))
-        .ok_or_else(|| "invalid HTTP".to_string())?;
-    let first = head.lines().next().unwrap_or("");
-    let mut parts = first.split_whitespace();
-    let method = parts.next().unwrap_or("GET").to_string();
-    let path = parts
-        .next()
-        .unwrap_or("/")
-        .split('?')
-        .next()
-        .unwrap_or("/")
-        .to_string();
-    Ok((method, path, body))
-}
-
-fn response_header(status: u16, body: &str) -> String {
-    let reason = match status {
-        200 => "OK",
-        204 => "No Content",
-        400 => "Bad Request",
-        404 => "Not Found",
-        _ => "OK",
-    };
-    format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        body.as_bytes().len() // bayt sayısı — karakter sayısı çok baytlı UTF-8'de kırpık yanıt üretiyordu
-    )
+    http::parse_http(raw)
 }
 
 fn write_response(stream: &mut std::net::TcpStream, status: u16, body: &str) -> Result<(), String> {
-    let header = response_header(status, body);
-    stream
-        .write_all(header.as_bytes())
-        .and_then(|_| stream.write_all(body.as_bytes()))
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    http::write_response(stream, status, body)
 }
 
 #[cfg(test)]
 mod bridge_tests {
     use super::*;
-    use std::io::Write;
     use std::net::{Shutdown, TcpListener, TcpStream};
     use std::sync::Arc;
     use std::time::Duration;
@@ -573,7 +491,7 @@ mod bridge_tests {
         server.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
         let payload = req_bytes("GET", "/health", "");
         client.write_all(&payload).unwrap();
-        let buf = read_request(&mut server).unwrap();
+        let buf = http::read_request(&mut server).unwrap();
         assert!(!buf.is_empty());
         let (method, path, body) = parse_req(&buf);
         assert_eq!(method, "GET");
@@ -593,7 +511,7 @@ mod bridge_tests {
         std::thread::sleep(Duration::from_millis(50));
         client.write_all(&payload[split..]).unwrap();
         client.flush().unwrap();
-        let buf = read_request(&mut server).unwrap();
+        let buf = http::read_request(&mut server).unwrap();
         let (method, path, got) = parse_req(&buf);
         assert_eq!(method, "POST");
         assert_eq!(path, "/dta/chat");
@@ -609,7 +527,7 @@ mod bridge_tests {
             .unwrap();
         client.flush().unwrap();
         client.shutdown(Shutdown::Both).unwrap(); // erken kopma — gövde eksik
-        let buf = read_request(&mut server).unwrap(); // asılmadan eldekiyle dönmeli
+        let buf = http::read_request(&mut server).unwrap(); // asılmadan eldekiyle dönmeli
         let raw = String::from_utf8_lossy(&buf);
         assert!(raw.contains("Content-Length: 100"));
         assert!(raw.contains("{\"text\":"));
@@ -620,7 +538,7 @@ mod bridge_tests {
         let (client, mut server) = socket_pair();
         server.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
         client.shutdown(Shutdown::Both).unwrap();
-        let buf = read_request(&mut server).unwrap();
+        let buf = http::read_request(&mut server).unwrap();
         assert!(buf.is_empty());
     }
 
@@ -631,7 +549,7 @@ mod bridge_tests {
         client
             .write_all(b"GET /dta/chat/pending HTTP/1.1\r\nHost: x\r\n\r\n")
             .unwrap();
-        let buf = read_request(&mut server).unwrap();
+        let buf = http::read_request(&mut server).unwrap();
         let (method, path, _) = parse_req(&buf);
         assert_eq!(method, "GET");
         assert_eq!(path, "/dta/chat/pending");
@@ -831,7 +749,7 @@ mod bridge_tests {
     #[test]
     fn content_length_counts_bytes_not_chars() {
         let body = "şı — Türkçe çok baytlı gövde"; // karakter sayısı < bayt sayısı
-        let header = response_header(200, body);
+        let header = http::response_header(200, body);
         let expected = format!("Content-Length: {}", body.as_bytes().len());
         assert!(header.contains(&expected), "header: {header}");
         let char_count = body.chars().count();

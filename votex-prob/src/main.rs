@@ -3,11 +3,12 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::TcpListener;
 use std::sync::RwLock;
 
 use votex_prob::api;
+use votex_prob::http;
 use votex_prob::policy::PolicyState;
 use votex_prob::schema::ENGINE_VERSION;
 
@@ -38,18 +39,15 @@ fn handle_connection(
     policy: &RwLock<PolicyState>,
 ) -> Result<(), String> {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
-    let mut buf = vec![0u8; 1 << 20];
-    let n = stream.read(&mut buf).map_err(|e| e.to_string())?;
-    if n == 0 {
+    // Paylaşılan katman: parçalı segment + erken kopma güvenli okuma ve
+    // bayt-sayılı Content-Length (dta_bridge'teki 0.4.157 düzeltmeleriyle aynı).
+    let buf = http::read_request(&mut stream)?;
+    if buf.is_empty() {
         return Ok(());
     }
-    let raw = String::from_utf8_lossy(&buf[..n]);
+    let raw = String::from_utf8_lossy(&buf).into_owned();
     let (status, body) = api::dispatch(&raw, policy);
-    let resp = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: application/json; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        body.len(),
-        body
-    );
-    stream.write_all(resp.as_bytes()).map_err(|e| e.to_string())?;
+    let resp = http::response_bytes(&status, &body);
+    stream.write_all(&resp).map_err(|e| e.to_string())?;
     Ok(())
 }

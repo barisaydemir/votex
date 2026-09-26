@@ -4,5 +4,6 @@
 
 pub mod api;
 pub mod decide;
+pub mod http;
 pub mod policy;
 pub mod schema;

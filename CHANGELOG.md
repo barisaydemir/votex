@@ -1,3 +1,9 @@
+## 0.4.160 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Refactor: VotexProb koprusu paylasilan http modulune gecirildi (votex_prob::http) - dta_bridge ile ayni okuma/Content-Length kurallari
+
 ## 0.4.159 — 26 Eylül 2026
 
 ### Eklendi
