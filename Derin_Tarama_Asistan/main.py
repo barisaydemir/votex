@@ -504,13 +504,18 @@ class JarvisLive:
         if assistant_text:
             turns.append({"role": "assistant", "text": assistant_text, "ts": now_ms})
         if not turns:
+            _boot_log("[chat] push atlandi — halka iceigi bos (in/out transcript yok)")
             return
 
         def _send():
             try:
-                votex_chat.push_chat_turns(turns)
-            except Exception:
-                pass
+                out = votex_chat.push_chat_turns(turns)
+                if isinstance(out, dict) and out.get("ok"):
+                    _boot_log(f"[chat] push ok: roles={[t.get('role') for t in turns]}")
+                else:
+                    _boot_log(f"[chat] push BASARISIZ: {str(out)[:200]}")
+            except Exception as e:
+                _boot_log(f"[chat] push istisna: {e}")
 
         threading.Thread(target=_send, name="votex-chat-push", daemon=True).start()
 
@@ -524,7 +529,9 @@ class JarvisLive:
             pass
         if not self._loop or not self.session:
             self.ui.write_log(f"ERR: {get_product_name()} baglantisi henuz hazir degil.")
+            _boot_log("[chat] panel mesaji beklemede — Live baglantisi yok")
             return False  # bağlantı gelene kadar kuyrukta beklet
+        _boot_log(f"[chat] panel mesaji alindi: {text[:80]}")
         asyncio.run_coroutine_threadsafe(self._send_user_text(text), self._loop)
         return True
 
@@ -568,17 +575,22 @@ class JarvisLive:
     async def _send_user_text(self, text: str):
         """Yazi komutu — once client_content (2.5), olmazsa realtime text."""
         if not self.session:
+            _boot_log("[chat] send atlandi — session yok")
             return
         try:
             await self.session.send_client_content(
                 turns={"role": "user", "parts": [{"text": text}]},
                 turn_complete=True,
             )
-        except Exception:
+            _boot_log(f"[chat] send_client_content ok len={len(text)}")
+        except Exception as e:
+            _boot_log(f"[chat] send_client_content HATA: {e}")
             try:
                 await self.session.send_realtime_input(text=text)
-            except Exception as e:
-                self.ui.write_log(f"ERR: Yazi gonderilemedi — {e}")
+                _boot_log(f"[chat] send_realtime_input(text) fallback ok len={len(text)}")
+            except Exception as e2:
+                _boot_log(f"[chat] send_realtime_input(text) da HATA: {e2}")
+                self.ui.write_log(f"ERR: Yazi gonderilemedi — {e2}")
                 self.ui.set_state("ERROR")
 
     async def _interrupt_audio(self):
@@ -908,9 +920,19 @@ class JarvisLive:
         out_buf, in_buf = [], []
         output_noise = False
         output_noise_samples = []
+        received = 0
+        logged_first_message = False
+        _boot_log("[chat] _receive_audio task basladi")
         try:
             while True:
                 async for response in self.session.receive():
+                    received += 1
+                    if not logged_first_message:
+                        try:
+                            _boot_log(f"[chat] ilk mesaj geldi: type={type(response).__name__} keys={[k for k in (response.model_dump().keys() if hasattr(response, 'model_dump') else {}) if k]}")
+                        except Exception:
+                            pass
+                        logged_first_message = True
                     if response.data:
                         self.audio_in_queue.put_nowait(response.data)
 
@@ -921,6 +943,7 @@ class JarvisLive:
                             self.set_speaking(True)
                             raw_txt = sc.output_transcription.text.strip()
                             if raw_txt:
+                                _boot_log(f"[chat] out_transcript: {raw_txt[:120]}")
                                 txt, had_noise = self._clean_transcript_text(raw_txt)
                                 if had_noise:
                                     output_noise = True
@@ -936,6 +959,7 @@ class JarvisLive:
                                 raw_txt = str(getattr(part, "text", None) or "").strip()
                                 if not raw_txt:
                                     continue
+                                _boot_log(f"[chat] model_turn.text: {raw_txt[:120]}")
                                 self.set_speaking(True)
                                 txt, had_noise = self._clean_transcript_text(raw_txt)
                                 if had_noise:
@@ -946,11 +970,16 @@ class JarvisLive:
                         if sc.input_transcription and sc.input_transcription.text:
                             txt = sc.input_transcription.text.strip()
                             if txt:
+                                _boot_log(f"[chat] in_transcript: {txt[:120]}")
                                 in_buf.append(txt)
                                 self.ui.mark_user_activity(True)
 
                         if sc.turn_complete:
                             self.set_speaking(False)
+                            _boot_log(
+                                f"[chat] turn_complete: in_buf={len(in_buf)} out_buf={len(out_buf)} "
+                                f"mesaj={received}"
+                            )
 
                             full_in = " ".join(in_buf).strip()
                             if full_in:
@@ -971,6 +1000,8 @@ class JarvisLive:
                             output_noise_samples = []
 
                     if response.tool_call:
+                        names = [getattr(fc, "name", "?") for fc in response.tool_call.function_calls]
+                        _boot_log(f"[chat] tool_call: {names}")
                         fn_responses = []
                         for fc in response.tool_call.function_calls:
                             fr = await self._execute_tool(fc)
@@ -981,6 +1012,7 @@ class JarvisLive:
         except Exception as e:
             print(f"[DTA] Alim hatasi: {e}")
             traceback.print_exc()
+            _boot_log(f"[chat] _receive_audio COKTU: {e}")
             raise
 
     async def _play_audio(self):

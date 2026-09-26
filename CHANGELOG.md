@@ -1,3 +1,9 @@
+## 0.4.155 — 26 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- Fix: /dta/chat ducku text govdesini halkaya cevir (asistan yaniti halkaya dusmuyordu); DTA send/receive/push boot.log enstrumantasyonu
+
 ## 0.4.154 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

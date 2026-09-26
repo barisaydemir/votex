@@ -7,7 +7,7 @@
 ; yönetici hesabının kendi profiline kuruyordu; normal kullanıcı uygulamayı göremezdi.
 
 #define MyAppName "DFT Suite"
-#define MyAppVersion "0.4.154"
+#define MyAppVersion "0.4.155"
 #define MyAppPublisher "Digital Future Tech"
 #define MyAppURL "https://digitalfuture.tech"
 
@@ -24,7 +24,7 @@ UsePreviousAppDir=no
 DefaultGroupName=DFT Suite
 DisableProgramGroupPage=yes
 OutputDir=dist
-OutputBaseFilename=DFT_Suite_Setup_0.4.154
+OutputBaseFilename=DFT_Suite_Setup_0.4.155
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

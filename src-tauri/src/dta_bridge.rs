@@ -195,7 +195,27 @@ fn handle_connection(mut stream: std::net::TcpStream, app: &AppHandle) -> Result
         }
         ("POST", "/dta/chat") | ("POST", "/chat") => {
             let ring = app.state::<ChatRing>();
-            match dta_chat::handle_chat_post(&ring, body) {
+            // Düz/panel şekli {"text": "..."} turns'a çevrilir; aksi halde
+            // handle_chat_post turns=0 ile sessiz ok döndürüyor ve mesaj
+            // halkaya hiç düşmüyordu (assistant yanıtının gelmemesinin kök nedeni).
+            let body_value: Option<serde_json::Value> = serde_json::from_str(body).ok();
+            let plain_text = body_value
+                .as_ref()
+                .and_then(|v| {
+                    v.get("text")
+                        .and_then(|t| t.as_str().map(String::from))
+                        .or_else(|| v.as_str().map(String::from))
+                })
+                .map(|t| t.trim().to_string())
+                .filter(|t| !t.is_empty());
+            let effective_body = match plain_text {
+                Some(text) => serde_json::json!({
+                    "turns": [{"role": "user", "text": text, "meta": "panel"}]
+                })
+                .to_string(),
+                None => body.to_string(),
+            };
+            match dta_chat::handle_chat_post(&ring, &effective_body) {
                 Ok(resp) => (
                     200,
                     serde_json::to_string(&resp).unwrap_or_else(|_| "{}".into()),
