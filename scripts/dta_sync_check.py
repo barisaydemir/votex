@@ -186,6 +186,9 @@ def main() -> int:
     ap.add_argument("--json", action="store_true", help="makine-okur çıktı")
     ap.add_argument("--allow-missing", action="store_true",
                     help="eksik kopya FAIL değil SKIP sayılır (CI'da yalnız repo varken)")
+    ap.add_argument("--repo-only", action="store_true",
+                    help="yalnız repo kopyası denetlenir; diğer kopyalar repo'ya "
+                         "alias'lanır (CI — makine yollarından bağımsız, deterministik)")
     args = ap.parse_args()
 
     copies = {
@@ -193,6 +196,14 @@ def main() -> int:
         "surface-z": Path(args.surface),
         "kurulum": Path(args.installed),
     }
+    if args.repo_only:
+        # CI modu: checkout'ta yalnız repo kopyası anlamlıdır. Surface-z /
+        # kurulum yolları başka makinelerde yanlışlıkla var olabilir (ör.
+        # self-hosted runner aynı fiziksel makinedeyse) — bu durumda
+        # çalışma-zamanı farkları (reports/, memory/) sahibinden bağımsız
+        # sahte FARK üretir. Alias ile denetim saf repo tutarlılığına döner.
+        copies["surface-z"] = copies["repo"]
+        copies["kurulum"] = copies["repo"]
 
     maps, missing = build_maps(copies)
     if args.reference in missing:
