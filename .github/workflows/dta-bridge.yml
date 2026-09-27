@@ -52,6 +52,13 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-dta-${{ hashFiles('src-tauri/Cargo.lock') }}
 
+      - name: Rust test derleme denetimi (tüm paketler)
+        # cargo test dta yalnızca adı geçen testleri derler; votex-prob ve
+        # standalone crate'ler atlanır. Bu adım her paketin test profilini
+        # --no-run ile uçtan uca derler: derlenmeyen test kodu (ör. eksik
+        # trait import'u) burada yakalanır, yeşil CI'ın ardına saklanamaz.
+        run: npm run ci:prep
+
       - name: DTA kopya senkron denetimi (CI modu)
         # Yerelde üç kopya birebir olmalı (release guard'ı); CI'da yalnız
         # repo kopyası checkout edilir — eksikler SKIP, kendi tutarlılığı
