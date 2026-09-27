@@ -1,13 +1,26 @@
 name: CI
+
+# Self-hosted Windows runner (votex-local) — GitHub-hosted faturalandırmadan
+# bağımsız. Kalıcı makine: node/python/cargo kurulu, node_modules + target
+# klasörleri işler arasında kalır (artımlı derleme).
+
 on: [push]
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: votex-local
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm ci
-      - run: npm run test:js
-      - run: npm run build
+
+      - name: Bağımlılıklar (kalıcı node_modules)
+        run: npm install --no-audit --no-fund
+
+      - name: JS Testleri (vitest)
+        run: npm run test:js
+
+      - name: Frontend Build (vite)
+        run: npm run build
