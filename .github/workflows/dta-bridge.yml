@@ -63,10 +63,11 @@ jobs:
         # trait import'u) burada yakalanır, yeşil CI'ın ardına saklanamaz.
         run: npm run ci:prep
 
-      - name: DTA kopya senkron denetimi (tam — üç kopya)
-        # Self-hosted makinede surface-z ve kurulum kopyaları da mevcut;
-        # release guard'ının birebir aynısı CI'da da koşar.
-        run: npm run dta:sync-check
+      - name: DTA kopya senkron denetimi (CI modu)
+        # Repo içi kopyanın kendi tutarlılığı denetlenir; surface-z ve
+        # kurulum kopyaları yalnız yerel makinede olduğu için SKIP —
+        # tam üç kopya guard'ı yerel release akışında her tur koşar.
+        run: python scripts/dta_sync_check.py --allow-missing --json
 
       - name: Rust köprü testleri (dta_chat + bridge_tests)
         run: cargo test --manifest-path src-tauri/Cargo.toml dta
