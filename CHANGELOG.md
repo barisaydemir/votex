@@ -1,3 +1,9 @@
+## 0.4.170 — 27 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- fix: dta_bridge test modülüne eksik std::io trait import'u — CI kilidi sırasında yakalanamayan derleme hatası
+
 ## 0.4.169 — 27 Eylül 2026
 
 ### Sürüm güncellemeleri
