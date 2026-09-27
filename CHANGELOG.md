@@ -1,3 +1,9 @@
+## 0.4.172 — 27 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- feat: sync_main — korumalı main senkron döngüsü tek komutta (PR → rebase merge → hizalama → ff)
+
 ## 0.4.171 — 27 Eylül 2026
 
 ### Sürüm güncellemeleri

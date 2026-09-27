@@ -1,7 +1,7 @@
 {
   "name": "votex",
   "private": true,
-  "version": "0.4.171",
+  "version": "0.4.172",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,6 +20,7 @@
     "dta:update": "python scripts/dta_update.py",
     "check:rust": "cargo check",
     "ci:prep": "node scripts/ci_prep_check.mjs",
+    "sync_main": "node scripts/sync_main.mjs",
     "ci": "node scripts/ci-local.js",
     "ci:quick": "node scripts/ci-local.js --quick",
     "ci:full": "node scripts/ci-local.js",
