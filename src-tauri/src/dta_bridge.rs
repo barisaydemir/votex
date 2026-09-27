@@ -454,6 +454,7 @@ fn write_response(stream: &mut std::net::TcpStream, status: u16, body: &str) -> 
 #[cfg(test)]
 mod bridge_tests {
     use super::*;
+    use std::io::{Read as _, Write as _};
     use std::net::{Shutdown, TcpListener, TcpStream};
     use std::sync::Arc;
     use std::time::Duration;
