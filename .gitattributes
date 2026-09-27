@@ -1,0 +1,37 @@
+# Satır sonu politikası — vitest/SyntaxError EOL karışımı olaylarından sonra
+# (0.4.171/0.4.172 turlarında checkout'lar scripts/ altında LF/CRLF karışımı
+# üretmişti). Kaynakta LF saklanır; Windows çalışma kopyası CRLF'e
+# çevrilebilir (autocrlf), ancak JS/MJS dosyaları asla karışım içermez.
+* text=auto eol=crlf
+
+# Bu dillerde/uzantılarda LF zorunlu — karışım vitest'i SyntaxError ile düşürür
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.rs text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+
+# İkili dosyalar — hiçbir dönüşüm olmasın
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp3 binary
+*.wav binary
+*.exe binary
+*.dll binary
+*.zip binary
+*.pdf binary
+*.csv binary

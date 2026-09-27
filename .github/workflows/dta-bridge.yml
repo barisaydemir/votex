@@ -37,6 +37,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Runner araç yolları (cargo — self-hosted makineye özel)
+        # cargo kullanıcı profilinde kurulu (~/.cargo) ve servisin env
+        # anlık görüntüsüne girmemiş olabilir. GITHUB_PATH/GITHUB_ENV
+        # runner-native mekanizması bu adımı deterministik yapar;
+        # CARGO_HOME aynı zamanda ci:prep'in resolveCargo fallback'idir.
+        run: |
+          echo "C:\\Users\\cpbar\\.cargo\\bin" >> "$GITHUB_PATH"
+          echo "CARGO_HOME=C:\\Users\\cpbar\\.cargo" >> "$GITHUB_ENV"
+          echo "RUSTUP_HOME=C:\\Users\\cpbar\\.rustup" >> "$GITHUB_ENV"
+
       - name: Bağımlılıklar (kalıcı node_modules)
         run: npm install --no-audit --no-fund
 

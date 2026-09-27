@@ -26,6 +26,7 @@
 
 import { execFileSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { homedir } from "os";
 import { join, relative } from "path";
 import { pathToFileURL } from "url";
 
@@ -80,6 +81,21 @@ export function suspiciousTraitUses(dir) {
   return hits;
 }
 
+/**
+ * cargo yürütülebilirini çözer: PATH'te yoksa CARGO_HOME veya kullanıcı
+ * profilindeki standart konum denenir. Self-hosted runner servis hesaplarında
+ * (ör. NETWORK SERVICE) PATH eksik olabilir; CARGO_HOME (GITHUB_ENV ile
+ * bildirilmiş) veya ~/.cargo/bin kurtarıcı konumlardır.
+ */
+export function resolveCargo({ env = process.env, platform = process.platform, home = homedir() } = {}) {
+  const exe = platform === "win32" ? "cargo.exe" : "cargo";
+  const candidates = [];
+  if (env.CARGO_HOME) candidates.push(join(env.CARGO_HOME, "bin", exe));
+  candidates.push(join(home, ".cargo", "bin", exe));
+  for (const c of candidates) if (existsSync(c)) return c;
+  return exe; // PATH'e bırak — bulunamazsa ENOENT mesajı yolu gösterir
+}
+
 /** Tek paketi derler. Dönen durum: PASS | FAIL | SKIP | WARN. */
 export function auditPackage(pkg, root = ROOT) {
   const manifestPath = join(root, pkg.manifest);
@@ -91,7 +107,7 @@ export function auditPackage(pkg, root = ROOT) {
   }
   const t0 = Date.now();
   try {
-    const out = execFileSync("cargo", ["test", "--manifest-path", manifestPath, "--no-run"], {
+    const out = execFileSync(resolveCargo(), ["test", "--manifest-path", manifestPath, "--no-run"], {
       cwd: root,
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
