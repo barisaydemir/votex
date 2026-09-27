@@ -1,14 +1,15 @@
 name: dta-bridge
 
 # DTA/VotexProb köprü zincirinin push sonrası otomatik doğrulaması:
-#   1. dta:sync-check --allow-missing  → repo içi DTA kopyası kendisiyle
-#      birebir; eksik kopyalar (surface-z / C:\votex yalnız yerelde var)
-#      SKIP sayılır — sürüm akışındaki gerçek guard yerelde çalışır.
-#   2. test:e2e:bridge:bridge-only     → köprü HTTP katmanı birim/smoke
-#      katmanı; köprü sunucusu CI runner'da çalışmaz, betik bunu net
-#      "KÖPRÜ YOK" mesajıyla bildirir ve job soft-fail olur
-#      (continue-on-error) — yerel Windows runner'da tam tur koşar.
-#   3. cargo test dta + npm test:js    → köprü Rust tarafı + UI testleri.
+#   1. dta:sync-check            → ÜÇ kopya (repo + surface-z + kurulum)
+#                                  tam denetim — self-hosted makinede
+#                                  hepsi mevcut, --allow-missing gerekmez.
+#   2. ci:prep                   → tüm Rust paketlerinin test kodu derleme
+#                                  denetimi (workspace zorunlu).
+#   3. cargo test dta            → köprü Rust birim testleri.
+#   4. npm test:js               → UI testleri.
+# Runner: self-hosted Windows (votex-local) — GitHub-hosted faturalandırmadan
+# bağımsız; node/python/cargo makinede kurulu, target/ artımlı derlenir.
 
 on:
   push:
@@ -24,33 +25,20 @@ on:
       - ".github/workflows/dta-bridge.yml"
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   bridge:
     name: DTA köprü zinciri
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: votex-local
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-dta-${{ hashFiles('src-tauri/Cargo.lock') }}
+      - name: Bağımlılıklar (kalıcı node_modules)
+        run: npm install --no-audit --no-fund
 
       - name: Rust test derleme denetimi (tüm paketler)
         # cargo test dta yalnızca adı geçen testleri derler; votex-prob ve
@@ -59,34 +47,13 @@ jobs:
         # trait import'u) burada yakalanır, yeşil CI'ın ardına saklanamaz.
         run: npm run ci:prep
 
-      - name: DTA kopya senkron denetimi (CI modu)
-        # Yerelde üç kopya birebir olmalı (release guard'ı); CI'da yalnız
-        # repo kopyası checkout edilir — eksikler SKIP, kendi tutarlılığı
-        # yine de denetlenir.
-        run: python scripts/dta_sync_check.py --allow-missing --json
+      - name: DTA kopya senkron denetimi (tam — üç kopya)
+        # Self-hosted makinede surface-z ve kurulum kopyaları da mevcut;
+        # release guard'ının birebir aynısı CI'da da koşar.
+        run: npm run dta:sync-check
 
       - name: Rust köprü testleri (dta_chat + bridge_tests)
         run: cargo test --manifest-path src-tauri/Cargo.toml dta
 
-      - name: Köprü canlı E2E (bridge-only)
-        # Köprü sunucusu runner'da yok → betik exit 1 + "KÖPRÜ YOK".
-        # Smoke değeri: betiğin kendisinin çalıştığını ve önkoşul
-        # mesajını doğru verdiğini kanıtlar. Tam tur yerelde koşar
-        # (scripts/dta_update.py → npm run dta:update).
-        id: e2e
-        continue-on-error: true
-        run: npm run test:e2e:bridge:bridge-only
-
-      - name: Köprü smoke sonucu
-        if: always()
-        run: |
-          if [ "${{ steps.e2e.outcome }}" = "failure" ]; then
-            echo "ℹ️  Köprü sunucusu CI runner'ında yok (beklenen) — bridge-only E2E yerel Windows akışında koşar: npm run dta:update"
-          else
-            echo "✅ bridge-only E2E koştu"
-          fi
-
-      - name: UI testleri
-        run: |
-          npm ci
-          npm run test:js
+      - name: UI testleri (vitest)
+        run: npm run test:js

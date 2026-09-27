@@ -1,3 +1,9 @@
+## 0.4.173 — 27 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- ci: self-hosted Windows runner (votex-local) — Actions'ı GitHub-hosted faturalandırmadan bağımsız hale getir
+
 ## 0.4.172 — 27 Eylül 2026
 
 ### Sürüm güncellemeleri
