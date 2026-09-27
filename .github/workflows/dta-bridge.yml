@@ -67,7 +67,7 @@ jobs:
         # Repo içi kopyanın kendi tutarlılığı denetlenir; surface-z ve
         # kurulum kopyaları yalnız yerel makinede olduğu için SKIP —
         # tam üç kopya guard'ı yerel release akışında her tur koşar.
-        run: python scripts/dta_sync_check.py --allow-missing --json
+        run: python scripts/dta_sync_check.py --repo-only --json
 
       - name: Rust köprü testleri (dta_chat + bridge_tests)
         run: cargo test --manifest-path src-tauri/Cargo.toml dta
