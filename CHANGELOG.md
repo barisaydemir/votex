@@ -1,3 +1,9 @@
+## 0.4.169 — 27 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- fix: dta-bridge.yml çift name alanı — CI koşumu parse hatasıyla düşüyordu
+
 ## 0.4.168 — 26 Eylül 2026
 
 ### Sürüm güncellemeleri

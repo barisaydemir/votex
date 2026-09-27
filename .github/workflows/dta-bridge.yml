@@ -1,4 +1,4 @@
-name: DTA Bridge CI
+name: dta-bridge
 
 # DTA/VotexProb köprü zincirinin push sonrası otomatik doğrulaması:
 #   1. dta:sync-check --allow-missing  → repo içi DTA kopyası kendisiyle
@@ -9,8 +9,6 @@ name: DTA Bridge CI
 #      "KÖPRÜ YOK" mesajıyla bildirir ve job soft-fail olur
 #      (continue-on-error) — yerel Windows runner'da tam tur koşar.
 #   3. cargo test dta + npm test:js    → köprü Rust tarafı + UI testleri.
-
-name: dta-bridge
 
 on:
   push:
