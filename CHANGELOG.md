@@ -1,3 +1,9 @@
+## 0.4.171 — 27 Eylül 2026
+
+### Sürüm güncellemeleri
+
+- test: ci:prep — tüm Rust paketlerinin test kodu derleme denetimi (CI hazırlık)
+
 ## 0.4.170 — 27 Eylül 2026
 
 ### Sürüm güncellemeleri

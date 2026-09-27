@@ -58,7 +58,17 @@ run("JS Testleri (vitest)", "npx vitest run --reporter=dot", { timeout: 120_000 
 run("Frontend Build (vite)", "npx vite build", { timeout: 60_000 });
 
 if (!quick) {
-  // 3. Rust Check
+  // 3. Rust test derleme denetimi (tüm paketler — CI hazırlık)
+  // cargo test dta yalnızca adı geçen testleri derler; bu denetim votex-prob
+  // ve standalone crate'ler dahil her Rust paketinin test kodunun
+  // derlendiğini doğrular (derlenmeyen test kodu CI'da fark edilemez).
+  if (!skipRust) {
+    run("Rust Test Derleme Denetimi", "node scripts/ci_prep_check.mjs", {
+      timeout: 600_000,
+    });
+  }
+
+  // 4. Rust Check
   if (!skipRust && existsSync(join(ROOT, "src-tauri", "Cargo.toml"))) {
     run("Rust Check (0 uyarı)", "cargo check --manifest-path src-tauri/Cargo.toml 2>&1 | tail -5", {
       timeout: 300_000,
