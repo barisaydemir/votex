@@ -6,6 +6,7 @@ import {
   auditAll,
   auditPackage,
   PACKAGES,
+  resolveCargo,
   suspiciousTraitUses,
   tail,
   testBinaries,
@@ -84,6 +85,27 @@ describe("ci_prep_check", () => {
     const dir = tempDir();
     writeFileSync(join(dir, "plain.rs"), "fn f() { s.write_all(b\"x\").unwrap(); }\n");
     expect(suspiciousTraitUses(dir)).toEqual([]);
+  });
+
+  it("resolveCargo: CARGO_HOME → bin/cargo(.exe) önceliği", () => {
+    const cagoHome = tempDir();
+    mkdirSync(join(cagoHome, "bin"), { recursive: true });
+    writeFileSync(join(cagoHome, "bin", "cargo.exe"), "");
+    const p = resolveCargo({ env: { CARGO_HOME: cagoHome }, platform: "win32", home: "C:\\h" });
+    expect(p).toBe(join(cagoHome, "bin", "cargo.exe"));
+  });
+
+  it("resolveCargo: CARGO_HOME yoksa kullanıcı profili fallback", () => {
+    const home = tempDir();
+    mkdirSync(join(home, ".cargo", "bin"), { recursive: true });
+    writeFileSync(join(home, ".cargo", "bin", "cargo.exe"), "");
+    const p = resolveCargo({ env: {}, platform: "win32", home });
+    expect(p).toBe(join(home, ".cargo", "bin", "cargo.exe"));
+  });
+
+  it("resolveCargo: hiçbiri yoksa PATH'e bırakır (düz 'cargo')", () => {
+    const p = resolveCargo({ env: {}, platform: "linux", home: "/nonexistent-home-xyz" });
+    expect(p).toBe("cargo");
   });
 
   it("tail uzun çıktıyı son n karaktere kırpıp ellipsis koyar", () => {
