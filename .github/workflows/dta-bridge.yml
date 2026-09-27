@@ -50,6 +50,12 @@ jobs:
       - name: Bağımlılıklar (kalıcı node_modules)
         run: npm install --no-audit --no-fund
 
+      - name: Frontend build (dist/ — tauri resources glob'u için gerekli)
+        # tauri.conf.json "../dist/docs/*" glob'unu build script'te zorunlu
+        # kılar; runner'ın taze checkout'unda dist/ yoktur (kalıcı makinede
+        # commit'siz olduğu için asla oluşmamıştı). Cargo'dan ÖNCE üret.
+        run: npm run build
+
       - name: Rust test derleme denetimi (tüm paketler)
         # cargo test dta yalnızca adı geçen testleri derler; votex-prob ve
         # standalone crate'ler atlanır. Bu adım her paketin test profilini
