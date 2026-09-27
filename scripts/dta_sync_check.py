@@ -44,7 +44,9 @@ DEFAULT_COPY_INSTALLED = Path(r"C:\votex\Derin_Tarama_Asistan")
 COPY_NAMES = ("repo", "surface-z", "kurulum")
 
 # Ortam-bağımlı / üretilen içerik — hash denetimi dışında
-EXCLUDED_DIRS = {"__pycache__", ".venv_jarvis", ".venv", "logs", "config", ".git", ".idea", ".vscode"}
+# dist: paketleme çıktıları (tablet runtime'ları vb.) — commit'siz, makine
+# başına farklı içerikte olabilir; checkout'lar arasında da farklılık gösterir.
+EXCLUDED_DIRS = {"__pycache__", ".venv_jarvis", ".venv", ".venv.broken-rt", "logs", "config", ".git", ".idea", ".vscode", "dist", "_work"}
 EXCLUDED_FILES = {"api_keys.json", "boot.log", "dta-stdout.log", "dta-stderr.log"}
 
 HASH_CHUNK = 1 << 20
